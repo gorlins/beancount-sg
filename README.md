@@ -50,6 +50,13 @@ Sets each transaction's flag from its postings: `!` if any posting is `!`, other
 Unflagged postings are ignored, and special transaction flags (e.g. `P`) are kept. List it after
 any plugins that set posting flags, such as `flag_balanced`.
 
+## Utilities
+
+### `beancount_sg.builders`
+
+Concise constructors (`A`, `T`, `P`, `B`) for building amounts, transactions, postings and balance
+assertions in importers, plugins and tests.
+
 ## Development
 
 ```bash
