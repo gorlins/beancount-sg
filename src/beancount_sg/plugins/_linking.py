@@ -27,8 +27,11 @@ transaction matched in one window isn't considered in later ones. Every other
 posting to the account is flagged ``!``. Postings to the account are flagged
 whatever their current flag; transaction flags are never changed (use
 ``beancount_sg.plugins.flag_from_postings`` to roll posting flags up). A
-transaction with more than one posting to the account produces an error and is
-not matched.
+transaction's postings to a single linked account are treated as one: they are
+summed for the key and for matching, and all of them are flagged. A transaction
+with postings to more than one linked account (e.g. both ``Bills:Electric`` and
+``Bills:Water``), or to one account in several currencies, produces an error and
+is not matched.
 
 Strategy
 --------
@@ -68,7 +71,8 @@ from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple
 
 from beancount.core import account as account_lib
-from beancount.core.data import BeancountError, Directive, Meta, Posting, Transaction
+from beancount.core.amount import Amount
+from beancount.core.data import BeancountError, Directive, Meta, Transaction
 from beancount.core.display_context import DisplayFormatter, Precision
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
@@ -123,12 +127,18 @@ class Linker:
         self.is_linkable = account_lib.parent_matcher(account)
 
     def link_key(
-        self, txn: Transaction, posting: Posting, window: Window, formatter: DisplayFormatter
+        self,
+        txn: Transaction,
+        account: str,
+        units: Amount,
+        window: Window,
+        formatter: DisplayFormatter,
     ) -> str:
-        """The key grouping ``txn`` in ``window``, via its linked ``posting``.
+        """The key grouping ``txn`` in ``window``, via its postings to ``account``.
 
-        ``formatter`` renders amounts at each currency's usual precision, so that e.g.
-        ``1.1`` and ``1.10`` USD produce the same key.
+        ``units`` is the sum of those postings. ``formatter`` renders amounts at each
+        currency's usual precision, so that e.g. ``1.1`` and ``1.10`` USD produce the
+        same key.
         """
         # A link with our prefix already on the transaction, whether added by hand or by
         # an earlier tool, is kept as its key, so those groupings are preserved.
@@ -136,14 +146,13 @@ class Linker:
             if link.startswith(self.link_prefix + "-"):
                 return link
 
-        parts = [self.link_prefix, self.account_key(posting.account)]
+        parts = [self.link_prefix, self.account_key(account)]
         date_format, date_offset = window
         if date_format:
             date = txn.date + date_offset if date_offset else txn.date
             parts.append(date.strftime(date_format))
         if self.include_amount:
-            number = abs(posting.units.number)
-            parts.append(str(formatter.quantize(number, posting.units.currency)))
+            parts.append(str(formatter.quantize(abs(units.number), units.currency)))
         return "-".join(parts)
 
     def __call__(
@@ -153,48 +162,57 @@ class Linker:
         formatter = options_map["dcontext"].build(precision=Precision.MOST_COMMON)
         errors: list[BeancountError] = []
 
-        # Find each transaction's postings to the account: entry index -> posting indexes.
-        # Plugins run after Beancount fills in missing amounts, so every posting has units.
+        # Find each transaction's postings to the account. Plugins run after Beancount
+        # fills in missing amounts, so every posting has units.
+        # entry index -> indexes of its postings to the account (all get flagged)
         linkable: dict[int, list[int]] = {}
+        # entry index -> (account, summed units), for transactions that can be matched
+        totals: dict[int, tuple[str, Amount]] = {}
         for i, entry in enumerate(entries):
             if not isinstance(entry, Transaction):
                 continue
             indexes = [
                 j for j, posting in enumerate(entry.postings) if self.is_linkable(posting.account)
             ]
-            # More than one is an error. The transaction is still recorded below so its
-            # postings get flagged !, but matching skips it.
-            if len(indexes) > 1:
-                errors.append(
-                    LinkError(
-                        entry.meta,
-                        f"Transaction has {len(indexes)} postings to {self.account}; "
-                        "expected at most one to link",
-                        entry,
-                    )
-                )
-            if indexes:
-                linkable[i] = indexes
+            if not indexes:
+                continue
+            linkable[i] = indexes
+
+            postings = [entry.postings[j] for j in indexes]
+            accounts = {posting.account for posting in postings}
+            currencies = {posting.units.currency for posting in postings}
+            # Postings to one account are summed and linked as one. Postings to several
+            # accounts, or in several currencies, can't be: report an error and leave the
+            # transaction out of matching, so its postings get flagged !.
+            if len(accounts) > 1:
+                problem = f"postings to {len(accounts)} accounts under {self.account}"
+            elif len(currencies) > 1:
+                problem = f"postings to {accounts.pop()} in {len(currencies)} currencies"
+            else:
+                number = sum(posting.units.number for posting in postings)
+                totals[i] = (accounts.pop(), Amount(number, currencies.pop()))
+                continue
+            errors.append(LinkError(entry.meta, f"Transaction has {problem}; can't link it", entry))
 
         # Match window by window: entry index -> link, for matched transactions.
         matched: dict[int, str] = {}
         for window in self.windows:
             # Group the transactions not matched yet by their key in this window.
             groups: dict[str, list[int]] = defaultdict(list)
-            for i, indexes in linkable.items():
-                if len(indexes) == 1 and i not in matched:
-                    posting = entries[i].postings[indexes[0]]
-                    groups[self.link_key(entries[i], posting, window, formatter)].append(i)
+            for i, (account, units) in totals.items():
+                if i not in matched:
+                    key = self.link_key(entries[i], account, units, window, formatter)
+                    groups[key].append(i)
             # A group of two or more in one currency that sums to zero is a match!
             for link, members in groups.items():
-                units = [entries[i].postings[linkable[i][0]].units for i in members]
+                units = [totals[i][1] for i in members]
                 if len(members) < 2 or len({u.currency for u in units}) != 1:
                     continue
                 if sum(u.number for u in units) == 0:
                     matched.update(dict.fromkeys(members, link))
 
-        # Apply the results: matched transactions get the link and * on their linked
-        # posting; every other posting to the account gets !.
+        # Apply the results: matched transactions get the link and * on their postings to
+        # the account; every other posting to the account gets !.
         new_entries = list(entries)
         for i, indexes in linkable.items():
             txn = entries[i]

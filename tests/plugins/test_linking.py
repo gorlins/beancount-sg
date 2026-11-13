@@ -276,7 +276,37 @@ def test_linkable_accounts():
     assert not LINKER.is_linkable("Assets:TransfersOld")
 
 
-def test_multiple_linkable_postings_is_an_error():
+def test_postings_to_the_same_account_are_summed():
+    split = T(
+        "2020-01-15",
+        postings=[
+            P("Assets:Transfers", A(-60, "USD")),
+            P("Assets:Transfers", A(-40, "USD")),
+            P("Assets:Checking", A(100, "USD")),
+        ],
+    )
+    out, inn = link([split, transfer("2020-01-15", 100)])
+    assert out.links == inn.links == {"x-Transfers-20200115-100"}
+    assert [p.flag for p in out.postings] == [FLAG_OKAY, FLAG_OKAY, None]
+    assert inn.postings[0].flag == FLAG_OKAY
+
+
+def test_unmatched_postings_to_the_same_account_are_all_flagged_warning():
+    split = T(
+        "2020-01-15",
+        postings=[
+            P("Assets:Transfers", A(-60, "USD")),
+            P("Assets:Transfers", A(-40, "USD")),
+            P("Assets:Checking", A(100, "USD")),
+        ],
+    )
+    # The other side is 60, matching one posting but not the sum.
+    out, inn = link([split, transfer("2020-01-15", 60)])
+    assert not out.links and not inn.links
+    assert [p.flag for p in out.postings] == [FLAG_WARNING, FLAG_WARNING, None]
+
+
+def test_postings_to_several_linked_accounts_is_an_error():
     txn = T(
         "2020-01-15",
         postings=[
@@ -287,12 +317,26 @@ def test_multiple_linkable_postings_is_an_error():
     )
     new_entries, errors = LINKER([txn, transfer("2020-01-15", 100)], options())
     [error] = errors
-    assert "2 postings to Assets:Transfers" in error.message
+    assert "postings to 2 accounts under Assets:Transfers" in error.message
     assert error.entry == txn
     new_txn, other = new_entries
     assert not new_txn.links
     assert [p.flag for p in new_txn.postings] == [FLAG_WARNING, FLAG_WARNING, None]
     assert other.postings[0].flag == FLAG_WARNING
+
+
+def test_postings_to_the_same_account_in_several_currencies_is_an_error():
+    txn = T(
+        "2020-01-15",
+        postings=[
+            P("Assets:Transfers", A(-100, "USD")),
+            P("Assets:Transfers", A(-100, "EUR")),
+        ],
+    )
+    new_entries, errors = LINKER([txn], options())
+    [error] = errors
+    assert "postings to Assets:Transfers in 2 currencies" in error.message
+    assert [p.flag for p in new_entries[0].postings] == [FLAG_WARNING, FLAG_WARNING]
 
 
 def test_other_entries_are_untouched_and_input_is_not_mutated():
