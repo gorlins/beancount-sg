@@ -1,6 +1,6 @@
 [project]
 name = "beancount-sg"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Personal collection of Beancount plugins and Fava extensions"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,8 +22,19 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# Used when building without git metadata or tags (e.g. a shallow clone).
+fallback_version = "0.0.0"
+
+[tool.uv]
+# Rebuild the editable install when commits or tags change, so the version stays current.
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/beancount_sg"]
