@@ -35,48 +35,57 @@ __plugins__ = ("flag_balanced",)
 
 _MANAGED_FLAGS = frozenset({None, FLAG_OKAY, FLAG_WARNING})
 
+BalanceDates = dict[tuple[str, str], datetime.date]
+
 
 def flag_balanced(
     entries: list[Directive], options_map: dict[str, Any], config: str | None = None
 ) -> tuple[list[Directive], list[Any]]:
     """Set posting and transaction flags based on balance-assertion coverage."""
-    latest: dict[tuple[str, str], datetime.date] = {}
+    latest = latest_balance_dates(entries)
+    if not latest:
+        return entries, []
+    new_entries = [
+        flag_transaction(entry, latest)
+        if isinstance(entry, Transaction) and entry.flag in _MANAGED_FLAGS
+        else entry
+        for entry in entries
+    ]
+    return new_entries, []
+
+
+def latest_balance_dates(entries: list[Directive]) -> BalanceDates:
+    """Map each asserted (account, currency) to the date of its latest balance assertion."""
+    latest: BalanceDates = {}
     for entry in entries:
         if isinstance(entry, Balance):
             key = (entry.account, entry.amount.currency)
             if key not in latest or entry.date > latest[key]:
                 latest[key] = entry.date
-
-    if not latest:
-        return entries, []
-
-    def coverage(posting: Posting) -> datetime.date | None:
-        """Latest assertion date covering this posting, or None if untracked."""
-        if posting.units is None:
-            return None
-        dates = [
-            latest[key]
-            for acct in account_lib.parents(posting.account)
-            if (key := (acct, posting.units.currency)) in latest
-        ]
-        return max(dates, default=None)
-
-    new_entries = []
-    for entry in entries:
-        if isinstance(entry, Transaction) and entry.flag in _MANAGED_FLAGS:
-            entry = _flag_transaction(entry, coverage)
-        new_entries.append(entry)
-    return new_entries, []
+    return latest
 
 
-def _flag_transaction(txn: Transaction, coverage) -> Transaction:
+def coverage_date(posting: Posting, latest: BalanceDates) -> datetime.date | None:
+    """Latest assertion date covering a posting (via its account or a parent), or None."""
+    if posting.units is None:
+        return None
+    dates = [
+        latest[key]
+        for acct in account_lib.parents(posting.account)
+        if (key := (acct, posting.units.currency)) in latest
+    ]
+    return max(dates, default=None)
+
+
+def flag_transaction(txn: Transaction, latest: BalanceDates) -> Transaction:
+    """Return the transaction with its flags set; unchanged transactions are returned as-is."""
     postings = list(txn.postings)
     tracked = False
     all_covered = True
     for i, posting in enumerate(postings):
         if posting.flag not in _MANAGED_FLAGS:
             continue
-        covered_until = coverage(posting)
+        covered_until = coverage_date(posting, latest)
         if covered_until is None:
             continue
         tracked = True
