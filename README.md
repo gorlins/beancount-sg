@@ -35,14 +35,20 @@ Beancount plugins live in `beancount_sg.plugins`; Fava extensions live in `beanc
 plugin "beancount_sg.plugins.flag_balanced"
 ```
 
-Marks which transactions are verified by a balance assertion. For postings to accounts (and
+Flags postings by whether a balance assertion verifies them. For postings to accounts (and
 currencies) that have their own `balance` assertions, it sets the posting flag to `*` if a later
-assertion on that exact account covers it, and `!` otherwise. Other postings keep their flags,
-e.g. ones set by other plugins.
+assertion on that exact account covers it, and `!` otherwise. Other postings and all transaction
+flags are left alone.
 
-The transaction flag is then derived from all posting flags: `!` if any posting is `!`, else `*`
-if any posting is `*`. Special transaction flags (e.g. `P`) are kept. List this plugin after any
-plugins that set posting flags.
+### `beancount_sg.plugins.flag_from_postings`
+
+```beancount
+plugin "beancount_sg.plugins.flag_from_postings"
+```
+
+Sets each transaction's flag from its postings: `!` if any posting is `!`, otherwise `*`.
+Unflagged postings are ignored, and special transaction flags (e.g. `P`) are kept. List it after
+any plugins that set posting flags, such as `flag_balanced`.
 
 ## Development
 
