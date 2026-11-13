@@ -69,6 +69,7 @@ def flag_transaction(txn: Transaction, latest: BalanceDates) -> Transaction:
     postings = list(txn.postings)
     tracked = False
     all_covered = True
+    any_changed = False
     for i, posting in enumerate(postings):
         if posting.flag not in _MANAGED_FLAGS or posting.units is None:
             continue
@@ -81,12 +82,13 @@ def flag_transaction(txn: Transaction, latest: BalanceDates) -> Transaction:
         flag = FLAG_OKAY if covered else FLAG_WARNING
         if posting.flag != flag:
             postings[i] = posting._replace(flag=flag)
+            any_changed = True
 
     if not tracked:
         return txn
     flag = txn.flag
     if flag in _MANAGED_FLAGS:
         flag = FLAG_OKAY if all_covered else FLAG_WARNING
-    if flag == txn.flag and all(a is b for a, b in zip(postings, txn.postings, strict=True)):
+    if flag == txn.flag and not any_changed:
         return txn
     return txn._replace(flag=flag, postings=postings)

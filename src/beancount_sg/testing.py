@@ -36,8 +36,3 @@ def load_txns(ledger: str, plugins: Sequence[str] = (), **kwargs: Any) -> list[T
     """Load an inline ledger (see `load`) and return its transactions in date order."""
     entries, _ = load(ledger, plugins, **kwargs)
     return list(filter_txns(entries))
-
-
-def posting_flags(txn: Transaction) -> list[str | None]:
-    """The flags of a transaction's postings, in order."""
-    return [posting.flag for posting in txn.postings]

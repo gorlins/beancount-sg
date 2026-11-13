@@ -3,7 +3,7 @@ from beancount.core.data import filter_txns
 from beancount.core.flags import FLAG_OKAY, FLAG_PADDING, FLAG_TRANSFER, FLAG_WARNING
 
 from beancount_sg.plugins.flag_balanced import flag_balanced
-from beancount_sg.testing import load, load_txns, posting_flags
+from beancount_sg.testing import load, load_txns
 
 PLUGIN = "beancount_sg.plugins.flag_balanced"
 
@@ -21,7 +21,7 @@ def test_transaction_before_balance_is_okay():
         2020-03-01 balance Assets:Cash  -10 USD
         """)[0]
     assert txn.flag == FLAG_OKAY
-    assert posting_flags(txn) == [FLAG_OKAY, None]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, None]
 
 
 def test_transaction_on_balance_date_is_not_covered():
@@ -34,7 +34,7 @@ def test_transaction_on_balance_date_is_not_covered():
         2020-03-01 balance Assets:Cash  0 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [FLAG_WARNING, None]
+    assert [p.flag for p in txn.postings] == [FLAG_WARNING, None]
 
 
 def test_transaction_after_last_balance_is_warning():
@@ -46,7 +46,7 @@ def test_transaction_after_last_balance_is_warning():
           Expenses:Food
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [FLAG_WARNING, None]
+    assert [p.flag for p in txn.postings] == [FLAG_WARNING, None]
 
 
 def test_latest_balance_determines_coverage():
@@ -60,7 +60,7 @@ def test_latest_balance_determines_coverage():
         2020-03-01 balance Assets:Cash  -10 USD
         """)[0]
     assert txn.flag == FLAG_OKAY
-    assert posting_flags(txn) == [FLAG_OKAY, None]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, None]
 
 
 def test_mixed_coverage_flags_transaction_warning():
@@ -74,7 +74,7 @@ def test_mixed_coverage_flags_transaction_warning():
         2020-03-01 balance Assets:Bank  -50 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [FLAG_OKAY, FLAG_WARNING]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, FLAG_WARNING]
 
 
 def test_multiple_postings_to_same_account():
@@ -87,7 +87,7 @@ def test_multiple_postings_to_same_account():
         2020-03-01 balance Assets:Cash  -10 USD
         """)[0]
     assert txn.flag == FLAG_OKAY
-    assert posting_flags(txn) == [FLAG_OKAY, FLAG_OKAY, None]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, FLAG_OKAY, None]
 
 
 def test_untracked_accounts_are_untouched():
@@ -99,7 +99,7 @@ def test_untracked_accounts_are_untouched():
         2020-03-01 balance Assets:Bank  0 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [None, None]
+    assert [p.flag for p in txn.postings] == [None, None]
 
 
 def test_untracked_account_does_not_block_okay():
@@ -111,7 +111,7 @@ def test_untracked_account_does_not_block_okay():
         2020-03-01 balance Assets:Bank  -20 USD
         """)[0]
     assert txn.flag == FLAG_OKAY
-    assert posting_flags(txn) == [FLAG_OKAY, None]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, None]
 
 
 def test_parent_balance_does_not_cover_subaccount():
@@ -123,7 +123,7 @@ def test_parent_balance_does_not_cover_subaccount():
         2020-03-01 balance Assets:Bank  1 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [None, None]
+    assert [p.flag for p in txn.postings] == [None, None]
 
 
 def test_subaccount_balance_does_not_cover_parent():
@@ -135,7 +135,7 @@ def test_subaccount_balance_does_not_cover_parent():
         2020-03-01 balance Assets:Bank:Savings  0 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [None, None]
+    assert [p.flag for p in txn.postings] == [None, None]
 
 
 def test_balance_is_per_currency():
@@ -147,7 +147,7 @@ def test_balance_is_per_currency():
         2020-03-01 balance Assets:Cash  0 USD
         """)[0]
     assert txn.flag == FLAG_WARNING
-    assert posting_flags(txn) == [None, None]
+    assert [p.flag for p in txn.postings] == [None, None]
 
 
 def test_covered_warning_flags_are_cleared():
@@ -159,7 +159,7 @@ def test_covered_warning_flags_are_cleared():
         2020-03-01 balance Assets:Cash  -10 USD
         """)[0]
     assert txn.flag == FLAG_OKAY
-    assert posting_flags(txn) == [FLAG_OKAY, None]
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, None]
 
 
 @pytest.mark.parametrize(
@@ -178,7 +178,7 @@ def test_special_transaction_flag_is_kept_but_postings_are_managed(balance, expe
         {balance}
         """)[0]
     assert txn.flag == FLAG_TRANSFER
-    assert posting_flags(txn) == [expected, None]
+    assert [p.flag for p in txn.postings] == [expected, None]
 
 
 def test_padding_transactions_load_cleanly():

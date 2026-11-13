@@ -2,7 +2,7 @@ import pytest
 from beancount.core.data import Open
 from beancount.core.flags import FLAG_WARNING
 
-from beancount_sg.testing import load, load_txns, posting_flags
+from beancount_sg.testing import load, load_txns
 
 LEDGER = """
     2020-01-01 * "Lunch"
@@ -21,7 +21,7 @@ def test_load_raises_on_errors():
         load(LEDGER, auto_open=False)
 
 
-def test_load_txns_and_posting_flags():
+def test_load_txns():
     txn = load_txns(LEDGER)[0]
     assert txn.narration == "Lunch"
-    assert posting_flags(txn) == [FLAG_WARNING, None]
+    assert [p.flag for p in txn.postings] == [FLAG_WARNING, None]
