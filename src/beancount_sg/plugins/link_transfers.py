@@ -3,14 +3,13 @@
 Transactions posting the same amount (with opposite signs) to the configured
 account (or its subaccounts) are linked when they cancel out, e.g. a withdrawal
 from checking and the matching deposit into savings, both booked against an
-``Assets:Transfers`` clearing account.
+``Assets:Transfers`` clearing account. Matched postings are flagged ``*`` and
+unmatched ones ``!``.
 
-Transfers often clear on different days, so matching runs in passes from the
-tightest window to the loosest (see `PASSES`): same day, same week, same week
-with dates shifted 3 days, same month, then same month shifted 3 days. The
-shifted passes catch transfers that straddle a week or month boundary. A
-transaction linked in an earlier pass keeps that link and isn't re-matched. See
-`beancount_sg.plugins.linking.Linker` for how keys are built and matched.
+The two sides of a transfer often post on different days, so matching tries
+progressively wider date windows (see `WINDOWS`); a transaction matched in a
+tighter window isn't considered again. See `beancount_sg.plugins._linking.Linker`
+for how keys are built and matched.
 
 Usage::
 
@@ -24,19 +23,23 @@ from typing import Any
 
 from beancount.core.data import Directive
 
-from beancount_sg.plugins.linking import Linker
+from ._linking import Linker, Window
 
 __plugins__ = ("link_transfers",)
 
+# Calendar windows split transfers that straddle a boundary: one sent on a Friday
+# and received the next Monday lands in different weeks, and one sent on the 30th
+# and received on the 2nd lands in different months. Repeating each window with
+# dates shifted 3 days later moves the boundary, so such pairs fall in the same
+# window. Tightest first, so e.g. a same-day pair isn't grouped with other
+# same-amount transfers from later in the month.
 _SHIFT = datetime.timedelta(days=3)
-
-# (date_format, date_offset) for each matching pass, tightest first.
-PASSES: list[tuple[str, datetime.timedelta | None]] = [
-    ("%Y%m%d", None),
-    ("%Yw%W", None),
-    ("%Yw%W", _SHIFT),
-    ("%Y%m", None),
-    ("%Y%m", _SHIFT),
+WINDOWS: list[Window] = [
+    ("%Y%m%d", None),  # same day
+    ("%Yw%W", None),  # same week (Monday to Sunday)
+    ("%Yw%W", _SHIFT),  # same week, shifted: catches Friday -> Monday
+    ("%Y%m", None),  # same month
+    ("%Y%m", _SHIFT),  # same month, shifted: catches the 29th-31st -> early next month
 ]
 
 
@@ -46,6 +49,4 @@ def link_transfers(
     """Link same-amount transactions in the ``config`` account that cancel out."""
     if not config:
         raise ValueError('link_transfers requires an account, e.g. "Assets:Transfers"')
-    for date_format, date_offset in PASSES:
-        entries = Linker(config, date_format=date_format, date_offset=date_offset)(entries)
-    return entries, []
+    return Linker(config, windows=WINDOWS)(entries, options_map)

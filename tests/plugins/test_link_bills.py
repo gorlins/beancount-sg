@@ -1,5 +1,5 @@
 import pytest
-from beancount.core.flags import FLAG_OKAY
+from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
 from beancount_sg.testing import load_txns
 
@@ -57,7 +57,20 @@ def test_payment_in_another_month_is_not_linked():
         [PLUGIN],
     )
     assert all(not txn.links for txn in txns)
-    assert all(txn.postings[0].flag is None for txn in txns)
+    assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
+
+
+def test_multiple_postings_to_the_account_is_an_error():
+    with pytest.raises(AssertionError, match="2 postings to Liabilities:Bills"):
+        load_txns(
+            """
+            2020-01-05 * "Two bills at once"
+              Liabilities:Bills:Electric  -80 USD
+              Liabilities:Bills:Water     -20 USD
+              Expenses:Utilities
+            """,
+            [PLUGIN],
+        )
 
 
 def test_requires_an_account():

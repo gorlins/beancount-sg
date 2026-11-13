@@ -4,7 +4,8 @@ Transactions posting to the configured account (or its subaccounts) in the
 same month are linked when those postings cancel out, e.g. a bill accrued to
 ``Liabilities:Bills:Electric`` and the payment that clears it. Amounts are not
 part of the key, so a month's bill and payment are matched even if paid in
-parts. See `beancount_sg.plugins.linking.Linker` for details.
+parts. Matched postings are flagged ``*`` and unmatched ones ``!``. See
+`beancount_sg.plugins._linking.Linker` for details.
 
 Usage::
 
@@ -17,7 +18,7 @@ from typing import Any
 
 from beancount.core.data import Directive
 
-from beancount_sg.plugins.linking import Linker
+from ._linking import Linker
 
 __plugins__ = ("link_bills",)
 
@@ -28,5 +29,5 @@ def link_bills(
     """Link each month's transactions in the ``config`` account that cancel out."""
     if not config:
         raise ValueError('link_bills requires an account, e.g. "Liabilities:Bills"')
-    linker = Linker(config, date_format="%Y%m", include_amount=False)
-    return linker(entries), []
+    linker = Linker(config, windows=[("%Y%m", None)], include_amount=False)
+    return linker(entries, options_map)
