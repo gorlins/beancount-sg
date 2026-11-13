@@ -27,6 +27,8 @@ uv add git+https://github.com/gorlins/beancount-sg.git
 
 ## Plugins
 
+Beancount plugins live in `beancount_sg.plugins`; Fava extensions live in `beancount_sg.ext`.
+
 ### `beancount_sg.plugins.flag_balanced`
 
 ```beancount
