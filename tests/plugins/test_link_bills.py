@@ -77,8 +77,26 @@ def test_subaccounts_are_matched_separately():
     assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
 
 
-def test_multiple_postings_to_the_account_is_an_error():
-    with pytest.raises(AssertionError, match="2 postings to Liabilities:Bills"):
+def test_bill_split_across_postings_is_matched_by_its_total():
+    bill, payment = load_txns(
+        """
+        2020-01-05 * "Electric bill"
+          Liabilities:Bills:Electric  -60 USD
+          Liabilities:Bills:Electric  -20 USD
+          Expenses:Utilities
+
+        2020-01-25 * "Pay electric"
+          Liabilities:Bills:Electric   80 USD
+          Assets:Checking
+        """,
+        [PLUGIN],
+    )
+    assert bill.links == payment.links == {"x-Electric-202001"}
+    assert [p.flag for p in bill.postings] == [FLAG_OKAY, FLAG_OKAY, None]
+
+
+def test_postings_to_several_bill_accounts_is_an_error():
+    with pytest.raises(AssertionError, match="postings to 2 accounts under Liabilities:Bills"):
         load_txns(
             """
             2020-01-05 * "Two bills at once"
