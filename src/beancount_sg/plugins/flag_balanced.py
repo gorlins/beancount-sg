@@ -1,21 +1,23 @@
 """Flag transactions according to whether a balance assertion covers them.
 
 A balance assertion dated ``D`` checks an account's balance at the *start* of
-``D``, so it verifies every posting to that account (or any of its
-subaccounts) in that currency dated strictly before ``D``.
+``D``, so it verifies every posting to that account in that currency dated
+strictly before ``D``.
 
 For every posting whose account and currency have at least one balance
-assertion (on the account itself or on one of its parents), this plugin sets:
+assertion on that exact account (assertions on parent accounts don't count),
+this plugin sets:
 
 * the posting flag to ``*`` if it is dated before the latest such assertion,
   or ``!`` if it is not yet covered;
 * the transaction flag to ``!`` if any of these postings is uncovered,
   otherwise ``*``.
 
-Postings in accounts/currencies that never have a balance assertion are left
-alone, and transactions with none of these postings are not modified. Only
-transactions flagged ``*`` or ``!`` are touched; special flags such as
-``P`` (padding) are preserved.
+Postings in accounts/currencies without balance assertions are left alone,
+and transactions with none of these postings are not modified. Posting flags
+are managed regardless of the transaction flag, but the transaction flag is
+only changed if it is ``*`` or ``!``; special flags such as ``P`` (padding)
+are preserved. Postings with special flags are likewise left alone.
 
 Usage::
 
@@ -27,8 +29,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from beancount.core import account as account_lib
-from beancount.core.data import Balance, Directive, Posting, Transaction
+from beancount.core.data import Balance, Directive, Transaction
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
 __plugins__ = ("flag_balanced",)
@@ -46,9 +47,7 @@ def flag_balanced(
     if not latest:
         return entries, []
     new_entries = [
-        flag_transaction(entry, latest)
-        if isinstance(entry, Transaction) and entry.flag in _MANAGED_FLAGS
-        else entry
+        flag_transaction(entry, latest) if isinstance(entry, Transaction) else entry
         for entry in entries
     ]
     return new_entries, []
@@ -65,27 +64,15 @@ def latest_balance_dates(entries: list[Directive]) -> BalanceDates:
     return latest
 
 
-def coverage_date(posting: Posting, latest: BalanceDates) -> datetime.date | None:
-    """Latest assertion date covering a posting (via its account or a parent), or None."""
-    if posting.units is None:
-        return None
-    dates = [
-        latest[key]
-        for acct in account_lib.parents(posting.account)
-        if (key := (acct, posting.units.currency)) in latest
-    ]
-    return max(dates, default=None)
-
-
 def flag_transaction(txn: Transaction, latest: BalanceDates) -> Transaction:
     """Return the transaction with its flags set; unchanged transactions are returned as-is."""
     postings = list(txn.postings)
     tracked = False
     all_covered = True
     for i, posting in enumerate(postings):
-        if posting.flag not in _MANAGED_FLAGS:
+        if posting.flag not in _MANAGED_FLAGS or posting.units is None:
             continue
-        covered_until = coverage_date(posting, latest)
+        covered_until = latest.get((posting.account, posting.units.currency))
         if covered_until is None:
             continue
         tracked = True
@@ -97,7 +84,9 @@ def flag_transaction(txn: Transaction, latest: BalanceDates) -> Transaction:
 
     if not tracked:
         return txn
-    flag = FLAG_OKAY if all_covered else FLAG_WARNING
+    flag = txn.flag
+    if flag in _MANAGED_FLAGS:
+        flag = FLAG_OKAY if all_covered else FLAG_WARNING
     if flag == txn.flag and all(a is b for a, b in zip(postings, txn.postings, strict=True)):
         return txn
     return txn._replace(flag=flag, postings=postings)
