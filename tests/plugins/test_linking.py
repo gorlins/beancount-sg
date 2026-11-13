@@ -158,6 +158,15 @@ def test_unbalanced_group_is_not_matched():
     assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
 
 
+def test_group_that_does_not_cancel_is_not_split_into_pairs():
+    # Two -100s and one +100 share a key; no subset is matched.
+    txns = link(
+        [transfer("2020-01-15", -100), transfer("2020-01-15", -100), transfer("2020-01-15", 100)]
+    )
+    assert all(not txn.links for txn in txns)
+    assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
+
+
 def test_mixed_currencies_are_not_matched():
     txns = link([transfer("2020-01-15", -100), transfer("2020-01-15", 100, currency="EUR")])
     assert all(not txn.links for txn in txns)

@@ -18,12 +18,34 @@ transaction matched in one window isn't considered in later ones. Every other
 posting to the account is flagged ``!``. A transaction with more than one
 posting to the account produces an error and is not matched.
 
-Order windows from narrowest to widest. A group only matches if *all* of its
-members cancel, so a wide window can lump together transactions that narrower
-windows would pair off separately (two transfers in a month, say), or fail to
-match any of them. Windows of the same width, such as one period with different
-offsets, can go in any order: they cover different boundaries, and when a pair
-falls in more than one of them, the earlier window decides its link.
+Strategy
+--------
+
+Rather than comparing each transaction against every other one within a
+sliding date range (a convolution over the window, O(n²) in the worst case), the
+linker computes one hashable key per transaction and buckets transactions by
+key. Each window is a single O(n) pass: compute keys, group them in a dict, and
+check each group's sum. Everything that should match is found by key lookup, so
+the cost doesn't grow with the size of the date range or with ledger density.
+
+The trade-off is that keys are *calendar* buckets, not sliding ranges: a Friday
+and the following Monday fall in different weeks, however close they are. That
+is what multiple windows are for. Repeating a window with its dates shifted
+moves the bucket boundaries, so pairs split by one window's boundary land
+together in the shifted one.
+
+A key's whole group must cancel to match. The key is the definition of "these
+belong together". If a group doesn't sum to zero (say two -100s and one +100 in
+the same week), the linker doesn't guess which subset is the real pair. The
+group stays ``!`` for a human to resolve, e.g. by adding a manual link.
+
+Order windows from narrowest to widest. Because a group only matches if *all*
+of its members cancel, a wide window can lump together transactions that
+narrower windows would pair off separately (two transfers in a month, say), or
+fail to match any of them. Windows of the same width, such as one period with
+different offsets, can go in any order: they cover different boundaries, and
+when a pair falls in more than one of them, the earlier window decides its
+link.
 """
 
 from __future__ import annotations
