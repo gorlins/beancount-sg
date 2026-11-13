@@ -56,7 +56,8 @@ any plugins that set posting flags, such as `flag_balanced`.
 plugin "beancount_sg.plugins.link_bills" "Liabilities:Bills"
 ```
 
-Links each month's bills and payments in the given account when they cancel out.
+Links each month's bills and payments in the given account when they cancel out, flagging those
+postings `*` if matched and `!` if not.
 
 ### `beancount_sg.plugins.link_transfers`
 
@@ -65,7 +66,8 @@ plugin "beancount_sg.plugins.link_transfers" "Assets:Transfers"
 ```
 
 Links same-amount transactions in the given account when they cancel out, such as the two sides
-of a transfer, trying progressively wider date windows (same day, week, then month).
+of a transfer, trying progressively wider date windows (same day, week, then month). Postings are
+flagged like `link_bills`. Pair either with `flag_from_postings` to update transaction flags.
 
 ## Utilities
 

@@ -60,6 +60,23 @@ def test_payment_in_another_month_is_not_linked():
     assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
 
 
+def test_subaccounts_are_matched_separately():
+    txns = load_txns(
+        """
+        2020-01-05 * "Electric bill"
+          Liabilities:Bills:Electric  -80 USD
+          Expenses:Utilities
+
+        2020-01-25 * "Pay water"
+          Liabilities:Bills:Water      80 USD
+          Assets:Checking
+        """,
+        [PLUGIN],
+    )
+    assert all(not txn.links for txn in txns)
+    assert all(txn.postings[0].flag == FLAG_WARNING for txn in txns)
+
+
 def test_multiple_postings_to_the_account_is_an_error():
     with pytest.raises(AssertionError, match="2 postings to Liabilities:Bills"):
         load_txns(

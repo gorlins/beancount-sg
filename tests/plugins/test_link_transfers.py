@@ -31,7 +31,7 @@ def load_transfers(out_date: str, in_date: str, in_amount: str = "100.00"):
         ("2020-01-30", "2020-02-20", "x-Transfers-202002-100.00"),  # month, shifted 3 days
     ],
 )
-def test_each_pass_links_transfers(out_date, in_date, link):
+def test_each_window_links_transfers(out_date, in_date, link):
     out, inn = load_transfers(out_date, in_date)
     assert out.links == inn.links == {link}
     assert out.postings[1].flag == inn.postings[1].flag == FLAG_OKAY

@@ -15,8 +15,11 @@ date offset), in order. In each window, a group of two or more not-yet-matched
 transactions whose linked postings are all in one currency and sum to zero is
 matched: each gets the link, and its linked posting is flagged ``*``. A
 transaction matched in one window isn't considered in later ones. Every other
-posting to the account is flagged ``!``. A transaction with more than one
-posting to the account produces an error and is not matched.
+posting to the account is flagged ``!``. Postings to the account are flagged
+whatever their current flag; transaction flags are never changed (use
+``beancount_sg.plugins.flag_from_postings`` to roll posting flags up). A
+transaction with more than one posting to the account produces an error and is
+not matched.
 
 Strategy
 --------
@@ -60,6 +63,8 @@ from beancount.core.data import BeancountError, Directive, Meta, Posting, Transa
 from beancount.core.display_context import DisplayFormatter, Precision
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
+# (strftime format for the date part of the key, or None to omit it; offset added to
+# each transaction's date before formatting, or None)
 Window = tuple[str | None, datetime.timedelta | None]
 
 
@@ -80,8 +85,9 @@ class Linker:
     Args:
         account: Postings to this account or its subaccounts are linkable.
         windows: ``(date_format, date_offset)`` pairs to match in, narrowest first (see the
-            module docs). A None format leaves the date out of the key; the offset shifts
-            dates before formatting.
+            module docs). A None format leaves the date out of the key. The offset is added
+            to each date before formatting, so a positive offset moves the bucket
+            boundaries earlier (e.g. +3 days puts Friday into the following week).
         link_prefix: Prefix of generated links, and of existing links reused as keys.
         include_amount: Whether the key includes the absolute posting amount.
     """
@@ -98,11 +104,17 @@ class Linker:
         self.windows = windows
         self.link_prefix = link_prefix
         self.include_amount = include_amount
+        # Matches the account and its subaccounts, on component boundaries.
         self.is_linkable = account_lib.parent_matcher(account)
 
     def link_key(
         self, txn: Transaction, posting: Posting, window: Window, formatter: DisplayFormatter
     ) -> str:
+        """The key grouping ``txn`` in ``window``, via its linked ``posting``.
+
+        ``formatter`` renders amounts at each currency's usual precision, so that e.g.
+        ``1.1`` and ``1.10`` USD produce the same key.
+        """
         # A link with our prefix already on the transaction, whether added by hand or by
         # an earlier tool, is kept as its key, so those groupings are preserved. Sorted
         # so the choice is deterministic if there are several (set order isn't).
@@ -184,6 +196,7 @@ class Linker:
             if link and link not in links:
                 links = links | {link}
                 any_changed = True
+            # Only rebuild transactions that actually change.
             if any_changed:
                 new_entries[i] = txn._replace(links=links, postings=postings)
         return new_entries, errors

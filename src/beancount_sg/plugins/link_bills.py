@@ -4,7 +4,8 @@ Transactions posting to the configured account (or its subaccounts) in the
 same month are linked when those postings cancel out, e.g. a bill accrued to
 ``Liabilities:Bills:Electric`` and the payment that clears it. Amounts are not
 part of the key, so a month's bill and payment are matched even if paid in
-parts. Matched postings are flagged ``*`` and unmatched ones ``!``. See
+parts. Each subaccount (by its last component) is matched separately. Matched
+postings are flagged ``*`` and unmatched ones ``!``. See
 `beancount_sg.plugins._linking.Linker` for details.
 
 Usage::

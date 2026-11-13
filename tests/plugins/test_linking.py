@@ -3,7 +3,7 @@ import datetime
 from decimal import Decimal
 
 from beancount.core.display_context import DisplayContext
-from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
+from beancount.core.flags import FLAG_OKAY, FLAG_TRANSFER, FLAG_WARNING
 from beancount.parser.options import OPTIONS_DEFAULTS
 
 from beancount_sg.builders import A, B, P, T
@@ -66,6 +66,29 @@ def test_amount_uses_currency_precision():
 def test_amount_without_known_precision_is_used_as_is():
     out, inn = link([transfer("2020-01-15", "-1.10"), transfer("2020-01-15", "1.10")])
     assert out.links == inn.links == {"x-Transfers-20200115-1.10"}
+
+
+def test_window_without_date_format_omits_the_date():
+    linker = Linker("Assets:Transfers", windows=[(None, None)])
+    out, inn = link([transfer("2020-01-15", -100), transfer("2021-06-30", 100)], linker)
+    assert out.links == inn.links == {"x-Transfers-100"}
+
+
+def test_transaction_flag_is_not_changed():
+    txns = link(
+        [
+            T("2020-01-15", flag=FLAG_WARNING, postings=[P("Assets:Transfers", A(-5, "USD"))]),
+            T("2020-01-15", flag=FLAG_OKAY, postings=[P("Assets:Transfers", A(5, "USD"))]),
+            T("2020-01-16", flag=FLAG_OKAY, postings=[P("Assets:Transfers", A(7, "USD"))]),
+        ]
+    )
+    assert [txn.flag for txn in txns] == [FLAG_WARNING, FLAG_OKAY, FLAG_OKAY]
+    assert [txn.postings[0].flag for txn in txns] == [FLAG_OKAY, FLAG_OKAY, FLAG_WARNING]
+
+
+def test_special_posting_flag_is_overwritten():
+    out, inn = link([transfer("2020-01-15", -100, flag=FLAG_TRANSFER), transfer("2020-01-16", 100)])
+    assert out.postings[0].flag == inn.postings[0].flag == FLAG_WARNING
 
 
 def test_key_uses_account_leaf():
