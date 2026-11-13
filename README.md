@@ -50,6 +50,29 @@ Sets each transaction's flag from its postings: `!` if any posting is `!`, other
 Unflagged postings are ignored, and special transaction flags (e.g. `P`) are kept. List it after
 any plugins that set posting flags, such as `flag_balanced`.
 
+## Utilities
+
+### `beancount_sg.builders`
+
+Concise constructors for Beancount directives, with sensible defaults, for use in importers,
+plugins and tests:
+
+```python
+from beancount_sg.builders import A, B, P, T
+
+txn = T(
+    "2020-02-01",
+    payee="Cafe",
+    narration="Lunch",
+    postings=[P("Assets:Cash", A("-10.50", "USD")), P("Expenses:Food")],
+)
+balance = B("2020-03-01", "Assets:Cash", A("-10.50", "USD"))
+```
+
+- `A(number, currency)` builds an `Amount` from a `str`, `int` or `Decimal` (floats are rejected).
+- `T`, `P` and `B` build a `Transaction`, `Posting` and `Balance`. Dates may be `date` objects or
+  ISO strings, and arguments after the required ones are keyword-only.
+
 ## Development
 
 ```bash
