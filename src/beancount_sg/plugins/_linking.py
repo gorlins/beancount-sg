@@ -6,7 +6,13 @@ subaccounts) and groups them by a *link key* built from that posting:
     <link_prefix>-<account leaf>[-<date>][-<amount>]
 
 e.g. ``x-Checking-20200115-12.50``. The amount is the absolute value rendered
-at the currency's usual precision in the ledger. If a transaction already has
+at the currency's usual precision in the ledger.
+
+The account part is only the last component, which keeps links short and
+readable. The weakness is that subaccounts with the same leaf name, e.g.
+``Liabilities:Bills:Home:Electric`` and ``Liabilities:Bills:Office:Electric``,
+share keys, so their transactions can be matched against each other. To tell
+them apart, subclass `Linker` and override `Linker.account_key`. If a transaction already has
 a link that starts with ``<link_prefix>-``, that link is always its key, so
 transactions can be grouped by hand.
 
@@ -107,6 +113,14 @@ class Linker:
         # Matches the account and its subaccounts, on component boundaries.
         self.is_linkable = account_lib.parent_matcher(account)
 
+    def account_key(self, account: str) -> str:
+        """The account part of a link key: the leaf, e.g. ``Electric``.
+
+        Override to distinguish subaccounts that share a leaf name (see the module docs).
+        The result must only use characters valid in a link: letters, digits, ``-_/.``.
+        """
+        return account_lib.leaf(account)
+
     def link_key(
         self, txn: Transaction, posting: Posting, window: Window, formatter: DisplayFormatter
     ) -> str:
@@ -122,7 +136,7 @@ class Linker:
             if link.startswith(self.link_prefix + "-"):
                 return link
 
-        parts = [self.link_prefix, account_lib.leaf(posting.account)]
+        parts = [self.link_prefix, self.account_key(posting.account)]
         date_format, date_offset = window
         if date_format:
             date = txn.date + date_offset if date_offset else txn.date

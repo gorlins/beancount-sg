@@ -101,6 +101,35 @@ def test_key_uses_account_leaf():
     assert out.links == inn.links == {"x-Savings-20200115-5"}
 
 
+def test_subaccounts_with_the_same_leaf_share_a_key():
+    # A known weakness of using only the leaf; see test_account_key_can_be_overridden.
+    home, office = link(
+        [
+            T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(-5, "USD"))]),
+            T("2020-01-15", postings=[P("Assets:Transfers:Office:Savings", A(5, "USD"))]),
+        ]
+    )
+    assert home.links == office.links == {"x-Savings-20200115-5"}
+
+
+def test_account_key_can_be_overridden():
+    class PathLinker(Linker):
+        def account_key(self, account):
+            return account.removeprefix(self.account + ":").replace(":", ".")
+
+    home_out, home_in, office = link(
+        [
+            T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(-5, "USD"))]),
+            T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(5, "USD"))]),
+            T("2020-01-15", postings=[P("Assets:Transfers:Office:Savings", A(5, "USD"))]),
+        ],
+        PathLinker("Assets:Transfers"),
+    )
+    assert home_out.links == home_in.links == {"x-Home.Savings-20200115-5"}
+    assert not office.links
+    assert office.postings[0].flag == FLAG_WARNING
+
+
 def test_different_days_are_not_matched():
     txns = link([transfer("2020-01-15", -100), transfer("2020-01-16", 100)])
     assert all(not txn.links for txn in txns)
