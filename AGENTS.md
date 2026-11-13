@@ -34,6 +34,21 @@ uv run ruff format         # format
 Before committing, make sure `ruff check`, `ruff format --check`, and `pytest` all pass. If you
 change dependencies, update and commit `uv.lock` (CI runs `uv sync --locked`).
 
+Supported Python versions are 3.11 through 3.15, all tested in CI. When adding or dropping a
+version, update the CI matrix in `.github/workflows/ci.yml` and the classifiers in
+`pyproject.toml` together.
+
+## Versioning and releases
+
+The version is derived from git tags by `hatch-vcs`; never hardcode a version in
+`pyproject.toml` or the package. `beancount_sg.__version__` reads it from installed metadata.
+
+- Releases are `vX.Y.Z` tags on `main` (`git tag v0.2.0 && git push origin v0.2.0`). Only create
+  or push tags when the user asks.
+- Untagged commits get versions like `0.2.1.dev3+g<sha>`.
+- CI needs full history (`fetch-depth: 0`) to see tags; keep it.
+- `.git_archival.txt` + `.gitattributes` let GitHub tarball installs resolve the version; keep them.
+
 ## Git workflow
 
 - **Use semantically meaningful branch names** that describe the change, with a type prefix, e.g.
