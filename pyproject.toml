@@ -1,7 +1,7 @@
 [project]
 name = "beancount-sg"
 version = "0.1.0"
-description = "Beancount tools for Singapore"
+description = "Personal Beancount tools"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

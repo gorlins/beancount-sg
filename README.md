@@ -1,6 +1,6 @@
 # beancount-sg
 
-Beancount tools for Singapore.
+Personal Beancount tools.
 
 ## Installation
 

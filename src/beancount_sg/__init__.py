@@ -1,4 +1,4 @@
-"""Beancount tools for Singapore."""
+"""Personal Beancount tools."""
 
 from importlib.metadata import version
 
