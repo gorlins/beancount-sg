@@ -1,6 +1,6 @@
 # beancount-sg
 
-Personal collection of Beancount plugins and Fava extensions.
+Personal collection of Beancount plugins and Fava extensions. ("SG" is the author's initials.)
 
 ## Installation
 
@@ -32,4 +32,27 @@ uv sync            # create .venv and install the package + dev tools
 uv run pytest      # run tests
 uv run ruff check  # lint
 uv run ruff format # format
+```
+
+Before committing, make sure `ruff check`, `ruff format --check` and `pytest` all pass; CI runs
+them on every supported Python version.
+
+Fava is an optional dependency (the `fava` extra), so code that imports `fava` must stay out of
+modules that plugin-only users import.
+
+### Branches and pull requests
+
+- Name branches after the change, with a type prefix: `feat/…`, `fix/…`, `ci/…`, `docs/…`,
+  `build/…`.
+- One logical change per branch and pull request, started from the latest `main`.
+- Don't push directly to `main`.
+
+### Releases
+
+The version is derived from git tags, so it is never written in the code. To release, tag `main`
+and push the tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
 ```
