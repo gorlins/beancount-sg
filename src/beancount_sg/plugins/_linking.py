@@ -8,13 +8,16 @@ subaccounts) and groups them by a *link key* built from that posting:
 e.g. ``x-Checking-20200115-12.50``. The amount is the absolute value rendered
 at the currency's usual precision in the ledger.
 
-The account part is only the last component, which keeps links short and
-readable. The weakness is that subaccounts with the same leaf name, e.g.
-``Liabilities:Bills:Home:Electric`` and ``Liabilities:Bills:Office:Electric``,
-share keys, so their transactions can be matched against each other. To tell
-them apart, subclass `Linker` and override `Linker.account_key`. If a transaction already has
-a link that starts with ``<link_prefix>-``, that link is always its key, so
-transactions can be grouped by hand.
+By default the account part is only the last component, which keeps links
+short and readable. The weakness is that subaccounts with the same leaf name,
+e.g. ``Liabilities:Bills:Home:Electric`` and ``Liabilities:Bills:Office:Electric``,
+share keys, so their transactions can be matched against each other. Pass a
+different ``account_key`` function to tell them apart.
+
+If a transaction already has a link that starts with ``<link_prefix>-``, that
+link is always its key, so manual or pre-existing groupings are preserved.
+Having more than one such link on a transaction isn't supported: whichever is
+found first is used.
 
 Matching runs over one or more date *windows* (``strftime`` format and optional
 date offset), in order. In each window, a group of two or more not-yet-matched
@@ -61,7 +64,7 @@ from __future__ import annotations
 
 import datetime
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, NamedTuple
 
 from beancount.core import account as account_lib
@@ -96,6 +99,10 @@ class Linker:
             boundaries earlier (e.g. +3 days puts Friday into the following week).
         link_prefix: Prefix of generated links, and of existing links reused as keys.
         include_amount: Whether the key includes the absolute posting amount.
+        account_key: Maps a posting's account to the account part of the key. Defaults
+            to its leaf (e.g. ``Electric``); pass another function to distinguish
+            subaccounts that share a leaf name (see the module docs). The result must
+            only use characters valid in a link: letters, digits and ``-_/.``.
     """
 
     def __init__(
@@ -105,21 +112,15 @@ class Linker:
         windows: Sequence[Window] = (("%Y%m%d", None),),
         link_prefix: str = "x",
         include_amount: bool = True,
+        account_key: Callable[[str], str] = account_lib.leaf,
     ):
         self.account = account
         self.windows = windows
         self.link_prefix = link_prefix
         self.include_amount = include_amount
+        self.account_key = account_key
         # Matches the account and its subaccounts, on component boundaries.
         self.is_linkable = account_lib.parent_matcher(account)
-
-    def account_key(self, account: str) -> str:
-        """The account part of a link key: the leaf, e.g. ``Electric``.
-
-        Override to distinguish subaccounts that share a leaf name (see the module docs).
-        The result must only use characters valid in a link: letters, digits, ``-_/.``.
-        """
-        return account_lib.leaf(account)
 
     def link_key(
         self, txn: Transaction, posting: Posting, window: Window, formatter: DisplayFormatter
@@ -130,9 +131,8 @@ class Linker:
         ``1.1`` and ``1.10`` USD produce the same key.
         """
         # A link with our prefix already on the transaction, whether added by hand or by
-        # an earlier tool, is kept as its key, so those groupings are preserved. Sorted
-        # so the choice is deterministic if there are several (set order isn't).
-        for link in sorted(txn.links or ()):
+        # an earlier tool, is kept as its key, so those groupings are preserved.
+        for link in txn.links or ():
             if link.startswith(self.link_prefix + "-"):
                 return link
 

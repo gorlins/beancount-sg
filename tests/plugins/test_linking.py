@@ -102,7 +102,7 @@ def test_key_uses_account_leaf():
 
 
 def test_subaccounts_with_the_same_leaf_share_a_key():
-    # A known weakness of using only the leaf; see test_account_key_can_be_overridden.
+    # A known weakness of using only the leaf; see test_account_key_can_be_configured.
     home, office = link(
         [
             T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(-5, "USD"))]),
@@ -112,18 +112,18 @@ def test_subaccounts_with_the_same_leaf_share_a_key():
     assert home.links == office.links == {"x-Savings-20200115-5"}
 
 
-def test_account_key_can_be_overridden():
-    class PathLinker(Linker):
-        def account_key(self, account):
-            return account.removeprefix(self.account + ":").replace(":", ".")
-
+def test_account_key_can_be_configured():
+    linker = Linker(
+        "Assets:Transfers",
+        account_key=lambda account: account.removeprefix("Assets:Transfers:").replace(":", "."),
+    )
     home_out, home_in, office = link(
         [
             T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(-5, "USD"))]),
             T("2020-01-15", postings=[P("Assets:Transfers:Home:Savings", A(5, "USD"))]),
             T("2020-01-15", postings=[P("Assets:Transfers:Office:Savings", A(5, "USD"))]),
         ],
-        PathLinker("Assets:Transfers"),
+        linker,
     )
     assert home_out.links == home_in.links == {"x-Home.Savings-20200115-5"}
     assert not office.links
