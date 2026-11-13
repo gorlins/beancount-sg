@@ -25,6 +25,20 @@ With uv:
 uv add git+https://github.com/gorlins/beancount-sg.git
 ```
 
+## Plugins
+
+### `beancount_sg.plugins.flag_balanced`
+
+```beancount
+plugin "beancount_sg.plugins.flag_balanced"
+```
+
+Marks which transactions are verified by a balance assertion. For postings to accounts (and
+currencies) that have balance assertions, it sets the posting flag to `*` if a later `balance`
+directive on that account or one of its parents covers it, and `!` otherwise. The transaction flag
+becomes `!` if any such posting is uncovered, else `*`. Other transactions and special flags are
+left alone.
+
 ## Development
 
 ```bash
