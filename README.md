@@ -64,8 +64,8 @@ Links each month's bills and payments in the given account when they cancel out.
 plugin "beancount_sg.plugins.link_transfers" "Assets:Transfers"
 ```
 
-Links same-day, same-amount transactions in the given account when they cancel out, such as the
-two sides of a transfer.
+Links same-amount transactions in the given account when they cancel out, such as the two sides
+of a transfer, trying progressively wider date windows (same day, week, then month).
 
 ## Utilities
 
@@ -73,11 +73,6 @@ two sides of a transfer.
 
 Concise constructors (`A`, `T`, `P`, `B`) for building amounts, transactions, postings and balance
 assertions in importers, plugins and tests.
-
-### `beancount_sg.linking`
-
-`Linker`, the reusable logic behind the linking plugins: it groups transactions by a key built from
-their postings to an account, and links groups that cancel out.
 
 ## Development
 

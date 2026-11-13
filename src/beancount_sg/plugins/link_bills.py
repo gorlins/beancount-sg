@@ -4,7 +4,7 @@ Transactions posting to the configured account (or its subaccounts) in the
 same month are linked when those postings cancel out, e.g. a bill accrued to
 ``Liabilities:Bills:Electric`` and the payment that clears it. Amounts are not
 part of the key, so a month's bill and payment are matched even if paid in
-parts. See `beancount_sg.linking.Linker` for details.
+parts. See `beancount_sg.plugins.linking.Linker` for details.
 
 Usage::
 
@@ -17,7 +17,7 @@ from typing import Any
 
 from beancount.core.data import Directive
 
-from beancount_sg.linking import Linker
+from beancount_sg.plugins.linking import Linker
 
 __plugins__ = ("link_bills",)
 

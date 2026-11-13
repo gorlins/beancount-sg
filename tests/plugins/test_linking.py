@@ -3,7 +3,7 @@ import datetime
 from beancount.core.flags import FLAG_OKAY
 
 from beancount_sg.builders import A, B, P, T
-from beancount_sg.linking import Linker
+from beancount_sg.plugins.linking import Linker
 
 LINKER = Linker("Assets:Transfers")
 

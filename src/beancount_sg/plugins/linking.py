@@ -19,17 +19,15 @@ from __future__ import annotations
 
 import datetime
 from collections import defaultdict
-from dataclasses import dataclass
 
 from beancount.core.data import Directive, Posting, Transaction
 from beancount.core.flags import FLAG_OKAY
 
 
-@dataclass(frozen=True)
 class Linker:
     """Groups and links transactions by their postings to ``account``.
 
-    Attributes:
+    Args:
         account: Postings to this account or its subaccounts are linkable.
         link_prefix: Prefix of generated links, and of existing links reused as keys.
         date_format: ``strftime`` format for the date part of the key, or None to omit it.
@@ -37,11 +35,20 @@ class Linker:
         include_amount: Whether the key includes the absolute posting amount.
     """
 
-    account: str
-    link_prefix: str = "x"
-    date_format: str | None = "%Y%m%d"
-    date_offset: datetime.timedelta | None = None
-    include_amount: bool = True
+    def __init__(
+        self,
+        account: str,
+        *,
+        link_prefix: str = "x",
+        date_format: str | None = "%Y%m%d",
+        date_offset: datetime.timedelta | None = None,
+        include_amount: bool = True,
+    ):
+        self.account = account
+        self.link_prefix = link_prefix
+        self.date_format = date_format
+        self.date_offset = date_offset
+        self.include_amount = include_amount
 
     def is_linkable(self, posting: Posting) -> bool:
         return posting.account == self.account or posting.account.startswith(self.account + ":")
