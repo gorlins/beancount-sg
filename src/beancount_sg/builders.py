@@ -10,8 +10,10 @@ tersely, e.g. in importers, plugins and tests::
         postings=[P("Assets:Cash", A("-10", "USD")), P("Expenses:Food", A(10, "USD"))],
     )
 
-Dates may be given as ``datetime.date`` objects or ISO ``YYYY-MM-DD`` strings.
-Every call gets its own fresh metadata dict, tag/link sets and posting list.
+Dates may be given as ``datetime.date`` or ``datetime.datetime`` objects (the
+time is dropped) or ISO ``YYYY-MM-DD`` strings. Arguments after the required
+ones are keyword-only. Every call gets its own fresh metadata dict and posting
+list, and tags/links are frozensets as Beancount's parser produces.
 """
 
 from __future__ import annotations
@@ -101,7 +103,7 @@ def B(
 
 def _to_date(value: DateLike) -> datetime.date:
     if isinstance(value, datetime.datetime):
-        raise TypeError(f"expected a date, not a datetime: {value!r}")
+        return value.date()
     if isinstance(value, datetime.date):
         return value
     return datetime.date.fromisoformat(value)

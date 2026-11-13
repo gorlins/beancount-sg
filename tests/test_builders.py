@@ -82,9 +82,10 @@ def test_meta_and_postings_are_copied():
     assert txn.postings == postings and txn.postings is not postings
 
 
-def test_rejects_datetime():
-    with pytest.raises(TypeError, match="datetime"):
-        T(datetime.datetime(2020, 2, 1, 12, 0))
+def test_datetime_is_converted_to_date():
+    txn = T(datetime.datetime(2020, 2, 1, 12, 30))
+    assert txn.date == datetime.date(2020, 2, 1)
+    assert type(txn.date) is datetime.date
 
 
 def test_rejects_invalid_date_string():
