@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history + tags for hatch-vcs
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
