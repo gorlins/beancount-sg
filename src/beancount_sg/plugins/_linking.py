@@ -11,11 +11,19 @@ a link that starts with ``<link_prefix>-``, that link is always its key, so
 transactions can be grouped by hand.
 
 Matching runs over one or more date *windows* (``strftime`` format and optional
-date offset), tightest first. In each window, a group of two or more
-not-yet-matched transactions whose linked postings are all in one currency and
-sum to zero is matched: each gets the link, and its linked posting is flagged
-``*``. Every other posting to the account is flagged ``!``. A transaction with
-more than one posting to the account produces an error and is not matched.
+date offset), in order. In each window, a group of two or more not-yet-matched
+transactions whose linked postings are all in one currency and sum to zero is
+matched: each gets the link, and its linked posting is flagged ``*``. A
+transaction matched in one window isn't considered in later ones. Every other
+posting to the account is flagged ``!``. A transaction with more than one
+posting to the account produces an error and is not matched.
+
+Order windows from narrowest to widest. A group only matches if *all* of its
+members cancel, so a wide window can lump together transactions that narrower
+windows would pair off separately (two transfers in a month, say), or fail to
+match any of them. Windows of the same width, such as one period with different
+offsets, can go in any order: they cover different boundaries, and when a pair
+falls in more than one of them, the earlier window decides its link.
 """
 
 from __future__ import annotations
@@ -26,7 +34,7 @@ from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 from beancount.core import account as account_lib
-from beancount.core.data import Directive, Meta, Posting, Transaction
+from beancount.core.data import BeancountError, Directive, Meta, Posting, Transaction
 from beancount.core.display_context import DisplayFormatter, Precision
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
@@ -34,6 +42,11 @@ Window = tuple[str | None, datetime.timedelta | None]
 
 
 class LinkError(NamedTuple):
+    """Conforms to `beancount.core.data.BeancountError`, a Protocol that can't be subclassed.
+
+    Beancount's own errors are NamedTuples with these fields too.
+    """
+
     source: Meta
     message: str
     entry: Directive
@@ -44,8 +57,9 @@ class Linker:
 
     Args:
         account: Postings to this account or its subaccounts are linkable.
-        windows: ``(date_format, date_offset)`` pairs to match in, tightest first. A None
-            format leaves the date out of the key; the offset shifts dates before formatting.
+        windows: ``(date_format, date_offset)`` pairs to match in, narrowest first (see the
+            module docs). A None format leaves the date out of the key; the offset shifts
+            dates before formatting.
         link_prefix: Prefix of generated links, and of existing links reused as keys.
         include_amount: Whether the key includes the absolute posting amount.
     """
@@ -67,6 +81,9 @@ class Linker:
     def link_key(
         self, txn: Transaction, posting: Posting, window: Window, formatter: DisplayFormatter
     ) -> str:
+        # A link with our prefix already on the transaction, whether added by hand or by
+        # an earlier tool, is kept as its key, so those groupings are preserved. Sorted
+        # so the choice is deterministic if there are several (set order isn't).
         for link in sorted(txn.links or ()):
             if link.startswith(self.link_prefix + "-"):
                 return link
@@ -83,21 +100,22 @@ class Linker:
 
     def __call__(
         self, entries: list[Directive], options_map: dict[str, Any]
-    ) -> tuple[list[Directive], list[LinkError]]:
+    ) -> tuple[list[Directive], list[BeancountError]]:
         """Return the entries with matched groups linked and linkable postings flagged."""
         formatter = options_map["dcontext"].build(precision=Precision.MOST_COMMON)
-        errors: list[LinkError] = []
+        errors: list[BeancountError] = []
 
-        # entry index -> indexes of its postings to the account
+        # Find each transaction's postings to the account: entry index -> posting indexes.
+        # Plugins run after Beancount fills in missing amounts, so every posting has units.
         linkable: dict[int, list[int]] = {}
         for i, entry in enumerate(entries):
             if not isinstance(entry, Transaction):
                 continue
             indexes = [
-                j
-                for j, posting in enumerate(entry.postings)
-                if self.is_linkable(posting.account) and posting.units is not None
+                j for j, posting in enumerate(entry.postings) if self.is_linkable(posting.account)
             ]
+            # More than one is an error. The transaction is still recorded below so its
+            # postings get flagged !, but matching skips it.
             if len(indexes) > 1:
                 errors.append(
                     LinkError(
@@ -110,14 +128,16 @@ class Linker:
             if indexes:
                 linkable[i] = indexes
 
-        # entry index -> link, for matched transactions
+        # Match window by window: entry index -> link, for matched transactions.
         matched: dict[int, str] = {}
         for window in self.windows:
+            # Group the transactions not matched yet by their key in this window.
             groups: dict[str, list[int]] = defaultdict(list)
             for i, indexes in linkable.items():
                 if len(indexes) == 1 and i not in matched:
                     posting = entries[i].postings[indexes[0]]
                     groups[self.link_key(entries[i], posting, window, formatter)].append(i)
+            # A group of two or more in one currency that sums to zero is a match!
             for link, members in groups.items():
                 units = [entries[i].postings[linkable[i][0]].units for i in members]
                 if len(members) < 2 or len({u.currency for u in units}) != 1:
@@ -125,6 +145,8 @@ class Linker:
                 if sum(u.number for u in units) == 0:
                     matched.update(dict.fromkeys(members, link))
 
+        # Apply the results: matched transactions get the link and * on their linked
+        # posting; every other posting to the account gets !.
         new_entries = list(entries)
         for i, indexes in linkable.items():
             txn = entries[i]

@@ -109,6 +109,42 @@ def test_tighter_window_takes_precedence():
     ]
 
 
+WEEK = "%Yw%W"
+SHIFT = datetime.timedelta(days=3)
+
+
+def test_equally_wide_windows_with_opposite_offsets_cover_different_boundaries():
+    linker = Linker("Assets:Transfers", windows=[(WEEK, None), (WEEK, SHIFT), (WEEK, -SHIFT)])
+    txns = link(
+        [
+            transfer("2020-01-13", -100),  # Mon and Wed: same week
+            transfer("2020-01-15", 100),
+            transfer("2020-01-16", -200),  # Thu -> Mon: only the -3 day shift pairs these
+            transfer("2020-01-20", 200),
+        ],
+        linker,
+    )
+    assert [txn.links for txn in txns] == [
+        {"x-Transfers-2020w02-100"},
+        {"x-Transfers-2020w02-100"},
+        {"x-Transfers-2020w02-200"},
+        {"x-Transfers-2020w02-200"},
+    ]
+
+
+def test_earlier_of_equally_wide_windows_decides_the_link():
+    # Fri -> Mon falls in the same week under both a +3 and a -3 day shift.
+    entries = [transfer("2020-01-17", -100), transfer("2020-01-20", 100)]
+    plus_first = Linker("Assets:Transfers", windows=[(WEEK, SHIFT), (WEEK, -SHIFT)])
+    minus_first = Linker("Assets:Transfers", windows=[(WEEK, -SHIFT), (WEEK, SHIFT)])
+    assert {link for txn in link(entries, plus_first) for link in txn.links} == {
+        "x-Transfers-2020w03-100"
+    }
+    assert {link for txn in link(entries, minus_first) for link in txn.links} == {
+        "x-Transfers-2020w02-100"
+    }
+
+
 def test_date_offset_shifts_the_key_date():
     linker = Linker("Assets:Transfers", windows=[("%Y%m", datetime.timedelta(days=5))])
     out, inn = link([transfer("2020-01-28", -100), transfer("2020-02-02", 100)], linker)
