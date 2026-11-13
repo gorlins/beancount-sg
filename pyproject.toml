@@ -1,18 +1,22 @@
 [project]
 name = "beancount-sg"
 version = "0.1.0"
-description = "Personal Beancount tools"
+description = "Personal collection of Beancount plugins and Fava extensions"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "beancount>=3",
 ]
 
+[project.optional-dependencies]
+fava = ["fava>=1.30"]
+
 [project.urls]
 Repository = "https://github.com/gorlins/beancount-sg"
 
 [dependency-groups]
 dev = [
+    "fava>=1.30",
     "pytest>=8",
     "ruff>=0.6",
 ]
