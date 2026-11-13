@@ -162,6 +162,68 @@ def test_covered_warning_flags_are_cleared():
     assert [p.flag for p in txn.postings] == [FLAG_OKAY, None]
 
 
+def test_warning_posting_set_elsewhere_flags_transaction_warning():
+    # Assets:Cash has no balance assertions; its flag comes from elsewhere (e.g. another plugin).
+    txn = load_flagged("""
+        2020-02-01 * "Withdraw"
+          Assets:Bank  -20 USD
+          ! Assets:Cash  20 USD
+
+        2020-03-01 balance Assets:Bank  -20 USD
+        """)[0]
+    assert txn.flag == FLAG_WARNING
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, FLAG_WARNING]
+
+
+def test_okay_posting_set_elsewhere_counts_toward_okay():
+    txn = load_flagged("""
+        2020-02-01 ! "Withdraw"
+          Assets:Bank  -20 USD
+          * Assets:Cash  20 USD
+
+        2020-03-01 balance Assets:Bank  -20 USD
+        """)[0]
+    assert txn.flag == FLAG_OKAY
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, FLAG_OKAY]
+
+
+def test_uncovered_posting_overrides_okay_set_elsewhere():
+    txn = load_flagged("""
+        2020-02-01 balance Assets:Bank  0 USD
+
+        2020-02-15 ! "Withdraw"
+          Assets:Bank  -20 USD
+          * Assets:Cash  20 USD
+        """)[0]
+    assert txn.flag == FLAG_WARNING
+    assert [p.flag for p in txn.postings] == [FLAG_WARNING, FLAG_OKAY]
+
+
+@pytest.mark.parametrize(
+    ("txn_flag", "posting_flag"), [(FLAG_OKAY, FLAG_WARNING), (FLAG_WARNING, FLAG_OKAY)]
+)
+def test_posting_flags_set_elsewhere_apply_without_balances(txn_flag, posting_flag):
+    txn = load_flagged(f"""
+        2020-02-01 {txn_flag} "Withdraw"
+          Assets:Bank  -20 USD
+          {posting_flag} Assets:Cash  20 USD
+        """)[0]
+    assert txn.flag == posting_flag
+    assert [p.flag for p in txn.postings] == [None, posting_flag]
+
+
+def test_special_transaction_flag_kept_despite_warning_posting():
+    txn = load_flagged(f"""
+        2020-02-01 {FLAG_TRANSFER} "Transfer"
+          Assets:Bank  -20 USD
+          ! Assets:Cash  20 USD
+
+        2020-03-01 balance Assets:Bank  -20 USD
+        """)[0]
+    assert txn.flag == FLAG_TRANSFER
+    assert [p.flag for p in txn.postings] == [FLAG_OKAY, FLAG_WARNING]
+
+
 @pytest.mark.parametrize(
     ("balance", "expected"),
     [
@@ -231,12 +293,12 @@ def test_input_list_is_not_mutated():
     assert list(filter_txns(new_entries))[0].flag == FLAG_OKAY
 
 
-def test_no_balances_returns_entries_unchanged():
+def test_no_flagged_postings_leaves_entries_unchanged():
     entries, options_map = load("""
         2020-02-01 ! "Lunch"
           Assets:Cash  -10 USD
           Expenses:Food
         """)
     new_entries, errors = flag_balanced(entries, options_map)
-    assert new_entries is entries
     assert errors == []
+    assert all(new is old for new, old in zip(new_entries, entries, strict=True))

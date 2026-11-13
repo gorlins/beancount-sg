@@ -37,9 +37,12 @@ plugin "beancount_sg.plugins.flag_balanced"
 
 Marks which transactions are verified by a balance assertion. For postings to accounts (and
 currencies) that have their own `balance` assertions, it sets the posting flag to `*` if a later
-assertion on that exact account covers it, and `!` otherwise. The transaction flag becomes `!` if
-any such posting is uncovered, else `*`; special transaction flags (e.g. `P`) are kept. Postings
-in accounts without their own assertions are left alone.
+assertion on that exact account covers it, and `!` otherwise. Other postings keep their flags,
+e.g. ones set by other plugins.
+
+The transaction flag is then derived from all posting flags: `!` if any posting is `!`, else `*`
+if any posting is `*`. Special transaction flags (e.g. `P`) are kept. List this plugin after any
+plugins that set posting flags.
 
 ## Development
 
