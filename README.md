@@ -50,12 +50,34 @@ Sets each transaction's flag from its postings: `!` if any posting is `!`, other
 Unflagged postings are ignored, and special transaction flags (e.g. `P`) are kept. List it after
 any plugins that set posting flags, such as `flag_balanced`.
 
+### `beancount_sg.plugins.link_bills`
+
+```beancount
+plugin "beancount_sg.plugins.link_bills" "Liabilities:Bills"
+```
+
+Links each month's bills and payments in the given account when they cancel out.
+
+### `beancount_sg.plugins.link_transfers`
+
+```beancount
+plugin "beancount_sg.plugins.link_transfers" "Assets:Transfers"
+```
+
+Links same-day, same-amount transactions in the given account when they cancel out, such as the
+two sides of a transfer.
+
 ## Utilities
 
 ### `beancount_sg.builders`
 
 Concise constructors (`A`, `T`, `P`, `B`) for building amounts, transactions, postings and balance
 assertions in importers, plugins and tests.
+
+### `beancount_sg.linking`
+
+`Linker`, the reusable logic behind the linking plugins: it groups transactions by a key built from
+their postings to an account, and links groups that cancel out.
 
 ## Development
 
