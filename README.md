@@ -50,6 +50,25 @@ Sets each transaction's flag from its postings: `!` if any posting is `!`, other
 Unflagged postings are ignored, and special transaction flags (e.g. `P`) are kept. List it after
 any plugins that set posting flags, such as `flag_balanced`.
 
+### `beancount_sg.plugins.link_bills`
+
+```beancount
+plugin "beancount_sg.plugins.link_bills" "Liabilities:Bills"
+```
+
+Links each month's bills and payments in the given account when they cancel out, flagging those
+postings `*` if matched and `!` if not.
+
+### `beancount_sg.plugins.link_transfers`
+
+```beancount
+plugin "beancount_sg.plugins.link_transfers" "Assets:Transfers"
+```
+
+Links same-amount transactions in the given account when they cancel out, such as the two sides
+of a transfer, trying progressively wider date windows (same day, week, then month). Postings are
+flagged like `link_bills`. Pair either with `flag_from_postings` to update transaction flags.
+
 ## Utilities
 
 ### `beancount_sg.builders`
