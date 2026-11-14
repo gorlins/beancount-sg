@@ -85,6 +85,11 @@ shares of a stock or fund, and closes the account if it holds only that commodit
 Concise constructors (`A`, `T`, `P`, `B`) for building amounts, transactions, postings and balance
 assertions in importers, plugins and tests.
 
+### `beancount_sg.plugins.plugin_helpers`
+
+`map_transactions` and `flat_map_transactions` run a per-transaction function over a ledger, for
+writing plugins that rewrite transactions or add directives next to them.
+
 ## Development
 
 ```bash

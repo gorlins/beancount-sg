@@ -42,6 +42,7 @@ Usage::
 from __future__ import annotations
 
 import datetime
+import functools
 from typing import Any, NamedTuple
 
 from beancount.core import account as account_lib
@@ -56,7 +57,9 @@ from beancount.core.data import (
 )
 from beancount.core.number import ZERO
 
-from ..builders import A, B
+from beancount_sg.builders import A, B
+
+from .plugin_helpers import flat_map_transactions
 
 __plugins__ = ("close_positions",)
 
@@ -76,43 +79,62 @@ def close_positions(
 ) -> tuple[list[Directive], list[BeancountError]]:
     """Add a zero balance assertion and a close the day after each closing posting."""
     # Directives the ledger already has, so none are duplicated.
-    closed = {entry.account for entry in entries if isinstance(entry, Close)}
-    balances = {
+    closed = frozenset(entry.account for entry in entries if isinstance(entry, Close))
+    balances = frozenset(
         (entry.date, entry.account, entry.amount.currency)
         for entry in entries
         if isinstance(entry, Balance)
-    }
+    )
+    close_txn = functools.partial(close_transaction, closed=closed, balances=balances)
+    return flat_map_transactions(entries, close_txn)
 
-    new_entries = list(entries)
+
+def close_transaction(
+    txn: Transaction,
+    *,
+    closed: frozenset[str],
+    balances: frozenset[tuple[datetime.date, str, str]],
+) -> tuple[list[Directive], list[BeancountError]]:
+    """The transaction plus a balance and close for each of its closing postings.
+
+    ``closed`` and ``balances`` are the accounts closed and the balance assertions
+    (date, account, currency) already in the ledger, which aren't added again.
+    """
+    directives: list[Directive] = [txn]
     errors: list[BeancountError] = []
-    for txn in entries:
-        if not isinstance(txn, Transaction):
+    # Also skip ones added for an earlier closing posting in this transaction.
+    added_closes: set[str] = set()
+    added_balances: set[tuple[datetime.date, str, str]] = set()
+    for posting in txn.postings:
+        if not (posting.meta and posting.meta.get(META_KEY)):
             continue
-        for posting in txn.postings:
-            if not (posting.meta and posting.meta.get(META_KEY)):
-                continue
-            # Point the error or added directives at the closing posting's source line.
-            meta = new_metadata(
-                posting.meta.get("filename", "<close_positions>"), posting.meta.get("lineno", 0)
-            )
-            # Only a sale out of a position held at cost can close it.
-            if posting.cost is None or posting.units.number >= 0:
-                errors.append(
-                    ClosePositionError(
-                        meta,
-                        f"'{META_KEY}' is only for sales of a position held at cost; "
-                        f"{posting.account} {posting.units} isn't one",
-                        txn,
-                    )
+        # Point the error or added directives at the closing posting's source line.
+        meta = new_metadata(
+            posting.meta.get("filename", "<close_positions>"), posting.meta.get("lineno", 0)
+        )
+        # Only a sale out of a position held at cost can close it.
+        if posting.cost is None or posting.units.number >= 0:
+            errors.append(
+                ClosePositionError(
+                    meta,
+                    f"'{META_KEY}' is only for sales of a position held at cost; "
+                    f"{posting.account} {posting.units} isn't one",
+                    txn,
                 )
-                continue
-            date = txn.date + datetime.timedelta(days=1)
-            currency = posting.units.currency
-            if (date, posting.account, currency) not in balances:
-                balances.add((date, posting.account, currency))
-                new_entries.append(B(date, posting.account, A(ZERO, currency), meta=meta))
-            # Close the account only if it holds just this commodity.
-            if account_lib.leaf(posting.account) == currency and posting.account not in closed:
-                closed.add(posting.account)
-                new_entries.append(Close(meta, date, posting.account))
-    return new_entries, errors
+            )
+            continue
+        date = txn.date + datetime.timedelta(days=1)
+        currency = posting.units.currency
+        balance = (date, posting.account, currency)
+        if balance not in balances and balance not in added_balances:
+            added_balances.add(balance)
+            directives.append(B(date, posting.account, A(ZERO, currency), meta=meta))
+        # Close the account only if it holds just this commodity.
+        if (
+            account_lib.leaf(posting.account) == currency
+            and posting.account not in closed
+            and posting.account not in added_closes
+        ):
+            added_closes.add(posting.account)
+            directives.append(Close(meta, date, posting.account))
+    return directives, errors

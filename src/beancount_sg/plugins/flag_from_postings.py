@@ -20,6 +20,8 @@ from typing import Any
 from beancount.core.data import Directive, Transaction
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
+from .plugin_helpers import map_transactions
+
 __plugins__ = ("flag_from_postings",)
 
 
@@ -27,10 +29,7 @@ def flag_from_postings(
     entries: list[Directive], options_map: dict[str, Any], config: str | None = None
 ) -> tuple[list[Directive], list[Any]]:
     """Set transaction flags from posting flags."""
-    new_entries = [
-        flag_transaction(entry) if isinstance(entry, Transaction) else entry for entry in entries
-    ]
-    return new_entries, []
+    return map_transactions(entries, flag_transaction)
 
 
 def flag_transaction(txn: Transaction) -> Transaction:
