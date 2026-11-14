@@ -1,6 +1,6 @@
-"""Helpers for plugins that work one transaction at a time.
+"""Helpers for writing Beancount plugins that work one transaction at a time.
 
-Most plugins look at each transaction on its own and either rewrite it or add
+Many plugins look at each transaction on its own and either rewrite it or add
 directives next to it. These helpers run that per-transaction function over the
 ledger and return ``(entries, errors)``, so a plugin can return their result
 directly. Directives other than transactions are passed through unchanged.
@@ -9,7 +9,19 @@ Use `map_transactions` when the function only rewrites the transaction, and
 `flat_map_transactions` when it also adds or removes directives, or reports
 errors. Anything the function needs from the rest of the ledger (e.g. existing
 balance assertions) should be computed first and passed in, e.g. with
-`functools.partial`.
+`functools.partial`. For example::
+
+    from beancount_sg.plugin_helpers import map_transactions
+
+    __plugins__ = ("tag_large",)
+
+    def tag_large(entries, options_map):
+        return map_transactions(entries, _tag_if_large)
+
+    def _tag_if_large(txn):
+        if any(abs(p.units.number) >= 1000 for p in txn.postings):
+            return txn._replace(tags=txn.tags | {"large"})
+        return txn
 """
 
 from __future__ import annotations

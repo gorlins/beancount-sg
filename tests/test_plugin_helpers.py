@@ -4,7 +4,7 @@ from beancount.core.data import Directive, Meta, Note
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
 from beancount_sg.builders import A, B, P, T
-from beancount_sg.plugins._transform import flat_map_transactions, map_transactions
+from beancount_sg.plugin_helpers import flat_map_transactions, map_transactions
 
 
 class Error(NamedTuple):
