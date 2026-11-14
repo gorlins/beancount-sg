@@ -17,8 +17,12 @@ and this plugin adds, dated the following day:
 
 A balance is checked at the start of its date, so the assertion verifies the
 position right after the trade; if anything is left, Beancount reports a
-balance error at the closing posting. Because the account is closed too, this
-is meant for accounts that hold a single security, e.g. one account per ticker.
+balance error at the closing posting.
+
+The account is only closed if it holds just that security, which is recognized
+by its leaf being the commodity name, as in ``Assets:Brokerage:VTI`` holding
+``VTI``. For an account holding several securities, like ``Assets:Brokerage``,
+only the balance assertion for the sold commodity is added.
 
 Only sales are supported: a closing posting must reduce a position held at
 cost, i.e. have a cost basis (``{...}``) and negative units. Any other posting
@@ -40,6 +44,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, NamedTuple
 
+from beancount.core import account as account_lib
 from beancount.core.data import (
     Balance,
     BeancountError,
@@ -102,13 +107,12 @@ def close_positions(
                 )
                 continue
             date = txn.date + datetime.timedelta(days=1)
-            balance = (date, posting.account, posting.units.currency)
-            if balance not in balances:
-                balances.add(balance)
-                new_entries.append(
-                    B(date, posting.account, A(ZERO, posting.units.currency), meta=meta)
-                )
-            if posting.account not in closed:
+            currency = posting.units.currency
+            if (date, posting.account, currency) not in balances:
+                balances.add((date, posting.account, currency))
+                new_entries.append(B(date, posting.account, A(ZERO, currency), meta=meta))
+            # Close the account only if it holds just this commodity.
+            if account_lib.leaf(posting.account) == currency and posting.account not in closed:
                 closed.add(posting.account)
                 new_entries.append(Close(meta, date, posting.account))
     return new_entries, errors

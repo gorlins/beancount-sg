@@ -38,6 +38,28 @@ def test_closing_posting_adds_balance_and_close_next_day():
     assert closes == [(next_day, "Assets:Options:QQQC")]
 
 
+def test_account_holding_several_commodities_gets_balance_but_no_close():
+    _, balances, closes = load_closed("""
+        2018-01-10 * "Buy into a shared account"
+          Assets:Brokerage  3 VTI {200.00 USD}
+          Assets:Brokerage  5 BND {70.00 USD}
+          Assets:Cash
+
+        2018-02-16 * "Sell all VTI"
+          Assets:Brokerage  -3 VTI {200.00 USD} @ 210.00 USD
+            closing: TRUE
+          Assets:Cash  630.00 USD
+          Income:PnL
+
+        2018-03-01 * "Still trading BND"
+          Assets:Brokerage  -1 BND {70.00 USD} @ 71.00 USD
+          Assets:Cash  71.00 USD
+          Income:PnL
+        """)
+    assert balances == [(datetime.date(2018, 2, 17), "Assets:Brokerage", A(0, "VTI"))]
+    assert closes == []
+
+
 def test_position_left_open_is_a_balance_error():
     with pytest.raises(AssertionError, match="Balance failed for 'Assets:Options:QQQC'"):
         load_closed("""

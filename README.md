@@ -75,8 +75,8 @@ flagged like `link_bills`. Pair either with `flag_from_postings` to update trans
 plugin "beancount_sg.plugins.close_positions"
 ```
 
-For postings marked `closing: TRUE`, asserts the position is zero the next day and closes the
-account, e.g. after selling all shares of a stock or fund.
+For sales marked `closing: TRUE`, asserts the position is zero the next day, e.g. after selling all
+shares of a stock or fund, and closes the account if it holds only that commodity.
 
 ## Utilities
 
