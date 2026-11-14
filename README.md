@@ -87,6 +87,15 @@ plugin "beancount_sg.plugins.uptodate_subaccounts"
 Extends Fava's `fava-uptodate-indication` from an account to its direct subaccounts, e.g. to every
 security under a brokerage account.
 
+### `beancount_sg.plugins.check_numbers`
+
+```beancount
+plugin "beancount_sg.plugins.check_numbers"
+```
+
+Records the check number from narrations like `CHECK #1042` as `check_no` metadata on payments by
+check.
+
 ## Utilities
 
 ### `beancount_sg.builders`
