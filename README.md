@@ -69,6 +69,15 @@ Links same-amount transactions in the given account when they cancel out, such a
 of a transfer, trying progressively wider date windows (same day, week, then month). Postings are
 flagged like `link_bills`. Pair either with `flag_from_postings` to update transaction flags.
 
+### `beancount_sg.plugins.close_positions`
+
+```beancount
+plugin "beancount_sg.plugins.close_positions"
+```
+
+For postings marked `closing: TRUE`, asserts the position is zero the next day and closes the
+account, e.g. when an option is sold off or expires.
+
 ## Utilities
 
 ### `beancount_sg.builders`
