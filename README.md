@@ -76,7 +76,7 @@ plugin "beancount_sg.plugins.close_positions"
 ```
 
 For postings marked `closing: TRUE`, asserts the position is zero the next day and closes the
-account, e.g. when an option is sold off or expires.
+account, e.g. after selling all shares of a stock or fund.
 
 ## Utilities
 

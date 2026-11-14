@@ -1,31 +1,29 @@
 """Assert that a position is fully closed, and close its account.
 
-Some trades are known to close out a position: afterwards, the account should
-hold none of that instrument. Options are the typical case, where each contract
-is held in one lot and eventually expires or is sold off entirely. Mark such a
-posting with ``closing: TRUE`` metadata:
+When you sell all of a holding, such as every share of a stock or mutual fund,
+the account holding it should be empty afterwards. Mark the selling posting
+with ``closing: TRUE`` metadata:
 
-    2018-02-16 * "SOLD -14 QQQ 100 16 FEB 18 160 CALL @5.31"
-      Assets:Brokerage:Options:QQQ180216C160  -1400 QQQ180216C160 {2.70 USD} @ 5.31 USD
+    2024-06-03 * "Sell all VTI"
+      Assets:Brokerage:VTI   -25 VTI {210.00 USD} @ 265.40 USD
         closing: TRUE
-      Assets:Brokerage:Cash                    7416.13 USD
-      Income:Brokerage:PnL
+      Assets:Brokerage:Cash  6635.00 USD
+      Income:Brokerage:Gains
 
 and this plugin adds, dated the following day:
 
-    2018-02-17 balance Assets:Brokerage:Options:QQQ180216C160  0 QQQ180216C160
-    2018-02-17 close Assets:Brokerage:Options:QQQ180216C160
+    2024-06-04 balance Assets:Brokerage:VTI  0 VTI
+    2024-06-04 close Assets:Brokerage:VTI
 
-The balance assertion checks the position right after the trade (a balance is
-checked at the start of its date), so a position that isn't actually closed is
-reported as a balance error. Because the account is closed too, this is meant
-for accounts that hold a single instrument.
+A balance is checked at the start of its date, so the assertion verifies the
+position right after the trade; if anything is left, Beancount reports a
+balance error at the closing posting. Because the account is closed too, this
+is meant for accounts that hold a single security, e.g. one account per ticker.
 
-Compared to Beancount's built-in ``beancount.plugins.check_closing``, this
-plugin keeps the ``closing`` metadata, also closes the account, handles every
-closing posting in a transaction, and doesn't add a balance or close that the
-ledger (or an earlier closing posting) already has. The inserted directives
-point at the closing posting's source line, so errors are reported there.
+Every closing posting in a transaction is handled, the ``closing`` metadata is
+kept, and no balance or close is added if the ledger (or an earlier closing
+posting) already has it. The same ``closing`` metadata is used by Beancount's
+built-in ``beancount.plugins.check_closing``, which adds only the balance check.
 
 Usage::
 
