@@ -19,10 +19,13 @@ Usage::
 from __future__ import annotations
 
 import datetime
+import functools
 from typing import Any
 
 from beancount.core.data import Balance, Directive, Transaction
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
+
+from ._transform import map_transactions
 
 __plugins__ = ("flag_balanced",)
 
@@ -38,11 +41,7 @@ def flag_balanced(
     latest = latest_balance_dates(entries)
     if not latest:
         return entries, []
-    new_entries = [
-        flag_postings(entry, latest) if isinstance(entry, Transaction) else entry
-        for entry in entries
-    ]
-    return new_entries, []
+    return map_transactions(entries, functools.partial(flag_postings, latest=latest))
 
 
 def latest_balance_dates(entries: list[Directive]) -> BalanceDates:
