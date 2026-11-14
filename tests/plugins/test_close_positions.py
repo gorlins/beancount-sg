@@ -5,6 +5,7 @@ import pytest
 from beancount.core.data import Balance, Close, filter_txns
 
 from beancount_sg.builders import A
+from beancount_sg.plugins.close_positions import close_positions
 from beancount_sg.testing import load
 
 PLUGIN = "beancount_sg.plugins.close_positions"
@@ -114,3 +115,39 @@ def test_metadata_is_kept_and_added_directives_point_at_the_posting():
     assert posting.meta["closing"] is True
     added = [e for e in entries if isinstance(e, Balance | Close)]
     assert {e.meta["lineno"] for e in added} == {posting.meta["lineno"]}
+
+
+@pytest.mark.parametrize(
+    "posting",
+    [
+        "Assets:Cash  -100.00 USD",  # no position at all
+        "Assets:Options:QQQC  1 QQQC {2.70 USD}",  # a purchase, not a sale
+        "Assets:Cash  -100.00 EUR @ 1.10 USD",  # a conversion at a price, not at cost
+    ],
+)
+def test_closing_posting_that_is_not_a_sale_is_an_error(posting):
+    entries, options_map = load(
+        textwrap.dedent(BUY)
+        + f"""
+2018-02-16 * "Not a sale"
+  {posting}
+    closing: TRUE
+  Income:Other
+"""
+    )
+    new_entries, errors = close_positions(entries, options_map)
+    [error] = errors
+    assert "only for sales of a position held at cost" in error.message
+    marked = list(filter_txns(entries))[-1].postings[0]
+    assert error.source["lineno"] == marked.meta["lineno"]
+    assert not [e for e in new_entries if isinstance(e, Balance | Close)]
+
+
+def test_not_a_sale_is_reported_when_loading():
+    with pytest.raises(AssertionError, match="only for sales of a position held at cost"):
+        load_closed("""
+            2018-02-16 * "Withdraw"
+              Assets:Cash  -100.00 USD
+                closing: TRUE
+              Expenses:Misc
+            """)
