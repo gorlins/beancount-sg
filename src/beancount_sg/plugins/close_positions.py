@@ -57,8 +57,9 @@ from beancount.core.data import (
 )
 from beancount.core.number import ZERO
 
-from ..builders import A, B
-from ..plugin_helpers import flat_map_transactions
+from beancount_sg.builders import A, B
+
+from .plugin_helpers import flat_map_transactions
 
 __plugins__ = ("close_positions",)
 

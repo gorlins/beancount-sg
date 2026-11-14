@@ -20,7 +20,7 @@ from typing import Any
 from beancount.core.data import Directive, Transaction
 from beancount.core.flags import FLAG_OKAY, FLAG_WARNING
 
-from ..plugin_helpers import map_transactions
+from .plugin_helpers import map_transactions
 
 __plugins__ = ("flag_from_postings",)
 

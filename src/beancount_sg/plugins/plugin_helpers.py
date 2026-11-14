@@ -11,7 +11,7 @@ errors. Anything the function needs from the rest of the ledger (e.g. existing
 balance assertions) should be computed first and passed in, e.g. with
 `functools.partial`. For example::
 
-    from beancount_sg.plugin_helpers import map_transactions
+    from beancount_sg.plugins.plugin_helpers import map_transactions
 
     __plugins__ = ("tag_large",)
 
