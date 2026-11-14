@@ -78,6 +78,15 @@ plugin "beancount_sg.plugins.close_positions"
 For sales marked `closing: TRUE`, asserts the position is zero the next day, e.g. after selling all
 shares of a stock or fund, and closes the account if it holds only that commodity.
 
+### `beancount_sg.plugins.uptodate_subaccounts`
+
+```beancount
+plugin "beancount_sg.plugins.uptodate_subaccounts"
+```
+
+Extends Fava's `fava-uptodate-indication` from an account to its direct subaccounts, e.g. to every
+security under a brokerage account.
+
 ## Utilities
 
 ### `beancount_sg.builders`
