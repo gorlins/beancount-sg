@@ -105,6 +105,15 @@ plugin "beancount_sg.plugins.tag_recurring_payees"
 Once any transaction from a payee is tagged `#recurring` (or a configured tag), tags all of that
 payee's transactions.
 
+### `beancount_sg.plugins.tag_travel`
+
+```beancount
+plugin "beancount_sg.plugins.tag_travel" "{'travel_accounts': ['Expenses:Travel'], 'conditional_accounts': ['Expenses:Food']}"
+```
+
+Tags travel spending, and everyday spending while away (per `travel` events), with `#travel` and a
+trip tag such as `#new-york-city-2024`.
+
 ## Utilities
 
 ### `beancount_sg.builders`
