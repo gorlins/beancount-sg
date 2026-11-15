@@ -43,13 +43,50 @@ def test_travel_accounts_always_tagged_and_conditional_only_while_away():
     ]
 
 
-def test_event_applies_to_transactions_on_its_date_whatever_the_line_order():
+def test_trip_starts_on_its_event_date_whatever_the_line_order():
     assert tags(
         spend("2024-03-04", "Expenses:Food", "Lunch on arrival")
         + '2024-03-04 event "travel" "Boston"\n'
-        + '2024-03-08 event "travel" "home"\n'
-        + spend("2024-03-08", "Expenses:Food", "Dinner at home")
+    ) == [{"travel", "boston-2024"}]
+
+
+def test_return_day_is_part_of_the_trip_by_default():
+    assert tags(
+        '2024-03-04 event "travel" "Boston"\n'
+        + '2024-03-09 event "travel" "home"\n'
+        + spend("2024-03-09", "Expenses:Food", "Dinner the day we got back")
+        + spend("2024-03-10", "Expenses:Food", "Dinner the day after")
     ) == [{"travel", "boston-2024"}, set()]
+
+
+def test_return_day_can_be_excluded():
+    config = CONFIG[:-1] + ", 'include_return_day': False}"
+    assert tags(
+        '2024-03-04 event "travel" "Boston"\n'
+        + '2024-03-09 event "travel" "home"\n'
+        + spend("2024-03-09", "Expenses:Food", "Dinner the day we got back"),
+        (PLUGIN[0], config),
+    ) == [set()]
+
+
+@pytest.mark.parametrize("next_trip", ["2024-03-09", "2024-03-10"])
+def test_next_trip_starting_on_or_after_return_day_takes_over(next_trip):
+    assert tags(
+        '2024-03-04 event "travel" "Boston"\n'
+        + '2024-03-09 event "travel" "home"\n'
+        + f'{next_trip} event "travel" "Chicago"\n'
+        + spend("2024-03-10", "Expenses:Food")
+    ) == [{"travel", "chicago-2024"}]
+
+
+def test_leaving_again_on_return_day_starts_the_new_trip():
+    assert tags(
+        '2024-03-04 event "travel" "Boston"\n'
+        + '2024-03-09 event "travel" "home"\n'
+        + '2024-03-09 event "travel" "Chicago"\n'
+        + spend("2024-03-09", "Expenses:Food")
+        + spend("2024-03-10", "Expenses:Food")
+    ) == [{"travel", "chicago-2024"}, {"travel", "chicago-2024"}]
 
 
 def test_moving_between_trips_changes_the_trip_tag():
@@ -90,6 +127,8 @@ def test_separate_loads_do_not_share_the_location():
         ("New York City", "new-york-city-2024"),
         ("Zürich", "zurich-2024"),
         ("  St. John's, NL  ", "st-john-s-nl-2024"),
+        ("Straße", "strasse-2024"),
+        ("Москва", "moskva-2024"),
     ],
 )
 def test_trip_tag(location, expected):
