@@ -38,7 +38,7 @@ import functools
 import re
 from typing import Any
 
-from beancount.core.account_types import AccountTypes, get_account_type
+from beancount.core.account_types import get_account_type
 from beancount.core.data import Directive, Transaction
 from beancount.parser.options import get_account_types
 
@@ -56,34 +56,38 @@ def add_check_numbers(
     entries: list[Directive], options_map: dict[str, Any], config: str | None = None
 ) -> tuple[list[Directive], list[Any]]:
     """Add ``check_no`` metadata to payments by check."""
+    # Root account names checks can be written from, e.g. {"Assets", "Liabilities"}.
     account_types = get_account_types(options_map)
+    paying_roots = frozenset({account_types.assets, account_types.liabilities})
     return map_transactions(
-        entries, functools.partial(record_check_number, account_types=account_types)
+        entries, functools.partial(record_check_number, paying_roots=paying_roots)
     )
 
 
-def record_check_number(txn: Transaction, *, account_types: AccountTypes) -> Transaction:
+def record_check_number(txn: Transaction, *, paying_roots: frozenset[str]) -> Transaction:
     """The transaction with its check number recorded, if it's a payment by check."""
     if META_KEY in txn.meta:
         return txn
-    number = get_check_number(txn, account_types)
+    number = get_check_number(txn, paying_roots)
     if number is None:
         return txn
     # Beancount metadata can't hold a plain int, so store the number as a string.
     return txn._replace(meta={**txn.meta, META_KEY: number})
 
 
-def get_check_number(txn: Transaction, account_types: AccountTypes) -> str | None:
-    """The check number if ``txn`` is a payment by check, else None."""
+def get_check_number(txn: Transaction, paying_roots: frozenset[str]) -> str | None:
+    """The check number if ``txn`` is a payment by check, else None.
+
+    ``paying_roots`` are the root account names a check can be written from.
+    """
     match = _CHECK_NUMBER.search(txn.narration or "")
     if match is None:
         return None
     # The check is written from exactly one asset or liability account.
-    balance_sheet = {account_types.assets, account_types.liabilities}
     paying = [
         posting
         for posting in txn.postings
-        if get_account_type(posting.account) in balance_sheet and posting.units.number < 0
+        if get_account_type(posting.account) in paying_roots and posting.units.number < 0
     ]
     if len(paying) != 1:
         return None
