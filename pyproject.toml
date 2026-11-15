@@ -15,6 +15,7 @@ classifiers = [
 ]
 dependencies = [
     "beancount>=3",
+    "python-slugify>=8",
 ]
 
 [project.optional-dependencies]
