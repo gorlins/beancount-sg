@@ -14,22 +14,22 @@ automatically with ``beancount_sg.plugins.add_check_numbers``.
 - The category is the other posting's account, or ``<split>`` if there are
   several.
 - The amount is the positive amount paid, in that account's currency.
+
+Clicking a check's date opens the transaction, as in Fava's journal. The table
+can be sorted by clicking a column header.
 """
 
 from __future__ import annotations
 
+import datetime
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from beancount.core.account_types import get_account_type
+from beancount.core.amount import Amount
 from beancount.core.data import Directive, Transaction
+from fava.beans.funcs import hash_entry
 from fava.context import g
-from fava.core.query import (
-    AmountColumn,
-    DateColumn,
-    IntColumn,
-    QueryResultTable,
-    StrColumn,
-)
 from fava.ext import FavaExtensionBase
 
 from beancount_sg.plugins.add_check_numbers import META_KEY
@@ -37,15 +37,19 @@ from beancount_sg.plugins.add_check_numbers import META_KEY
 SPLIT = "<split>"
 _MAX_TEXT = 32
 
-COLUMNS = [
-    DateColumn("date"),
-    IntColumn("check_no"),
-    StrColumn("payee"),
-    StrColumn("account"),
-    StrColumn("category"),
-    StrColumn("narration"),
-    AmountColumn("amount"),
-]
+
+@dataclass(frozen=True)
+class CheckRow:
+    """A check in the checkbook table."""
+
+    entry_hash: str  # Fava's id for the transaction, used to link to it
+    date: datetime.date
+    check_no: int | None
+    payee: str | None
+    account: str | None
+    category: str
+    narration: str | None
+    amount: Amount | None
 
 
 class Checkbook(FavaExtensionBase):
@@ -53,15 +57,15 @@ class Checkbook(FavaExtensionBase):
 
     report_title = "Checkbook"
 
-    def table(self) -> QueryResultTable:
+    def rows(self) -> list[CheckRow]:
         """The checks in Fava's currently filtered entries."""
         roots = frozenset(
             {self.ledger.options["name_assets"], self.ledger.options["name_liabilities"]}
         )
-        return checkbook_table(g.filtered.entries, roots)
+        return checkbook_rows(g.filtered.entries, roots)
 
 
-def checkbook_table(entries: Iterable[Directive], paying_roots: frozenset[str]) -> QueryResultTable:
+def checkbook_rows(entries: Iterable[Directive], paying_roots: frozenset[str]) -> list[CheckRow]:
     """A row per transaction with check_no metadata, in entry order.
 
     ``paying_roots`` are the root account names a check can be written from.
@@ -77,20 +81,19 @@ def checkbook_table(entries: Iterable[Directive], paying_roots: frozenset[str]) 
         ]
         paid = paying[0] if len(paying) == 1 else None
         others = [posting.account for posting in txn.postings if posting is not paid]
-        row = (
-            txn.date,
-            _check_number(txn.meta[META_KEY]),
-            _truncate(txn.payee),
-            paid.account if paid else None,
-            others[0] if len(others) == 1 else SPLIT,
-            _truncate(txn.narration),
-            -paid.units if paid else None,
-        )
-        # Fava's table expects values in its serialised form, e.g. for amounts.
         rows.append(
-            tuple(column.serialise(value) for column, value in zip(COLUMNS, row, strict=True))
+            CheckRow(
+                entry_hash=hash_entry(txn),
+                date=txn.date,
+                check_no=_check_number(txn.meta[META_KEY]),
+                payee=_truncate(txn.payee),
+                account=paid.account if paid else None,
+                category=others[0] if len(others) == 1 else SPLIT,
+                narration=_truncate(txn.narration),
+                amount=-paid.units if paid else None,
+            )
         )
-    return QueryResultTable(COLUMNS, rows)
+    return rows
 
 
 def _check_number(value: object) -> int | None:
