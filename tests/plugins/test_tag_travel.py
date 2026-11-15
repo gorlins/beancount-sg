@@ -50,36 +50,16 @@ def test_trip_starts_on_its_event_date_whatever_the_line_order():
     ) == [{"travel", "boston-2024"}]
 
 
-def test_return_day_is_part_of_the_trip_by_default():
+def test_home_applies_from_its_date():
     assert tags(
         '2024-03-04 event "travel" "Boston"\n'
-        + '2024-03-09 event "travel" "home"\n'
+        + '2024-03-10 event "travel" "home"\n'
         + spend("2024-03-09", "Expenses:Food", "Dinner the day we got back")
         + spend("2024-03-10", "Expenses:Food", "Dinner the day after")
     ) == [{"travel", "boston-2024"}, set()]
 
 
-def test_return_day_can_be_excluded():
-    config = CONFIG[:-1] + ", 'include_return_day': False}"
-    assert tags(
-        '2024-03-04 event "travel" "Boston"\n'
-        + '2024-03-09 event "travel" "home"\n'
-        + spend("2024-03-09", "Expenses:Food", "Dinner the day we got back"),
-        (PLUGIN[0], config),
-    ) == [set()]
-
-
-@pytest.mark.parametrize("next_trip", ["2024-03-09", "2024-03-10"])
-def test_next_trip_starting_on_or_after_return_day_takes_over(next_trip):
-    assert tags(
-        '2024-03-04 event "travel" "Boston"\n'
-        + '2024-03-09 event "travel" "home"\n'
-        + f'{next_trip} event "travel" "Chicago"\n'
-        + spend("2024-03-10", "Expenses:Food")
-    ) == [{"travel", "chicago-2024"}]
-
-
-def test_leaving_again_on_return_day_starts_the_new_trip():
+def test_last_event_on_a_date_wins():
     assert tags(
         '2024-03-04 event "travel" "Boston"\n'
         + '2024-03-09 event "travel" "home"\n'
@@ -151,6 +131,7 @@ def test_multiline_config_is_accepted():
     [
         (None, "requires a config"),
         ("{'travel_acounts': ['Expenses:Travel']}", "must be a dict with keys"),
+        ("{'include_return_day': True}", "must be a dict with keys"),
     ],
 )
 def test_bad_config_is_a_load_error(config, message):
