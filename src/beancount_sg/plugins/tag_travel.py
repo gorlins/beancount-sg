@@ -1,16 +1,15 @@
 """Tag travel spending, and everyday spending while away, with the trip.
 
-Record where you are with ``travel`` events, and ``home`` when you get back:
+Record where you are with ``travel`` events, and ``home`` once you're back:
 
     2024-03-04 event "travel" "New York City"
-    2024-03-09 event "travel" "home"
+    2024-03-10 event "travel" "home"
 
 Configure which accounts to tag, as a Python dict:
 
     plugin "beancount_sg.plugins.tag_travel" "{
       'travel_accounts': ['Expenses:Travel'],
       'conditional_accounts': ['Expenses:Food', 'Expenses:Transport'],
-      'include_return_day': True,
     }"
 
 Then a transaction with a posting to (a subaccount of) one of these accounts
@@ -23,14 +22,11 @@ is tagged:
 The trip tag is the location and the year the trip started, slugified, e.g.
 ``#new-york-city-2024`` or ``#zurich-2024``.
 
-A trip starts on its event's date, including transactions on that date, and
+Like other Beancount directives, an event applies from the start of its date:
+a trip starts on its event's date, including transactions on that date, and
 lasts until the next ``travel`` event. Before the first event you're at home.
-
-With ``include_return_day`` (the default), the day you get home still counts as
-part of the trip, e.g. the taxi from the airport, so a ``home`` event takes
-effect the day after its date; above, the trip covers March 4 to 9. Set it to
-``False`` to end the trip on the ``home`` event's date instead. Either way, a
-new trip starting on the day you get home takes over from that day.
+To count the day you get back as part of the trip (e.g. the taxi from the
+airport), date ``home`` the day after, as above: the trip covers March 4 to 9.
 
 Usage::
 
@@ -58,7 +54,7 @@ TAG = "travel"
 EVENT_TYPE = "travel"
 HOME = "home"
 
-_CONFIG_KEYS = {"travel_accounts", "conditional_accounts", "include_return_day"}
+_CONFIG_KEYS = {"travel_accounts", "conditional_accounts"}
 
 
 def tag_travel(
@@ -68,9 +64,7 @@ def tag_travel(
     settings = _parse_config(config)
     travel = _matcher(settings.get("travel_accounts", []))
     conditional = _matcher(settings.get("conditional_accounts", []))
-    dates, trips = trip_timeline(
-        entries, include_return_day=settings.get("include_return_day", True)
-    )
+    dates, trips = trip_timeline(entries)
     return map_transactions(
         entries,
         functools.partial(
@@ -79,33 +73,19 @@ def tag_travel(
     )
 
 
-def trip_timeline(
-    entries: list[Directive], *, include_return_day: bool = True
-) -> tuple[list[datetime.date], list[str | None]]:
-    """Parallel lists of the dates trips take effect and their tags (None at home).
+def trip_timeline(entries: list[Directive]) -> tuple[list[datetime.date], list[str | None]]:
+    """Parallel lists of travel event dates and the trip tag from each (None at home).
 
     Entries are in date order, and same-date events in file order, so the last
-    event on a date wins. With ``include_return_day``, ``home`` takes effect the
-    day after its event, unless another trip starts on the event's own date.
+    event on a date wins.
     """
-    events = [e for e in entries if isinstance(e, Event) and e.type == EVENT_TYPE]
     dates: list[datetime.date] = []
     trips: list[str | None] = []
-    for i, event in enumerate(events):
-        if event.description.strip().lower() != HOME:
-            dates.append(event.date)
-            trips.append(trip_tag(event.description, event.date))
-            continue
-        date = event.date
-        if include_return_day:
-            # Leaving again the same day: the new trip takes over, so skip this one.
-            if i + 1 < len(events) and events[i + 1].date == date:
-                continue
-            # This stays in date order: the next event is at least a day later, and if
-            # it's exactly a day later it comes after this one, so it wins that date.
-            date += datetime.timedelta(days=1)
-        dates.append(date)
-        trips.append(None)
+    for entry in entries:
+        if isinstance(entry, Event) and entry.type == EVENT_TYPE:
+            dates.append(entry.date)
+            is_home = entry.description.strip().lower() == HOME
+            trips.append(None if is_home else trip_tag(entry.description, entry.date))
     return dates, trips
 
 
