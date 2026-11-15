@@ -16,27 +16,30 @@ The *category* of a transaction is the account of its automatic posting: the
 one written without an amount, whose amount Beancount fills in. That's usually
 the expense or income account an importer couldn't decide on.
 
-Edits change only the payee string on the transaction's first line and the
-account name on the automatic posting's line, leaving everything else as
-written: other strings, tags, links, comments, flags, metadata and spacing. They
+Edits are made by parsing the transaction's text with autobean-refactor, a
+lossless Beancount parser, changing only its payee and the automatic posting's
+account, and printing it back: everything else stays exactly as written (other
+strings, tags, links, comments, flags, metadata, spacing, line endings). Edits
 never add or remove lines, so other entries' line numbers stay valid while a
 batch is applied.
+
+An empty or missing new payee or category means "no change". Removing a payee,
+or setting it to an empty string, isn't supported.
 """
 
 from __future__ import annotations
 
+import functools
+import io
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+import lark
+from autobean_refactor import models, parser, printer
 from beancount.core.data import Directive, Posting, Transaction
-
-# A Beancount string literal, with backslash escapes.
-_STRING = r'"(?:[^"\\]|\\.)*"'
-# A transaction's first line: date, flag, then one or two strings (payee, narration).
-_HEADER = re.compile(rf"^(?P<head>\S+\s+\S+\s+)(?P<first>{_STRING})(?P<second>\s+{_STRING})?")
 
 
 class EditError(ValueError):
@@ -45,7 +48,10 @@ class EditError(ValueError):
 
 @dataclass(frozen=True)
 class PlannedEdit:
-    """A matching transaction and its new payee and category, if they change."""
+    """A matching transaction and its new payee and category, if they change.
+
+    ``payee`` and ``category`` are None (or empty) where nothing changes.
+    """
 
     txn: Transaction
     payee: str | None = None
@@ -67,7 +73,7 @@ def plan_edits(
     """The matching transactions (see `find_transactions`) and what would change.
 
     ``payee`` is a template for the new payee (see `new_payee`), and ``category``
-    the new category account; either may be empty to leave it alone. A new value that's
+    the new category account; leave either empty to keep it as it is. A new value that's
     the same as the current one, or a category for a transaction without exactly
     one automatic posting, counts as no change.
 
@@ -81,7 +87,7 @@ def plan_edits(
         edits.append(
             PlannedEdit(
                 txn,
-                payee=to_payee if to_payee != txn.payee else None,
+                payee=to_payee if to_payee and to_payee != txn.payee else None,
                 category=(
                     category if category and posting and category != posting.account else None
                 ),
@@ -131,6 +137,9 @@ def automatic_posting(txn: Transaction) -> Posting | None:
 def new_payee(txn: Transaction, template: str) -> str | None:
     """The payee ``template`` gives for ``txn``, or None if it can't be filled in.
 
+    An empty template, or one that fills in to an empty string, also gives None,
+    i.e. no change.
+
     ``{key}`` placeholders are filled from the transaction's metadata, e.g.
     ``{plaid_payee}``, with Python format specs, e.g. ``{store:04}``; a
     transaction missing a key gets None. Use ``{{`` and ``}}`` for literal braces.
@@ -138,7 +147,7 @@ def new_payee(txn: Transaction, template: str) -> str | None:
     if not template:
         return None
     try:
-        return template.format_map(txn.meta)
+        return template.format_map(txn.meta) or None
     except KeyError:
         return None
 
@@ -151,32 +160,42 @@ def rewrite_entry(
     This only transforms text; see `apply_edits` to edit the source files.
 
     Args:
-        text: The transaction's lines in its source file, from its first line
+        text: The transaction's text in its source file, from its first line
             through at least its last posting.
         txn: The loaded transaction.
-        payee: The new payee, or None to keep it.
-        category: The new account for the automatic posting, or None to keep it.
-            Ignored if the transaction doesn't have exactly one.
+        payee: The new payee; empty or None keeps it.
+        category: The new account for the automatic posting; empty or None keeps
+            it. Ignored if the transaction doesn't have exactly one.
 
     Raises:
-        EditError: If ``text`` doesn't start with the transaction's date (e.g. its
-            file changed and the lines moved), or the lines to edit aren't found.
+        EditError: If ``text`` isn't the transaction (e.g. its file changed and
+            the lines moved since it was loaded).
     """
-    lines = text.split("\n")
-    if not lines[0].startswith(str(txn.date)):
-        raise EditError(
-            f"Expected the transaction dated {txn.date} at line {txn.meta['lineno']}, "
-            f"found {lines[0]!r}; has the file changed since it was loaded?"
-        )
-    if payee is not None and payee != txn.payee:
-        lines[0] = _set_payee(lines[0], payee)
+    # The parser expects the transaction without a final line ending; keep it aside.
+    body = text.rstrip("\r\n")
+    ending = text[len(body) :]
+    try:
+        entry = _parser().parse(body, models.Transaction)
+    except lark.exceptions.UnexpectedInput as error:
+        raise EditError(_moved(txn, f"couldn't parse {body.splitlines()[0]!r}")) from error
+    # Check the text is this transaction, not e.g. one the line numbers now point to.
+    if (entry.date, entry.narration) != (txn.date, txn.narration):
+        raise EditError(_moved(txn, f"found {entry.date} {entry.narration!r}"))
+
+    if payee and payee != txn.payee:
+        entry.payee = payee
+
     posting = automatic_posting(txn)
-    if category is not None and posting is not None and category != posting.account:
-        index = posting.meta["lineno"] - txn.meta["lineno"]
-        if index >= len(lines):
-            raise EditError(f"Line {posting.meta['lineno']} isn't part of the entry's text")
-        lines[index] = _set_account(lines[index], posting.account, category)
-    return "\n".join(lines)
+    if category and posting is not None and category != posting.account:
+        # Beancount keeps postings in the order they're written, so the automatic
+        # posting is at the same position in the parsed text.
+        index = txn.postings.index(posting)
+        written = entry.postings[index] if index < len(entry.postings) else None
+        if written is None or written.account != posting.account:
+            raise EditError(_moved(txn, f"not its posting to {posting.account}"))
+        written.account = category
+
+    return printer.print_model(entry, io.StringIO()).getvalue() + ending
 
 
 class Backend(Protocol):
@@ -199,21 +218,21 @@ class FileBackend:
     """Reads and writes transactions directly in their source files.
 
     An entry's text is its lines from its first line through its last posting,
-    found from their line numbers. Line endings are preserved.
+    found from their line numbers, exactly as in the file (with line endings).
     """
 
     def read_entry(self, txn: Transaction) -> str:
         path, start, end = _entry_span(txn)
-        return "\n".join(_read_lines(path)[start:end])
+        return "".join(_read_lines(path)[start:end])
 
     def write_entry(self, txn: Transaction, old: str, new: str) -> None:
         path, start, end = _entry_span(txn)
         lines = _read_lines(path)
-        if "\n".join(lines[start:end]) != old:
+        if "".join(lines[start:end]) != old:
             raise EditError(f"{path} changed while editing it")
-        lines[start:end] = new.split("\n")
+        lines[start:end] = new.splitlines(keepends=True)
         with path.open("w", encoding="utf-8", newline="") as file:
-            file.write("\n".join(lines))
+            file.write("".join(lines))
 
 
 @dataclass
@@ -246,29 +265,13 @@ def apply_edits(edits: Iterable[PlannedEdit], backend: Backend | None = None) ->
     return result
 
 
-def _set_payee(header: str, payee: str) -> str:
-    match = _HEADER.match(header)
-    if match is None:
-        raise EditError(f"Can't find the payee or narration in {header!r}")
-    quoted = '"' + payee.replace("\\", "\\\\").replace('"', '\\"') + '"'
-    if match["second"]:  # Payee and narration: replace the payee.
-        start, end = match.span("first")
-        return header[:start] + quoted + header[end:]
-    # Only a narration: insert the payee before it.
-    start = match.start("first")
-    return header[:start] + quoted + " " + header[start:]
-
-
-def _set_account(line: str, old: str, new: str) -> str:
-    # The account as a whole word, so e.g. Expenses:Food doesn't match Expenses:FoodX.
-    pattern = re.compile(rf"(?<!\S){re.escape(old)}(?!\S)")
-    if pattern.search(line) is None:
-        raise EditError(f"Can't find {old} in {line!r}")
-    return pattern.sub(new, line, count=1)
-
-
 def _entry_span(txn: Transaction) -> tuple[Path, int, int]:
-    """The transaction's file, and the 0-based range of lines from its first to last posting."""
+    """The transaction's file, and the slice of its lines from its first to last posting.
+
+    Beancount's line numbers are 1-based, so the transaction's first line is at
+    index ``lineno - 1``, and the slice ends just after the last posting's line,
+    at index ``lineno`` of that posting.
+    """
     linenos = [txn.meta["lineno"]] + [
         posting.meta["lineno"]
         for posting in txn.postings
@@ -278,6 +281,19 @@ def _entry_span(txn: Transaction) -> tuple[Path, int, int]:
 
 
 def _read_lines(path: Path) -> list[str]:
-    # newline="" keeps any \r of \r\n line endings, so they're written back as they were.
+    """The file's lines, each with its line ending (\\n or \\r\\n) as written."""
     with path.open(encoding="utf-8", newline="") as file:
-        return file.read().split("\n")
+        return file.read().splitlines(keepends=True)
+
+
+def _moved(txn: Transaction, found: str) -> str:
+    return (
+        f"Expected the transaction dated {txn.date} at line {txn.meta['lineno']}, but "
+        f"{found}; has the file changed since it was loaded?"
+    )
+
+
+@functools.cache
+def _parser() -> parser.Parser:
+    """autobean-refactor's parser, built once (building it compiles its grammar)."""
+    return parser.Parser()

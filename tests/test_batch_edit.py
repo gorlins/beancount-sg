@@ -125,10 +125,11 @@ def test_automatic_posting(ledger_file):
         ("", None),
         ("{{literal}}", "{literal}"),
         ("Store {store:04}", "Store 0012"),  # format specs work on metadata values
+        ("{blank}", None),  # filling in to an empty string means no change
     ],
 )
 def test_new_payee(template, expected):
-    txn = T("2024-01-05", meta={"plaid_payee": "Starbucks Corp", "store": 12})
+    txn = T("2024-01-05", meta={"plaid_payee": "Starbucks Corp", "store": 12, "blank": ""})
     assert new_payee(txn, template) == expected
 
 
@@ -146,11 +147,16 @@ def test_plan_edits(ledger_file):
     ]
 
 
-def test_plan_edits_with_nothing_to_change(ledger_file):
+@pytest.mark.parametrize(
+    ("payee", "category"),
+    [
+        ("Grocer", "Expenses:Uncategorized"),  # the same as now
+        ("", ""),  # empty: keep as is
+    ],
+)
+def test_plan_edits_with_nothing_to_change(ledger_file, payee, category):
     _, txns = ledger_file(LEDGER)
-    [plan] = plan_edits(
-        txns, payee_regex="grocer", payee="Grocer", category="Expenses:Uncategorized"
-    )
+    [plan] = plan_edits(txns, payee_regex="grocer", payee=payee, category=category)
     assert (plan.payee, plan.category, plan.changes) == (None, None, False)
 
 
@@ -203,6 +209,7 @@ def test_rewrite_entry_sets_category_on_the_automatic_posting_only(ledger_file):
 def test_rewrite_entry_without_changes_returns_the_text(ledger_file):
     text, txn = entry(ledger_file, '2024-01-05 * "Coffee Shop" "Latte"' + POSTINGS)
     assert rewrite_entry(text, txn) == text
+    assert rewrite_entry(text, txn, payee="", category="") == text  # empty: keep as is
     assert rewrite_entry(text, txn, payee="Coffee Shop", category="Expenses:Uncategorized") == text
 
 
@@ -216,10 +223,17 @@ def test_rewrite_entry_ignores_category_without_a_single_automatic_posting(ledge
     assert rewrite_entry(text, txn, category="Expenses:Coffee") == text
 
 
-def test_rewrite_entry_requires_the_transaction_text():
+@pytest.mark.parametrize(
+    "text",
+    [
+        '2024-01-06 * "Other"\n  Assets:Checking  -5.00 USD',  # another date
+        '; a comment\n2024-01-05 * "Old"',  # lines moved down
+    ],
+)
+def test_rewrite_entry_refuses_text_that_is_not_the_transaction(text):
     txn = T("2024-01-05", payee="Old", meta={"lineno": 1})
     with pytest.raises(EditError, match="Expected the transaction dated 2024-01-05"):
-        rewrite_entry('2024-01-06 * "Other"', txn, payee="New")
+        rewrite_entry(text, txn, payee="New")
 
 
 # apply_edits, with the default FileBackend
@@ -307,7 +321,7 @@ def test_file_backend_reads_from_the_first_line_through_the_last_posting(ledger_
         '2024-01-05 * "Coffee Shop" "Latte"\n'
         "  Assets:Checking  -5.00 USD\n"
         '    note: "posting meta"\n'
-        "  Expenses:Uncategorized"
+        "  Expenses:Uncategorized\n"
     )
 
 
