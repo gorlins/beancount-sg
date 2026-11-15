@@ -123,3 +123,32 @@ def test_fava_backend_reports_changed_text_as_an_edit_error(ledger_path):
     with pytest.raises(EditError):
         FavaBackend(ledger).write_entry(txn, "not the current text", "new text")
     assert ledger_path.read_text() == LEDGER
+
+
+SPLIT_LEDGER = """option "title" "Test"
+2020-01-01 custom "fava-extension" "beancount_sg.ext.batch_edit"
+2020-01-01 open Assets:Checking
+2020-01-01 open Expenses:Coffee
+2020-01-01 open Expenses:Food
+
+2024-01-05 * "COFFEE SHOP #12" "Latte and a muffin"
+  Assets:Checking  -9.00 USD
+  Expenses:Coffee   5.00 USD
+  Expenses:Food
+"""
+
+
+def test_split_shows_split_and_only_its_payee_changes(tmp_path):
+    path = tmp_path / "main.beancount"
+    path.write_text(SPLIT_LEDGER)
+    client = create_app([path], load=True).test_client()
+    search = {"payee_regex": "coffee", "new_payee": "Cafe", "new_category": "Expenses:Food"}
+
+    body = client.get(URL, query_string=search).get_data(as_text=True)
+    assert "<td>-SPLIT-</td>" in body
+
+    assert client.post(URL + "apply", query_string=search).get_json() == {
+        "changed": 1,
+        "errors": [],
+    }
+    assert path.read_text() == SPLIT_LEDGER.replace('"COFFEE SHOP #12"', '"Cafe"')

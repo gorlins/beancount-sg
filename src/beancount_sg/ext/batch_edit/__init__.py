@@ -14,8 +14,9 @@ date to open the transaction. "Apply" then edits the source files.
 - The new payee can use ``{key}`` placeholders filled from each transaction's
   metadata, e.g. ``{plaid_payee}``; transactions without the key keep their
   payee.
-- The category is the account of the transaction's automatic posting (the one
-  without a written amount).
+- The category is the transaction's income or expense account. A split
+  transaction (two or more) shows ``-SPLIT-``; its payee can be changed, but not
+  its category.
 
 See `beancount_sg.batch_edit` for the editing rules.
 """
@@ -26,7 +27,9 @@ import hashlib
 import re
 from dataclasses import dataclass
 
+from beancount.core.account_types import AccountTypes
 from beancount.core.data import Transaction
+from beancount.parser.options import get_account_types
 from fava.beans.funcs import hash_entry
 from fava.context import g
 from fava.core import FavaLedger
@@ -39,7 +42,6 @@ from beancount_sg.batch_edit import (
     EditError,
     PlannedEdit,
     apply_edits,
-    automatic_posting,
     plan_edits,
 )
 
@@ -76,6 +78,7 @@ class BatchEdit(FavaExtensionBase):
             fields = self.fields()
             edits = plan_edits(
                 g.filtered.entries,
+                account_types=self.account_types(),
                 payee_regex=fields["payee_regex"],
                 narration_regex=fields["narration_regex"],
                 payee=fields["new_payee"],
@@ -85,11 +88,9 @@ class BatchEdit(FavaExtensionBase):
         except re.error as error:
             return Preview([], error=f"Invalid regex: {error}")
 
-    @staticmethod
-    def category(edit: PlannedEdit) -> str | None:
-        """The transaction's current category."""
-        posting = automatic_posting(edit.txn)
-        return posting.account if posting else None
+    def account_types(self) -> AccountTypes:
+        """The ledger's account root names."""
+        return get_account_types(self.ledger.options)
 
     @staticmethod
     def entry_hash(edit: PlannedEdit) -> str:
@@ -101,7 +102,9 @@ class BatchEdit(FavaExtensionBase):
         preview = self.preview()
         if preview.error:
             return jsonify({"changed": 0, "errors": [preview.error]})
-        result = apply_edits(preview.edits, FavaBackend(self.ledger))
+        result = apply_edits(
+            preview.edits, FavaBackend(self.ledger), account_types=self.account_types()
+        )
         errors = [
             f"{edit.txn.date} {edit.txn.payee or edit.txn.narration}: {error}"
             for edit, error in result.errors

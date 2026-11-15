@@ -134,8 +134,8 @@ number, payee, paying account, category and amount.
 ```
 
 A "Batch Edit" report: find transactions by payee and/or narration regex, preview new payees
-(optionally from metadata, e.g. `{plaid_payee}`) and categories, then apply them to the ledger
-files.
+(optionally from metadata, e.g. `{plaid_payee}`) and categories (income or expense accounts), then
+apply them to the ledger files. Split transactions show `-SPLIT-` and keep their categories.
 
 ## Utilities
 

@@ -7,11 +7,13 @@ from beancount import loader
 from beancount.core.data import filter_txns
 
 from beancount_sg.batch_edit import (
+    SPLIT,
     EditError,
     FileBackend,
     PlannedEdit,
     apply_edits,
-    automatic_posting,
+    category_posting,
+    current_category,
     find_transactions,
     new_payee,
     plan_edits,
@@ -21,8 +23,11 @@ from beancount_sg.builders import A, P, T
 
 OPENS = """
 2020-01-01 open Assets:Checking
+2020-01-01 open Assets:Savings
 2020-01-01 open Expenses:Uncategorized
 2020-01-01 open Expenses:Coffee
+2020-01-01 open Expenses:Food
+2020-01-01 open Income:Refunds
 """
 
 LEDGER = (
@@ -94,11 +99,13 @@ def test_find_needs_a_pattern(ledger_file):
     assert find_transactions(txns) == []
 
 
-def test_find_skips_generated_transactions(ledger_file):
+def test_find_skips_transactions_not_in_a_file(ledger_file, tmp_path):
     _, [written, *_] = ledger_file(LEDGER)
     generated = T("2024-01-05", payee="Coffee Shop", meta={"filename": "<pad>", "lineno": 0})
+    missing = T("2024-01-05", payee="Coffee Shop", meta={"filename": str(tmp_path / "gone")})
     built = T("2024-01-05", payee="Coffee Shop")
-    assert find_transactions([written, generated, built], payee_regex="coffee") == [written]
+    found = find_transactions([written, generated, missing, built], payee_regex="coffee")
+    assert found == [written]
 
 
 def test_find_rejects_invalid_patterns():
@@ -106,10 +113,24 @@ def test_find_rejects_invalid_patterns():
         find_transactions([], payee_regex="(")
 
 
-def test_automatic_posting(ledger_file):
-    _, [txn, *_] = ledger_file(LEDGER)
-    assert automatic_posting(txn).account == "Expenses:Uncategorized"
-    assert automatic_posting(T("2024-01-05", postings=[P("Assets:A", A(1, "USD"))])) is None
+# Categories
+
+
+@pytest.mark.parametrize(
+    ("postings", "category"),
+    [
+        ("  Assets:Checking  -5.00 USD\n  Expenses:Coffee", "Expenses:Coffee"),
+        ("  Assets:Checking  -5.00 USD\n  Expenses:Coffee  5.00 USD", "Expenses:Coffee"),
+        ("  Assets:Checking  5.00 USD\n  Income:Refunds", "Income:Refunds"),
+        ("  Assets:Checking  -5.00 USD\n  Expenses:Coffee  3.00 USD\n  Expenses:Food", SPLIT),
+        ("  Assets:Checking  -5.00 USD\n  Assets:Savings", None),  # a transfer
+    ],
+)
+def test_current_category(ledger_file, postings, category):
+    _, [txn] = ledger_file(OPENS + '\n2024-01-05 * "Shop"\n' + postings + "\n")
+    assert current_category(txn) == category
+    posting = category_posting(txn)
+    assert (posting.account if posting else None) == (None if category == SPLIT else category)
 
 
 # new_payee
@@ -160,6 +181,20 @@ def test_plan_edits_with_nothing_to_change(ledger_file, payee, category):
     assert (plan.payee, plan.category, plan.changes) == (None, None, False)
 
 
+SPLIT_ENTRY = (
+    '2024-01-05 * "Coffee Shop" "Latte and a muffin"\n'
+    "  Assets:Checking  -9.00 USD\n"
+    "  Expenses:Coffee  5.00 USD\n"
+    "  Expenses:Food"
+)
+
+
+def test_plan_edits_for_a_split_changes_only_the_payee(ledger_file):
+    _, [txn] = ledger_file(OPENS + "\n" + SPLIT_ENTRY + "\n")
+    [plan] = plan_edits([txn], payee_regex="coffee", payee="Cafe", category="Expenses:Coffee")
+    assert (plan.payee, plan.category, plan.current_category) == ("Cafe", None, SPLIT)
+
+
 # rewrite_entry
 
 POSTINGS = "\n  Assets:Checking  -5.00 USD\n  Expenses:Uncategorized"
@@ -192,7 +227,7 @@ def test_rewrite_entry_sets_payee_and_keeps_the_rest(ledger_file, header, payee,
     assert reloaded.payee == payee
 
 
-def test_rewrite_entry_sets_category_on_the_automatic_posting_only(ledger_file):
+def test_rewrite_entry_sets_category_on_the_category_posting_only(ledger_file):
     text, txn = entry(
         ledger_file,
         '2024-01-05 * "Coffee Shop" "Latte"\n'
@@ -213,25 +248,61 @@ def test_rewrite_entry_without_changes_returns_the_text(ledger_file):
     assert rewrite_entry(text, txn, payee="Coffee Shop", category="Expenses:Uncategorized") == text
 
 
-def test_rewrite_entry_ignores_category_without_a_single_automatic_posting(ledger_file):
+def test_rewrite_entry_sets_category_with_a_written_amount(ledger_file):
     text, txn = entry(
         ledger_file,
         '2024-01-05 * "Coffee Shop" "Latte"\n'
         "  Assets:Checking  -5.00 USD\n"
         "  Expenses:Uncategorized  5.00 USD",
     )
-    assert rewrite_entry(text, txn, category="Expenses:Coffee") == text
+    new = rewrite_entry(text, txn, category="Expenses:Coffee")
+    assert new == text.replace("Expenses:Uncategorized  5.00 USD", "Expenses:Coffee  5.00 USD")
+
+
+def test_rewrite_entry_changes_a_splits_payee_but_not_its_category(ledger_file):
+    text, txn = entry(ledger_file, SPLIT_ENTRY)
+    new = rewrite_entry(text, txn, payee="Cafe", category="Expenses:Uncategorized")
+    assert new == text.replace('"Coffee Shop"', '"Cafe"')
+
+
+def test_rewrite_entry_finds_the_category_posting_by_its_line(ledger_file):
+    text, txn = entry(ledger_file, '2024-01-05 * "Coffee Shop" "Latte"' + POSTINGS)
+    # As if plugins had reordered the postings and added one that isn't in the file.
+    added = P("Assets:Rounding", A("0.00", "USD"))
+    shuffled = txn._replace(postings=[added, *reversed(txn.postings)])
+    new = rewrite_entry(text, shuffled, category="Expenses:Coffee")
+    assert new == text.replace("Expenses:Uncategorized", "Expenses:Coffee")
+
+
+@pytest.mark.parametrize(
+    "posting_line",
+    [
+        "  Expenses:Food",  # another account on the posting's line
+        "  Expenses:Uncategorized  5.00 USD",  # an amount where none was written
+        '  note: "added"\n  Expenses:Uncategorized',  # the posting moved to another line
+    ],
+)
+def test_rewrite_entry_refuses_a_different_posting_on_the_line(ledger_file, posting_line):
+    text, txn = entry(ledger_file, '2024-01-05 * "Coffee Shop" "Latte"' + POSTINGS)
+    changed = text.replace("  Expenses:Uncategorized", posting_line)
+    with pytest.raises(EditError, match="not its posting to Expenses:Uncategorized"):
+        rewrite_entry(changed, txn, category="Expenses:Coffee")
 
 
 @pytest.mark.parametrize(
     "text",
     [
-        '2024-01-06 * "Other"\n  Assets:Checking  -5.00 USD',  # another date
-        '; a comment\n2024-01-05 * "Old"',  # lines moved down
+        '2024-01-06 * "Old" "Latte"',  # another date
+        '2024-01-05 * "Other" "Latte"',  # another payee
+        '2024-01-05 * "Old" "Mocha"',  # another narration
+        "  Assets:Checking  -5.00 USD",  # not the start of a transaction
     ],
 )
 def test_rewrite_entry_refuses_text_that_is_not_the_transaction(text):
-    txn = T("2024-01-05", payee="Old", meta={"lineno": 1})
+    txn = T("2024-01-05", payee="Old", narration="Latte", meta={"lineno": 1})
+    assert rewrite_entry('2024-01-05 * "Old" "Latte"', txn, payee="New") == (
+        '2024-01-05 * "New" "Latte"'
+    )
     with pytest.raises(EditError, match="Expected the transaction dated 2024-01-05"):
         rewrite_entry(text, txn, payee="New")
 

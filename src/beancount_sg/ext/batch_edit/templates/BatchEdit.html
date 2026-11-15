@@ -46,7 +46,7 @@
       <td>{{ edit.txn.payee or '' }}</td>
       <td>{{ edit.payee if edit.payee is not none else '' }}</td>
       <td>{{ edit.txn.narration or '' }}</td>
-      <td>{{ extension.category(edit) or '' }}</td>
+      <td>{{ edit.current_category or '' }}</td>
       <td>{{ edit.account or '' }}</td>
     </tr>
     {% endfor %}
