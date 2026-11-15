@@ -1,12 +1,16 @@
-"""Batch edits to transactions' payees and categories, in the ledger's source.
+"""Batch edits to transactions' payees and categories, in the ledger's files.
 
-The building blocks for batch editing, independent of any front end (see
-``beancount_sg.ext.batch_edit`` for the Fava report):
+Batch editing independent of any front end (see ``beancount_sg.ext.batch_edit``
+for the Fava report):
 
 - `plan_edits` finds the transactions to edit and what would change for each:
   it combines `find_transactions` (payee and/or narration regexes),
   `new_payee` (a payee template) and `automatic_posting` (the category).
-- `edit_source` rewrites a transaction's source lines.
+- `apply_edits` writes planned edits to the ledger's source files, through a
+  backend: `FileBackend` (the default) edits the files directly; front ends can
+  provide their own, e.g. to write through Fava.
+- `rewrite_entry` is the text transformation underneath: it rewrites one
+  transaction's source text.
 
 The *category* of a transaction is the account of its automatic posting: the
 one written without an amount, whose amount Beancount fills in. That's usually
@@ -23,7 +27,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Protocol
 
 from beancount.core.data import Directive, Posting, Transaction
 
@@ -33,17 +39,21 @@ _STRING = r'"(?:[^"\\]|\\.)*"'
 _HEADER = re.compile(rf"^(?P<head>\S+\s+\S+\s+)(?P<first>{_STRING})(?P<second>\s+{_STRING})?")
 
 
+class EditError(ValueError):
+    """An edit couldn't be made, e.g. its text wasn't found or the file changed."""
+
+
 @dataclass(frozen=True)
 class PlannedEdit:
     """A matching transaction and its new payee and category, if they change."""
 
     txn: Transaction
     payee: str | None = None
-    account: str | None = None
+    category: str | None = None
 
     @property
     def changes(self) -> bool:
-        return self.payee is not None or self.account is not None
+        return bool(self.payee or self.category)
 
 
 def plan_edits(
@@ -52,12 +62,12 @@ def plan_edits(
     payee_regex: str = "",
     narration_regex: str = "",
     payee: str = "",
-    account: str = "",
+    category: str = "",
 ) -> list[PlannedEdit]:
     """The matching transactions (see `find_transactions`) and what would change.
 
-    ``payee`` is a template for the new payee (see `new_payee`), and ``account``
-    the new category; either may be empty to leave it alone. A new value that's
+    ``payee`` is a template for the new payee (see `new_payee`), and ``category``
+    the new category account; either may be empty to leave it alone. A new value that's
     the same as the current one, or a category for a transaction without exactly
     one automatic posting, counts as no change.
 
@@ -72,7 +82,9 @@ def plan_edits(
             PlannedEdit(
                 txn,
                 payee=to_payee if to_payee != txn.payee else None,
-                account=account if account and posting and account != posting.account else None,
+                category=(
+                    category if category and posting and category != posting.account else None
+                ),
             )
         )
     return edits
@@ -120,48 +132,124 @@ def new_payee(txn: Transaction, template: str) -> str | None:
     """The payee ``template`` gives for ``txn``, or None if it can't be filled in.
 
     ``{key}`` placeholders are filled from the transaction's metadata, e.g.
-    ``{plaid_payee}``; a transaction missing a key gets None. Use ``{{`` and
-    ``}}`` for literal braces.
+    ``{plaid_payee}``, with Python format specs, e.g. ``{store:04}``; a
+    transaction missing a key gets None. Use ``{{`` and ``}}`` for literal braces.
     """
     if not template:
         return None
-    values = {key: str(value) for key, value in txn.meta.items() if value is not None}
     try:
-        return template.format_map(values)
+        return template.format_map(txn.meta)
     except KeyError:
         return None
 
 
-def edit_source(
-    source: str, txn: Transaction, *, payee: str | None = None, account: str | None = None
+def rewrite_entry(
+    text: str, txn: Transaction, *, payee: str | None = None, category: str | None = None
 ) -> str:
-    """The transaction's source lines with its payee and/or category changed.
+    """A transaction's source text with its payee and/or category changed.
+
+    This only transforms text; see `apply_edits` to edit the source files.
 
     Args:
-        source: The transaction's lines in its source file, starting with its
-            first line (as Fava's ``get_entry_slice`` returns them).
+        text: The transaction's lines in its source file, from its first line
+            through at least its last posting.
         txn: The loaded transaction.
         payee: The new payee, or None to keep it.
-        account: The new account for the automatic posting, or None to keep it.
+        category: The new account for the automatic posting, or None to keep it.
             Ignored if the transaction doesn't have exactly one.
 
     Raises:
-        ValueError: If the lines to edit can't be found in ``source``.
+        EditError: If ``text`` doesn't start with the transaction's date (e.g. its
+            file changed and the lines moved), or the lines to edit aren't found.
     """
-    lines = source.split("\n")
+    lines = text.split("\n")
+    if not lines[0].startswith(str(txn.date)):
+        raise EditError(
+            f"Expected the transaction dated {txn.date} at line {txn.meta['lineno']}, "
+            f"found {lines[0]!r}; has the file changed since it was loaded?"
+        )
     if payee is not None and payee != txn.payee:
         lines[0] = _set_payee(lines[0], payee)
     posting = automatic_posting(txn)
-    if account is not None and posting is not None and account != posting.account:
+    if category is not None and posting is not None and category != posting.account:
         index = posting.meta["lineno"] - txn.meta["lineno"]
-        lines[index] = _set_account(lines[index], posting.account, account)
+        if index >= len(lines):
+            raise EditError(f"Line {posting.meta['lineno']} isn't part of the entry's text")
+        lines[index] = _set_account(lines[index], posting.account, category)
     return "\n".join(lines)
+
+
+class Backend(Protocol):
+    """Reads and writes transactions' source text, e.g. directly or through Fava."""
+
+    def read_entry(self, txn: Transaction) -> str:
+        """The transaction's source text, from its first line through its last posting."""
+        ...
+
+    def write_entry(self, txn: Transaction, old: str, new: str) -> None:
+        """Replace the transaction's text ``old`` with ``new``.
+
+        Raises:
+            EditError: If the text is no longer ``old``, e.g. the file changed.
+        """
+        ...
+
+
+class FileBackend:
+    """Reads and writes transactions directly in their source files.
+
+    An entry's text is its lines from its first line through its last posting,
+    found from their line numbers. Line endings are preserved.
+    """
+
+    def read_entry(self, txn: Transaction) -> str:
+        path, start, end = _entry_span(txn)
+        return "\n".join(_read_lines(path)[start:end])
+
+    def write_entry(self, txn: Transaction, old: str, new: str) -> None:
+        path, start, end = _entry_span(txn)
+        lines = _read_lines(path)
+        if "\n".join(lines[start:end]) != old:
+            raise EditError(f"{path} changed while editing it")
+        lines[start:end] = new.split("\n")
+        with path.open("w", encoding="utf-8", newline="") as file:
+            file.write("\n".join(lines))
+
+
+@dataclass
+class AppliedEdits:
+    """What `apply_edits` changed, and the edits that failed with why."""
+
+    changed: list[PlannedEdit] = field(default_factory=list)
+    errors: list[tuple[PlannedEdit, str]] = field(default_factory=list)
+
+
+def apply_edits(edits: Iterable[PlannedEdit], backend: Backend | None = None) -> AppliedEdits:
+    """Write the edits that change something to the ledger's source files.
+
+    Each edit is applied on its own: one that fails (e.g. its file changed since
+    it was loaded) is reported in the result, and the others still go ahead.
+    """
+    backend = backend or FileBackend()
+    result = AppliedEdits()
+    for edit in edits:
+        if not edit.changes:
+            continue
+        try:
+            old = backend.read_entry(edit.txn)
+            new = rewrite_entry(old, edit.txn, payee=edit.payee, category=edit.category)
+            if new != old:
+                backend.write_entry(edit.txn, old, new)
+                result.changed.append(edit)
+        except (EditError, OSError) as error:
+            result.errors.append((edit, str(error)))
+    return result
 
 
 def _set_payee(header: str, payee: str) -> str:
     match = _HEADER.match(header)
     if match is None:
-        raise ValueError(f"Can't find the payee or narration in {header!r}")
+        raise EditError(f"Can't find the payee or narration in {header!r}")
     quoted = '"' + payee.replace("\\", "\\\\").replace('"', '\\"') + '"'
     if match["second"]:  # Payee and narration: replace the payee.
         start, end = match.span("first")
@@ -175,5 +263,21 @@ def _set_account(line: str, old: str, new: str) -> str:
     # The account as a whole word, so e.g. Expenses:Food doesn't match Expenses:FoodX.
     pattern = re.compile(rf"(?<!\S){re.escape(old)}(?!\S)")
     if pattern.search(line) is None:
-        raise ValueError(f"Can't find {old} in {line!r}")
+        raise EditError(f"Can't find {old} in {line!r}")
     return pattern.sub(new, line, count=1)
+
+
+def _entry_span(txn: Transaction) -> tuple[Path, int, int]:
+    """The transaction's file, and the 0-based range of lines from its first to last posting."""
+    linenos = [txn.meta["lineno"]] + [
+        posting.meta["lineno"]
+        for posting in txn.postings
+        if posting.meta and "lineno" in posting.meta
+    ]
+    return Path(txn.meta["filename"]), txn.meta["lineno"] - 1, max(linenos)
+
+
+def _read_lines(path: Path) -> list[str]:
+    # newline="" keeps any \r of \r\n line endings, so they're written back as they were.
+    with path.open(encoding="utf-8", newline="") as file:
+        return file.read().split("\n")

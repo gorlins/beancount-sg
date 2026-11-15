@@ -22,17 +22,26 @@ See `beancount_sg.batch_edit` for the editing rules.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 
+from beancount.core.data import Transaction
 from fava.beans.funcs import hash_entry
 from fava.context import g
+from fava.core import FavaLedger
 from fava.core.file import get_entry_slice
 from fava.ext import FavaExtensionBase, extension_endpoint
 from fava.helpers import FavaAPIError
 from flask import Response, jsonify, request
 
-from beancount_sg.batch_edit import PlannedEdit, automatic_posting, edit_source, plan_edits
+from beancount_sg.batch_edit import (
+    EditError,
+    PlannedEdit,
+    apply_edits,
+    automatic_posting,
+    plan_edits,
+)
 
 # The report's search fields, passed as URL query parameters. Their names must not
 # clash with Fava's own (e.g. ``account`` and ``filter`` filter the whole page).
@@ -70,7 +79,7 @@ class BatchEdit(FavaExtensionBase):
                 payee_regex=fields["payee_regex"],
                 narration_regex=fields["narration_regex"],
                 payee=fields["new_payee"],
-                account=fields["new_category"],
+                category=fields["new_category"],
             )
             return Preview(edits)
         except re.error as error:
@@ -92,21 +101,31 @@ class BatchEdit(FavaExtensionBase):
         preview = self.preview()
         if preview.error:
             return jsonify({"changed": 0, "errors": [preview.error]})
-        changed = 0
-        errors = []
-        for edit in preview.edits:
-            if not edit.changes:
-                continue
-            try:
-                current = get_entry_slice(edit.txn)
-                new_source = edit_source(
-                    current.slice, edit.txn, payee=edit.payee, account=edit.account
-                )
-                if new_source != current.slice:
-                    self.ledger.file.save_entry_slice(
-                        hash_entry(edit.txn), new_source, current.sha256sum
-                    )
-                    changed += 1
-            except (ValueError, FavaAPIError) as error:
-                errors.append(f"{edit.txn.date} {edit.txn.payee or edit.txn.narration}: {error}")
-        return jsonify({"changed": changed, "errors": errors})
+        result = apply_edits(preview.edits, FavaBackend(self.ledger))
+        errors = [
+            f"{edit.txn.date} {edit.txn.payee or edit.txn.narration}: {error}"
+            for edit, error in result.errors
+        ]
+        return jsonify({"changed": len(result.changed), "errors": errors})
+
+
+class FavaBackend:
+    """A `beancount_sg.batch_edit.Backend` that edits files through Fava.
+
+    Writing through Fava's file module serialises writes with Fava's own edits,
+    rejects text that changed on disk, and tells Fava to reload the ledger.
+    """
+
+    def __init__(self, ledger: FavaLedger) -> None:
+        self.ledger = ledger
+
+    def read_entry(self, txn: Transaction) -> str:
+        return get_entry_slice(txn).slice
+
+    def write_entry(self, txn: Transaction, old: str, new: str) -> None:
+        # Fava identifies the expected current text by its SHA-256, as get_entry_slice does.
+        sha256sum = hashlib.sha256(old.encode("utf-8")).hexdigest()
+        try:
+            self.ledger.file.save_entry_slice(hash_entry(txn), new, sha256sum)
+        except FavaAPIError as error:
+            raise EditError(str(error)) from error
