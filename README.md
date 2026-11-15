@@ -114,6 +114,19 @@ plugin "beancount_sg.plugins.tag_travel" "{'travel_accounts': ['Expenses:Travel'
 Tags travel spending, and everyday spending while away (per `travel` events), with `#travel` and a
 trip tag such as `#new-york-city-2024`.
 
+## Fava extensions
+
+These need the `fava` extra.
+
+### `beancount_sg.ext.checkbook`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.checkbook"
+```
+
+A "Checkbook" report listing transactions with `check_no` metadata (see `add_check_numbers`): date,
+number, payee, paying account, category and amount.
+
 ## Utilities
 
 ### `beancount_sg.builders`

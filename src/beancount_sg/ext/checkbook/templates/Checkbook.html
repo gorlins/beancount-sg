@@ -1,0 +1,39 @@
+{# Rendered like Fava's journal: the date links to the transaction's context. #}
+{% macro account_cell(account) %}
+<td>{% if account and account in ledger.accounts %}<a href="{{ url_for('account', name=account) }}">{{ account }}</a>{% else %}{{ account or '' }}{% endif %}</td>
+{% endmacro %}
+
+<h2>Checkbook</h2>
+
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Date</th>
+      <th data-sort="num">Check</th>
+      <th data-sort="string">Payee</th>
+      <th data-sort="string">Account</th>
+      <th data-sort="string">Category</th>
+      <th data-sort="string">Narration</th>
+      <th data-sort="num">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in extension.rows() %}
+    <tr>
+      <td><a href="#context-{{ row.entry_hash }}">{{ row.date }}</a></td>
+      <td class="num">{{ row.check_no if row.check_no is not none else '' }}</td>
+      <td>{{ row.payee or '' }}</td>
+      {{ account_cell(row.account) }}
+      {{ account_cell(row.category) }}
+      <td>{{ row.narration or '' }}</td>
+      {% if row.amount %}
+      <td class="num" data-sort-value="{{ row.amount.number }}">{{ row.amount.number|format_currency(row.amount.currency) }} {{ row.amount.currency }}</td>
+      {% else %}
+      <td class="num" data-sort-value="0"></td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
