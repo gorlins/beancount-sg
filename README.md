@@ -96,6 +96,15 @@ plugin "beancount_sg.plugins.add_check_numbers"
 Records the check number from narrations like `CHECK #1042` as `check_no` metadata on payments by
 check.
 
+### `beancount_sg.plugins.tag_recurring_payees`
+
+```beancount
+plugin "beancount_sg.plugins.tag_recurring_payees"
+```
+
+Once any transaction from a payee is tagged `#recurring` (or a configured tag), tags all of that
+payee's transactions.
+
 ## Utilities
 
 ### `beancount_sg.builders`
