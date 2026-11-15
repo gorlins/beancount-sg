@@ -1,8 +1,13 @@
+"""Tests for the Batch Edit Fava report (editing itself is tested in tests/test_batch_edit.py)."""
+
 import pytest
 from beancount.core.data import filter_txns
 from fava.application import create_app
 from fava.beans.funcs import hash_entry
 from fava.core import FavaLedger
+
+from beancount_sg.batch_edit import EditError
+from beancount_sg.ext.batch_edit import FavaBackend
 
 LEDGER = """option "title" "Test"
 2020-01-01 custom "fava-extension" "beancount_sg.ext.batch_edit"
@@ -68,12 +73,27 @@ def test_invalid_regex_is_reported(client):
     assert "Invalid regex" in body
 
 
-def test_apply_edits_only_the_matching_lines(client, ledger_path):
-    response = client.post(URL + "apply", query_string=SEARCH)
-    assert response.get_json() == {"changed": 1, "errors": []}
-    assert ledger_path.read_text() == LEDGER.replace(
-        '"COFFEE SHOP #12" "Latte" #work', '"Coffee Shop" "Latte" #work'
-    ).replace("Expenses:Uncategorized ; from the bank", "Expenses:Coffee ; from the bank")
+def transactions(ledger_path):
+    """(payee, category) of each transaction, freshly loaded from the file."""
+    entries = FavaLedger(str(ledger_path)).all_entries
+    return [(txn.payee, txn.postings[-1].account) for txn in filter_txns(entries)]
+
+
+def test_apply_writes_the_previewed_edits_through_fava(client, ledger_path):
+    response = client.post(
+        URL + "apply",
+        query_string={
+            "payee_regex": "coffee",
+            "new_payee": "Cafe",
+            "new_category": "Expenses:Coffee",
+        },
+    )
+    assert response.get_json() == {"changed": 2, "errors": []}
+    assert transactions(ledger_path) == [
+        ("Cafe", "Expenses:Coffee"),
+        ("Cafe", "Expenses:Coffee"),
+        ("Grocer", "Expenses:Uncategorized"),
+    ]
 
 
 def test_apply_respects_the_fava_filter(client, ledger_path):
@@ -87,11 +107,19 @@ def test_preview_does_not_edit(client, ledger_path):
     assert ledger_path.read_text() == LEDGER
 
 
-def test_apply_several_edits_in_one_file(client, ledger_path):
-    response = client.post(
-        URL + "apply", query_string={"payee_regex": "coffee", "new_payee": "Cafe"}
-    )
-    assert response.get_json() == {"changed": 2, "errors": []}
-    assert ledger_path.read_text() == LEDGER.replace(
-        '"COFFEE SHOP #12" "Latte"', '"Cafe" "Latte"'
-    ).replace('"Coffee Shop" "Espresso"', '"Cafe" "Espresso"')
+def test_fava_backend_reads_and_writes_through_fava(ledger_path):
+    ledger = FavaLedger(str(ledger_path))
+    txn = next(filter_txns(ledger.all_entries))
+    backend = FavaBackend(ledger)
+    text = backend.read_entry(txn)
+    assert text.startswith('2024-01-05 * "COFFEE SHOP #12" "Latte" #work')
+    backend.write_entry(txn, text, text.replace("COFFEE SHOP #12", "Cafe"))
+    assert transactions(ledger_path)[0][0] == "Cafe"
+
+
+def test_fava_backend_reports_changed_text_as_an_edit_error(ledger_path):
+    ledger = FavaLedger(str(ledger_path))
+    txn = next(filter_txns(ledger.all_entries))
+    with pytest.raises(EditError):
+        FavaBackend(ledger).write_entry(txn, "not the current text", "new text")
+    assert ledger_path.read_text() == LEDGER
