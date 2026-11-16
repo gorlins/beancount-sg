@@ -127,6 +127,16 @@ These need the `fava` extra.
 A "Checkbook" report listing transactions with `check_no` metadata (see `add_check_numbers`): date,
 number, payee, paying account, category and amount.
 
+### `beancount_sg.ext.batch_edit`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.batch_edit"
+```
+
+A "Batch Edit" report: find transactions by payee and/or narration regex, preview new payees
+(optionally from metadata, e.g. `{plaid_payee}`) and categories (income or expense accounts), then
+apply them to the ledger files. Split transactions show `-SPLIT-` and keep their categories.
+
 ## Utilities
 
 ### `beancount_sg.builders`
@@ -138,6 +148,11 @@ assertions in importers, plugins and tests.
 
 `map_transactions` and `flat_map_transactions` run a per-transaction function over a ledger, for
 writing plugins that rewrite transactions or add directives next to them.
+
+### `beancount_sg.batch_edit`
+
+The editing logic behind the Batch Edit report, independent of Fava: plan payee and category
+changes for matching transactions and apply them to their source text.
 
 ## Development
 
