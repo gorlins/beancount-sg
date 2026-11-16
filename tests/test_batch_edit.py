@@ -192,7 +192,7 @@ SPLIT_ENTRY = (
 def test_plan_edits_for_a_split_changes_only_the_payee(ledger_file):
     _, [txn] = ledger_file(OPENS + "\n" + SPLIT_ENTRY + "\n")
     [plan] = plan_edits([txn], payee_regex="coffee", payee="Cafe", category="Expenses:Coffee")
-    assert (plan.payee, plan.category, plan.current_category) == ("Cafe", None, SPLIT)
+    assert (plan.payee, plan.category) == ("Cafe", None)
 
 
 # rewrite_entry
@@ -263,6 +263,15 @@ def test_rewrite_entry_changes_a_splits_payee_but_not_its_category(ledger_file):
     text, txn = entry(ledger_file, SPLIT_ENTRY)
     new = rewrite_entry(text, txn, payee="Cafe", category="Expenses:Uncategorized")
     assert new == text.replace('"Coffee Shop"', '"Cafe"')
+
+
+def test_rewrite_entry_refuses_a_category_posting_not_read_from_a_file(ledger_file):
+    text, txn = entry(ledger_file, '2024-01-05 * "Coffee Shop" "Latte"' + POSTINGS)
+    # As if a plugin had replaced the category posting with one of its own.
+    generated = P("Expenses:Uncategorized", A("5.00", "USD"))
+    replaced = txn._replace(postings=[txn.postings[0], generated])
+    with pytest.raises(EditError, match="wasn't read from a file"):
+        rewrite_entry(text, replaced, category="Expenses:Coffee")
 
 
 def test_rewrite_entry_finds_the_category_posting_by_its_line(ledger_file):

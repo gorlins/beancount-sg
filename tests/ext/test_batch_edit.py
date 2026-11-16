@@ -152,3 +152,9 @@ def test_split_shows_split_and_only_its_payee_changes(tmp_path):
         "errors": [],
     }
     assert path.read_text() == SPLIT_LEDGER.replace('"COFFEE SHOP #12"', '"Cafe"')
+
+
+def test_page_explains_how_to_use_it(client):
+    body = client.get(URL).get_data(as_text=True)
+    assert "<summary>How to use</summary>" in body
+    assert "-SPLIT-" in body

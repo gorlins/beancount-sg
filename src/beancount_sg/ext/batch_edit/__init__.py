@@ -42,6 +42,7 @@ from beancount_sg.batch_edit import (
     EditError,
     PlannedEdit,
     apply_edits,
+    current_category,
     plan_edits,
 )
 
@@ -87,6 +88,10 @@ class BatchEdit(FavaExtensionBase):
             return Preview(edits)
         except re.error as error:
             return Preview([], error=f"Invalid regex: {error}")
+
+    def current_category(self, edit: PlannedEdit) -> str | None:
+        """The transaction's category account, ``-SPLIT-``, or None."""
+        return current_category(edit.txn, self.account_types())
 
     def account_types(self) -> AccountTypes:
         """The ledger's account root names."""

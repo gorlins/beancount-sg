@@ -3,6 +3,26 @@
 
 <h2>Batch Edit</h2>
 
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>Find transactions by <b>payee</b> and/or <b>narration</b> with a regular expression.
+      Matching ignores case and starts at the beginning of the text: <code>coffee</code> finds
+      "Coffee Shop", and <code>.*coffee</code> finds "coffee" anywhere. Only transactions in the
+      current Fava filter (time, account, tags...) are searched.</li>
+    <li><b>New payee</b> replaces the payee of every match. Use <code>{key}</code> to fill in
+      a value from the transaction's metadata, e.g. <code>{plaid_payee}</code>; matches without
+      that key keep their payee.</li>
+    <li><b>New category</b> replaces the transaction's income or expense account. Transactions
+      split across several categories show <code>-SPLIT-</code>: their payee can change, but their
+      category is left alone.</li>
+    <li>Leave a field empty to keep it as it is. Payees can't be removed here; click a date to
+      open the transaction and edit it directly.</li>
+    <li><b>Search</b> previews the changes without editing anything. <b>Apply</b> edits your
+      ledger files, changing only the payee and category text.</li>
+  </ul>
+</details>
+
 <form method="get">
   {# Keep Fava's own filters (time, account, filter, ...) when searching. #}
   {% for key, value in request.args.items() if key not in fields %}
@@ -46,7 +66,7 @@
       <td>{{ edit.txn.payee or '' }}</td>
       <td>{{ edit.payee if edit.payee is not none else '' }}</td>
       <td>{{ edit.txn.narration or '' }}</td>
-      <td>{{ edit.current_category or '' }}</td>
+      <td>{{ extension.current_category(edit) or '' }}</td>
       <td>{{ edit.account or '' }}</td>
     </tr>
     {% endfor %}

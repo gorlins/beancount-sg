@@ -25,8 +25,9 @@ strings, tags, links, comments, flags, metadata, spacing, line endings). Edits
 never add or remove lines, so other entries' line numbers stay valid while a
 batch is applied.
 
-An empty or missing new payee or category means "no change". Removing a payee,
-or setting it to an empty string, isn't supported.
+An empty or missing new payee or category means "no change". Batch edits can't
+remove a payee or set it to an empty string; to do that, edit the transaction
+directly (e.g. in Fava's editor, which the report's dates link to).
 """
 
 from __future__ import annotations
@@ -61,14 +62,11 @@ class PlannedEdit:
     """A matching transaction and its new payee and category, if they change.
 
     ``payee`` and ``category`` are None (or empty) where nothing changes.
-    ``current_category`` is the transaction's category before the edit: an
-    account, `SPLIT`, or None if it has none.
     """
 
     txn: Transaction
     payee: str | None = None
     category: str | None = None
-    current_category: str | None = None
 
     @property
     def changes(self) -> bool:
@@ -106,7 +104,6 @@ def plan_edits(
                 category=(
                     category if category and posting and category != posting.account else None
                 ),
-                current_category=current_category(txn, account_types),
             )
         )
     return edits
@@ -173,7 +170,7 @@ def new_payee(txn: Transaction, template: str) -> str | None:
     """The payee ``template`` gives for ``txn``, or None if it can't be filled in.
 
     An empty template, or one that fills in to an empty string, also gives None,
-    i.e. no change.
+    i.e. no change: a payee can't be removed this way (see the module docs).
 
     ``{key}`` placeholders are filled from the transaction's metadata, e.g.
     ``{plaid_payee}``, with Python format specs, e.g. ``{store:04}``; a
@@ -203,7 +200,8 @@ def rewrite_entry(
         text: The transaction's text in its source file, from its first line
             through at least its last posting.
         txn: The loaded transaction.
-        payee: The new payee; empty or None keeps it.
+        payee: The new payee; empty or None keeps it. (A payee can't be removed;
+            see the module docs.)
         category: The new account for the category posting; empty or None keeps
             it. Ignored for a split transaction or one without a category.
         account_types: The ledger's account root names.
@@ -243,9 +241,12 @@ def _written_posting(
     plugins may have added or reordered the loaded transaction's postings.
 
     Raises:
-        EditError: If no posting on that line matches ``posting``.
+        EditError: If ``posting`` has no line number (it wasn't read from a file,
+            e.g. a plugin added it), or no posting on that line matches it.
     """
-    line = posting.meta.get("lineno", 0) - txn.meta["lineno"]  # 0-based line within the entry
+    if not posting.meta or "lineno" not in posting.meta:
+        raise EditError(f"The posting to {posting.account} wasn't read from a file")
+    line = posting.meta["lineno"] - txn.meta["lineno"]  # 0-based line within the entry
     for written in entry.postings:
         if entry.token_store.get_position(written.first_token).line != line:
             continue
