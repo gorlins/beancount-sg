@@ -1,6 +1,3 @@
-{% set fields = extension.fields() %}
-{% set preview = extension.preview() %}
-
 <h2>Batch Edit</h2>
 
 <details>
@@ -19,62 +16,24 @@
     <li>Leave a field empty to keep it as it is. Payees can't be removed here; click a date to
       open the transaction and edit it directly.</li>
     <li><b>Search</b> previews the changes without editing anything. <b>Apply</b> edits your
-      ledger files, changing only the payee and category text.</li>
+      ledger files, changing only the payee and category text, then refreshes the preview.</li>
   </ul>
 </details>
 
-<form method="get">
-  {# Keep Fava's own filters (time, account, filter, ...) when searching. #}
-  {% for key, value in request.args.items() if key not in fields %}
-  <input type="hidden" name="{{ key }}" value="{{ value }}">
-  {% endfor %}
+<form id="batch-edit-form">
   <p>
-    <label>Payee regex <input name="payee_regex" value="{{ fields.payee_regex }}"></label>
-    <label>Narration regex <input name="narration_regex" value="{{ fields.narration_regex }}"></label>
+    <label>Payee regex <input name="payee_regex"></label>
+    <label>Narration regex <input name="narration_regex"></label>
   </p>
   <p>
-    <label>New payee <input name="new_payee" value="{{ fields.new_payee }}" placeholder="e.g. {plaid_payee}"></label>
-    <label>New category <input name="new_category" value="{{ fields.new_category }}"></label>
+    <label>New payee <input name="new_payee" placeholder="e.g. {plaid_payee}"></label>
+    <label>New category <input name="new_category"></label>
   </p>
   <p>
     <button type="submit">Search</button>
-    <a href="?">Clear</a>
+    <button type="reset">Clear</button>
   </p>
 </form>
 
-{% if preview.error %}
-<p class="error">{{ preview.error }}</p>
-{% elif fields.payee_regex or fields.narration_regex %}
-<h3>{{ preview.edits|length }} matching, {{ preview.changes }} to change</h3>
-
-<sortable-table>
-<table>
-  <thead>
-    <tr>
-      <th data-sort="string">Date</th>
-      <th data-sort="string">Payee</th>
-      <th data-sort="string">New payee</th>
-      <th data-sort="string">Narration</th>
-      <th data-sort="string">Category</th>
-      <th data-sort="string">New category</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for edit in preview.edits %}
-    <tr>
-      <td><a href="#context-{{ extension.entry_hash(edit) }}">{{ edit.txn.date }}</a></td>
-      <td>{{ edit.txn.payee or '' }}</td>
-      <td>{{ edit.payee if edit.payee is not none else '' }}</td>
-      <td>{{ edit.txn.narration or '' }}</td>
-      <td>{{ extension.current_category(edit) or '' }}</td>
-      <td>{{ edit.account or '' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</sortable-table>
-
-{% if preview.changes %}
-<p><button id="batch-edit-apply" data-count="{{ preview.changes }}">Apply to {{ preview.changes }} transactions</button></p>
-{% endif %}
-{% endif %}
+{# Filled in by BatchEdit.js from the extension's preview endpoint. #}
+<div id="batch-edit-preview"></div>

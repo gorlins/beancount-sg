@@ -9,6 +9,10 @@ filter) by payee and/or narration regex, and enter a new payee and/or category.
 The table previews each matching transaction and what would change; click a
 date to open the transaction. "Apply" then edits the source files.
 
+The page itself is static: its script loads the preview from the ``preview``
+endpoint and applies edits with the ``apply`` endpoint, passing the search
+fields along with the page's own URL parameters (Fava's filters).
+
 - Regexes are case-insensitive and match from the start, e.g. ``coffee shop``
   or ``.*coffee`` to match anywhere.
 - The new payee can use ``{key}`` placeholders filled from each transaction's
@@ -73,8 +77,8 @@ class BatchEdit(FavaExtensionBase):
         """The search fields from the current request."""
         return {field: request.args.get(field, "") for field in FIELDS}
 
-    def preview(self) -> Preview:
-        """The planned edits for the current search, within the current Fava filter."""
+    def plan(self) -> Preview:
+        """The planned edits for the request's search, within its Fava filter."""
         try:
             fields = self.fields()
             edits = plan_edits(
@@ -101,10 +105,16 @@ class BatchEdit(FavaExtensionBase):
     def entry_hash(edit: PlannedEdit) -> str:
         return hash_entry(edit.txn)
 
+    @extension_endpoint
+    def preview(self) -> str:
+        """The preview table for the request's search, as an HTML fragment."""
+        template = self.jinja_env.get_template("BatchEditPreview.html")
+        return template.render(extension=self, preview=self.plan())
+
     @extension_endpoint(methods=["POST"])
     def apply(self) -> Response:
-        """Apply the current search's edits to the source files."""
-        preview = self.preview()
+        """Apply the request's search's edits to the source files."""
+        preview = self.plan()
         if preview.error:
             return jsonify({"changed": 0, "errors": [preview.error]})
         result = apply_edits(

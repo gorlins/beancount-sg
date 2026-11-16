@@ -1,0 +1,38 @@
+{# The preview table, rendered by the extension's preview endpoint. #}
+{% set fields = extension.fields() %}
+{% if preview.error %}
+<p class="error">{{ preview.error }}</p>
+{% elif fields.payee_regex or fields.narration_regex %}
+<h3>{{ preview.edits|length }} matching, {{ preview.changes }} to change</h3>
+
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Date</th>
+      <th data-sort="string">Payee</th>
+      <th data-sort="string">New payee</th>
+      <th data-sort="string">Narration</th>
+      <th data-sort="string">Category</th>
+      <th data-sort="string">New category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for edit in preview.edits %}
+    <tr>
+      <td><a href="#context-{{ extension.entry_hash(edit) }}">{{ edit.txn.date }}</a></td>
+      <td>{{ edit.txn.payee or '' }}</td>
+      <td>{{ edit.payee if edit.payee is not none else '' }}</td>
+      <td>{{ edit.txn.narration or '' }}</td>
+      <td>{{ extension.current_category(edit) or '' }}</td>
+      <td>{{ edit.account or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
+
+{% if preview.changes %}
+<p><button id="batch-edit-apply" data-count="{{ preview.changes }}">Apply to {{ preview.changes }} transactions</button></p>
+{% endif %}
+{% endif %}
