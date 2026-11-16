@@ -6,18 +6,27 @@ directives (see `beancount_sg.rewards`):
     2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 
 The "Credit Card Rewards" report covers the transactions in the current Fava
-filter. It has a table per card (spend, rate, reward and, where known, cash
-value per category) and hierarchy charts (treemap, sunburst or icicle) of the
-spend and the rewards' cash value by card and category, so cashback and points
-cards can be compared. Points without a ``rewards-point-value`` have no cash
-value, so they're left out of the value chart.
+filter. Its table has a row per card and category: the rate, spend, reward and,
+where known, the reward's cash value. Its hierarchy charts (e.g. as an icicle)
+show the spend and the rewards' cash value by card, then category, so cashback
+and points cards can be compared. Points without a ``rewards-point-value`` have
+no cash value, so they're left out of the value chart.
+
+A category, in the table or the charts, links to the card's account page
+filtered to that category's transactions (by its category metadata, on the
+transaction or any posting).
+
+Fava's charts label nodes by their last account component and link them to
+account pages, so a category's node is named ``<card>:<category>``; the page's
+script (``CreditCardRewards.js``) points those links at the category's filter
+instead.
 """
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
 from decimal import Decimal
 
 from beancount.core import account as account_lib
@@ -28,9 +37,11 @@ from fava.core.inventory import SimpleCounterInventory
 from fava.core.tree import SerialisedTreeNode
 from fava.ext import FavaExtensionBase
 from fava.internal_api import HierarchyChart
+from flask import request, url_for
 
 from beancount_sg.rewards import (
     CASHBACK,
+    UNCATEGORIZED,
     CategoryRewards,
     Program,
     RewardsError,
@@ -39,34 +50,11 @@ from beancount_sg.rewards import (
 )
 
 
-@dataclass(frozen=True)
-class CardRewards:
-    """A card's program, its rows per category, and their totals."""
-
-    program: Program
-    rows: list[CategoryRewards]
-
-    @property
-    def spend(self) -> list[Amount]:
-        return _totals(row.spend for row in self.rows)
-
-    @property
-    def reward(self) -> list[Amount]:
-        return _totals(row.reward for row in self.rows)
-
-    @property
-    def value(self) -> list[Amount]:
-        return _totals(row.value for row in self.rows if row.value is not None)
-
-    def rate_label(self, rate: Decimal) -> str:
-        """A rate as shown in the table, e.g. ``3%`` cashback or ``3x`` points."""
-        return f"{rate}%" if self.program.kind == CASHBACK else f"{rate}x"
-
-
 class CreditCardRewards(FavaExtensionBase):
     """Fava report of credit card rewards by card and category."""
 
     report_title = "Credit Card Rewards"
+    has_js_module = True
 
     def _programs(self) -> tuple[dict[str, Program], list[RewardsError]]:
         # From all entries, so a card's configuration applies whatever the filter.
@@ -76,50 +64,97 @@ class CreditCardRewards(FavaExtensionBase):
         """Invalid rewards configurations."""
         return self._programs()[1]
 
-    def cards(self) -> list[CardRewards]:
-        """Each configured card's rewards, within the current Fava filter."""
-        found, _ = self._programs()
-        rows = category_rewards(g.filtered.entries, found, get_account_types(self.ledger.options))
-        by_card: dict[str, list[CategoryRewards]] = defaultdict(list)
-        for row in rows:
-            by_card[row.program.account].append(row)
-        return [CardRewards(found[account], by_card[account]) for account in sorted(found)]
+    def configured(self) -> bool:
+        """Whether any card has rewards configured."""
+        return bool(self._programs()[0])
 
-    def charts(self) -> list[HierarchyChart]:
+    def rows(self) -> list[CategoryRewards]:
+        """Spending and rewards per card and category, within the current Fava filter."""
+        found, _ = self._programs()
+        return category_rewards(g.filtered.entries, found, get_account_types(self.ledger.options))
+
+    @staticmethod
+    def totals(amounts: Iterable[Amount | None]) -> list[Amount]:
+        """The amounts' totals, one per currency."""
+        totals: dict[str, Decimal] = defaultdict(Decimal)
+        for amount in amounts:
+            if amount:
+                totals[amount.currency] += amount.number
+        return [Amount(number, currency) for currency, number in totals.items()]
+
+    @staticmethod
+    def rate_label(row: CategoryRewards) -> str:
+        """A row's rate as shown in the table, e.g. ``3%`` cashback or ``3x`` points."""
+        return f"{row.rate}%" if row.program.kind == CASHBACK else f"{row.rate}x"
+
+    def category_url(self, row: CategoryRewards) -> str:
+        """The card's account page, filtered to the row's category.
+
+        The category filter is added to the page's current filter, if any.
+        """
+        category_filter = _category_filter(
+            row.program.category_key,
+            row.category,
+            get_account_types(self.ledger.options).expenses,
+        )
+        current = request.args.get("filter")
+        return url_for(
+            "account",
+            name=row.program.account,
+            filter=f"({current}) ({category_filter})" if current else category_filter,
+        )
+
+    def category_links(self, rows: list[CategoryRewards]) -> dict[str, str]:
+        """Each category chart node's account name, and the URL it should link to."""
+        return {_node_account(row): self.category_url(row) for row in rows}
+
+    @staticmethod
+    def charts(rows: list[CategoryRewards]) -> list[HierarchyChart]:
         """Hierarchy charts of spend and rewards' cash value by card, then category."""
-        cards = self.cards()
         return [
-            HierarchyChart("Spend", _tree(cards, lambda row: row.spend)),
-            HierarchyChart("Value", _tree(cards, lambda row: row.value)),
+            HierarchyChart("Spend", _tree(rows, lambda row: row.spend)),
+            HierarchyChart("Value", _tree(rows, lambda row: row.value)),
         ]
 
 
-def _totals(amounts: Iterable[Amount]) -> list[Amount]:
-    totals: dict[str, Decimal] = defaultdict(Decimal)
-    for amount in amounts:
-        totals[amount.currency] += amount.number
-    return [Amount(number, currency) for currency, number in totals.items()]
+def _category_filter(key: str, category: str, expenses: str) -> str:
+    """A Fava filter for transactions with spending in a category.
+
+    As in `beancount_sg.rewards.category_rewards`, an expense posting's category is
+    its own ``key`` metadata, or else its transaction's. So a transaction is in a
+    category if it has an expense posting with that category, or has the category
+    itself and an expense posting without one. Uncategorized spending has the key
+    on neither.
+    """
+    expense = f'account:"^{re.escape(expenses)}(:|$)"'
+    if category == UNCATEGORIZED:
+        return f'-{key}:"" any({expense} -{key}:"")'
+    # Fava matches values as case-insensitive regexes; \x22 is a quote, which
+    # would otherwise end the filter's string.
+    pattern = "^" + re.escape(category).replace('"', r"\x22") + "$"
+    return f'{key}:"{pattern}" any({expense} -{key}:""), any({expense} {key}:"{pattern}")'
 
 
-def _tree(cards: list[CardRewards], amount_of) -> SerialisedTreeNode:
+def _node_account(row: CategoryRewards) -> str:
+    """The chart node's name for a row: ``<card>:<category>``."""
+    return f"{row.program.account}:{row.category.replace(':', '-')}"
+
+
+def _tree(
+    rows: list[CategoryRewards], amount_of: Callable[[CategoryRewards], Amount | None]
+) -> SerialisedTreeNode:
     """A chart tree: the cards' common parent account, each card, then its categories.
 
     The root is the common prefix of the cards' parents, so a single card still
     gets its own node under the root.
-
-    Fava's charts label nodes by their last account component, so a category's
-    node is named ``<card>:<category>``.
     """
-    root = account_lib.commonprefix(account_lib.parent(card.program.account) for card in cards)
-    children = []
-    for card in cards:
-        leaves = [
-            _node(f"{card.program.account}:{row.category.replace(':', '-')}", amount)
-            for row in card.rows
-            if (amount := amount_of(row)) is not None
-        ]
-        children.append(_parent(card.program.account, leaves))
-    return _parent(root, children)
+    by_card: dict[str, list[SerialisedTreeNode]] = defaultdict(list)
+    for row in rows:
+        amount = amount_of(row)
+        if amount:
+            by_card[row.program.account].append(_node(_node_account(row), amount))
+    root = account_lib.commonprefix(account_lib.parent(card) for card in by_card)
+    return _parent(root, [_parent(card, leaves) for card, leaves in sorted(by_card.items())])
 
 
 def _node(account: str, amount: Amount) -> SerialisedTreeNode:

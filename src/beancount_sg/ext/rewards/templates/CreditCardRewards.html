@@ -7,29 +7,6 @@
 
 <h2>Credit Card Rewards</h2>
 
-<details>
-  <summary>How to set up</summary>
-  <p>Add rewards metadata to a credit card's <code>open</code> directive:</p>
-  <pre>2020-01-01 open Liabilities:CreditCard:Sapphire USD
-  rewards: "points"            ; or "cashback"
-  rewards-rate: 1              ; the default rate (defaults to 1)
-  rewards-rate-dining: 3       ; a category's rate: rewards-rate-&lt;category&gt;
-  rewards-unit: "UR"           ; points only: what the points are called
-  rewards-point-value: 0.0125  ; points only, optional: a point's cash value</pre>
-  <ul>
-    <li>A rate of 3 means 3% back for <code>cashback</code>, or 3 points per unit spent for
-      <code>points</code>.</li>
-    <li>Spending is a card's charges to <code>Expenses</code> accounts, grouped by each posting's
-      <code>category</code> metadata, or else its transaction's. Category rate keys are the
-      category in lowercase with dashes: <code>Food and Drink</code> uses
-      <code>rewards-rate-food-and-drink</code>. Spending without a category is
-      <code>uncategorized</code> and earns the default rate.</li>
-    <li>Only transactions in the current Fava filter (e.g. the time range) are counted.</li>
-    <li>The charts show spend and the rewards' cash value by card and category. Points count
-      towards value only with a <code>rewards-point-value</code>.</li>
-  </ul>
-</details>
-
 {% set errors = extension.errors() %}
 {% if errors %}
 <ul class="error">
@@ -37,24 +14,20 @@
 </ul>
 {% endif %}
 
-{% set cards = extension.cards() %}
-{% if not cards %}
-<p>No cards have rewards configured yet; see "How to set up".</p>
+{% set rows = extension.rows() %}
+{% if not extension.configured() %}
+<p>No cards have rewards configured yet; see "How to set up" below.</p>
+{% elif not rows %}
+<p>No spending in the current filter.</p>
 {% else %}
-<svelte-component type="charts"><script type="application/json">{{ extension.charts()|tojson }}</script></svelte-component>
+<svelte-component type="charts"><script type="application/json">{{ extension.charts(rows)|tojson }}</script></svelte-component>
+<script type="application/json" id="rewards-category-links">{{ extension.category_links(rows)|tojson }}</script>
 
-{% for card in cards %}
-{% set program = card.program %}
-<h3><a href="{{ url_for('account', name=program.account) }}">{{ program.account }}</a></h3>
-<p>
-  {% if program.kind == "cashback" %}Cashback{% else %}Points ({{ program.unit }}{% if program.point_value is not none %}, worth {{ program.point_value }} each{% endif %}){% endif %},
-  default rate {{ card.rate_label(program.default_rate) }}.
-</p>
-{% if card.rows %}
 <sortable-table>
 <table>
   <thead>
     <tr>
+      <th data-sort="string">Card</th>
       <th data-sort="string">Category</th>
       <th data-sort="num">Rate</th>
       <th data-sort="num">Spend</th>
@@ -63,10 +36,11 @@
     </tr>
   </thead>
   <tbody>
-    {% for row in card.rows %}
+    {% for row in rows %}
     <tr>
-      <td>{{ row.category }}</td>
-      <td class="num" data-sort-value="{{ row.rate }}">{{ card.rate_label(row.rate) }}</td>
+      <td><a href="{{ url_for('account', name=row.program.account) }}">{{ row.program.account }}</a></td>
+      <td><a href="{{ extension.category_url(row) }}">{{ row.category }}</a></td>
+      <td class="num" data-sort-value="{{ row.rate }}">{{ extension.rate_label(row) }}</td>
       {{ amounts_cell([row.spend]) }}
       {{ amounts_cell([row.reward]) }}
       {{ amounts_cell([row.value] if row.value else []) }}
@@ -77,15 +51,45 @@
     <tr>
       <th>Total</th>
       <th></th>
-      {{ amounts_cell(card.spend, "th") }}
-      {{ amounts_cell(card.reward, "th") }}
-      {{ amounts_cell(card.value, "th") }}
+      <th></th>
+      {{ amounts_cell(extension.totals(rows|map(attribute="spend")), "th") }}
+      {{ amounts_cell(extension.totals(rows|map(attribute="reward")), "th") }}
+      {{ amounts_cell(extension.totals(rows|map(attribute="value")), "th") }}
     </tr>
   </tfoot>
 </table>
 </sortable-table>
-{% else %}
-<p>No spending in the current filter.</p>
 {% endif %}
-{% endfor %}
-{% endif %}
+
+<details>
+  <summary>How to set up</summary>
+  <p>Add rewards metadata to a credit card's <code>open</code> directive. A cashback card needs
+    only its rates:</p>
+  <pre>2020-01-01 open Liabilities:CreditCard:CashPlus USD
+  rewards: "cashback"
+  rewards-rate: 1.5            ; the default rate (defaults to 1)
+  rewards-rate-groceries: 3    ; a category's rate: rewards-rate-&lt;category&gt;</pre>
+  <p>A points card can also name its points and give them a cash value:</p>
+  <pre>2020-01-01 open Liabilities:CreditCard:Voyager USD
+  rewards: "points"
+  rewards-rate-dining: 3
+  rewards-unit: "VP"           ; optional, defaults to POINTS
+  rewards-point-value: 0.0125  ; optional: a point's cash value</pre>
+  <ul>
+    <li>A rate of 3 means 3% back for <code>cashback</code>, or 3 points per unit spent for
+      <code>points</code>. Naming a program's points (<code>rewards-unit</code>) keeps them from
+      being added to other programs' points in the totals.</li>
+    <li>Spending is a card's charges to <code>Expenses</code> accounts, grouped by the
+      <strong>card issuer's category</strong> for each purchase, e.g. "Dining", which can differ from
+      the expense account it's booked to. It's read from the posting's <code>category</code>
+      metadata, or else the transaction's; <code>rewards-category-key: "bank_category"</code> on the
+      card reads another key instead. Spending without a category is <code>uncategorized</code>
+      and earns the default rate.</li>
+    <li>Category rate keys are the category in lowercase with dashes: <code>Food and Drink</code>
+      uses <code>rewards-rate-food-and-drink</code>.</li>
+    <li>Only transactions in the current Fava filter (e.g. the time range) are counted. Clicking a
+      category, in the table or the charts, opens the card's account page filtered to it.</li>
+    <li>The charts show spend and the rewards' cash value by card, then category. Points count
+      towards value only with a <code>rewards-point-value</code>.</li>
+  </ul>
+</details>
