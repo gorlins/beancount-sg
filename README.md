@@ -116,7 +116,8 @@ trip tag such as `#new-york-city-2024`.
 
 ## Fava extensions
 
-These need the `fava` extra.
+These need the `fava` extra. See [`docs/fava`](docs/fava/README.md) for how to use each report,
+with screenshots.
 
 ### `beancount_sg.ext.checkbook`
 
@@ -125,7 +126,7 @@ These need the `fava` extra.
 ```
 
 A "Checkbook" report listing transactions with `check_no` metadata (see `add_check_numbers`): date,
-number, payee, paying account, category and amount.
+number, payee, paying account, category and amount. [Docs](docs/fava/checkbook.md)
 
 ### `beancount_sg.ext.batch_edit`
 
@@ -136,6 +137,7 @@ number, payee, paying account, category and amount.
 A "Batch Edit" report: find transactions by payee and/or narration regex, preview new payees
 (optionally from metadata, e.g. `{plaid_payee}`) and categories (income or expense accounts), then
 apply them to the ledger files. Split transactions show `-SPLIT-` and keep their categories.
+[Docs](docs/fava/batch-edit.md)
 
 ### `beancount_sg.ext.rewards`
 
@@ -152,7 +154,7 @@ apply them to the ledger files. Split transactions show `-SPLIT-` and keep their
 
 A "Credit Card Rewards" report: each configured card's expense spending grouped by `category`
 metadata, with its rate, rewards and cash value, plus treemap/sunburst/icicle charts of spend and
-value by card and category.
+value by card and category. [Docs](docs/fava/rewards.md)
 
 ## Utilities
 
