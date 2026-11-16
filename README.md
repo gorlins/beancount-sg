@@ -137,6 +137,23 @@ A "Batch Edit" report: find transactions by payee and/or narration regex, previe
 (optionally from metadata, e.g. `{plaid_payee}`) and categories (income or expense accounts), then
 apply them to the ledger files. Split transactions show `-SPLIT-` and keep their categories.
 
+### `beancount_sg.ext.rewards`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
+
+2020-01-01 open Liabilities:CreditCard:Sapphire USD
+  rewards: "points"        ; or "cashback"
+  rewards-rate: 1          ; default rate
+  rewards-rate-dining: 3   ; per `category` metadata value
+  rewards-unit: "UR"
+  rewards-point-value: 0.0125
+```
+
+A "Credit Card Rewards" report: each configured card's expense spending grouped by `category`
+metadata, with its rate, rewards and cash value, plus treemap/sunburst/icicle charts of spend and
+value by card and category.
+
 ## Utilities
 
 ### `beancount_sg.builders`
@@ -153,6 +170,11 @@ writing plugins that rewrite transactions or add directives next to them.
 
 The editing logic behind the Batch Edit report, independent of Fava: plan payee and category
 changes for matching transactions and apply them to their source text.
+
+### `beancount_sg.rewards`
+
+The logic behind the Credit Card Rewards report, independent of Fava: read cards' rewards programs
+from `open` metadata, and total spending and rewards per card and category.
 
 ## Development
 

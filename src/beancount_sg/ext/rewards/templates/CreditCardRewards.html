@@ -1,0 +1,91 @@
+{# A cell of amounts (one per currency), sorted by the first; tag="th" for totals. #}
+{% macro amounts_cell(amounts, tag="td") -%}
+<{{ tag }} class="num" data-sort-value="{{ amounts[0].number if amounts else 0 }}">
+  {%- for amount in amounts %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
+</{{ tag }}>
+{%- endmacro %}
+
+<h2>Credit Card Rewards</h2>
+
+<details>
+  <summary>How to set up</summary>
+  <p>Add rewards metadata to a credit card's <code>open</code> directive:</p>
+  <pre>2020-01-01 open Liabilities:CreditCard:Sapphire USD
+  rewards: "points"            ; or "cashback"
+  rewards-rate: 1              ; the default rate (defaults to 1)
+  rewards-rate-dining: 3       ; a category's rate: rewards-rate-&lt;category&gt;
+  rewards-unit: "UR"           ; points only: what the points are called
+  rewards-point-value: 0.0125  ; points only, optional: a point's cash value</pre>
+  <ul>
+    <li>A rate of 3 means 3% back for <code>cashback</code>, or 3 points per unit spent for
+      <code>points</code>.</li>
+    <li>Spending is a card's charges to <code>Expenses</code> accounts, grouped by each posting's
+      <code>category</code> metadata, or else its transaction's. Category rate keys are the
+      category in lowercase with dashes: <code>Food and Drink</code> uses
+      <code>rewards-rate-food-and-drink</code>. Spending without a category is
+      <code>uncategorized</code> and earns the default rate.</li>
+    <li>Only transactions in the current Fava filter (e.g. the time range) are counted.</li>
+    <li>The charts show spend and the rewards' cash value by card and category. Points count
+      towards value only with a <code>rewards-point-value</code>.</li>
+  </ul>
+</details>
+
+{% set errors = extension.errors() %}
+{% if errors %}
+<ul class="error">
+  {% for error in errors %}<li>{{ error.message }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% set cards = extension.cards() %}
+{% if not cards %}
+<p>No cards have rewards configured yet; see "How to set up".</p>
+{% else %}
+<svelte-component type="charts"><script type="application/json">{{ extension.charts()|tojson }}</script></svelte-component>
+
+{% for card in cards %}
+{% set program = card.program %}
+<h3><a href="{{ url_for('account', name=program.account) }}">{{ program.account }}</a></h3>
+<p>
+  {% if program.kind == "cashback" %}Cashback{% else %}Points ({{ program.unit }}{% if program.point_value is not none %}, worth {{ program.point_value }} each{% endif %}){% endif %},
+  default rate {{ card.rate_label(program.default_rate) }}.
+</p>
+{% if card.rows %}
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Category</th>
+      <th data-sort="num">Rate</th>
+      <th data-sort="num">Spend</th>
+      <th data-sort="num">Rewards</th>
+      <th data-sort="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in card.rows %}
+    <tr>
+      <td>{{ row.category }}</td>
+      <td class="num" data-sort-value="{{ row.rate }}">{{ card.rate_label(row.rate) }}</td>
+      {{ amounts_cell([row.spend]) }}
+      {{ amounts_cell([row.reward]) }}
+      {{ amounts_cell([row.value] if row.value else []) }}
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th>Total</th>
+      <th></th>
+      {{ amounts_cell(card.spend, "th") }}
+      {{ amounts_cell(card.reward, "th") }}
+      {{ amounts_cell(card.value, "th") }}
+    </tr>
+  </tfoot>
+</table>
+</sortable-table>
+{% else %}
+<p>No spending in the current filter.</p>
+{% endif %}
+{% endfor %}
+{% endif %}
