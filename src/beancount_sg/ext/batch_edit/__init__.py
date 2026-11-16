@@ -11,7 +11,10 @@ date to open the transaction. "Apply" then edits the source files.
 
 The page itself is static: its script loads the preview from the ``preview``
 endpoint and applies edits with the ``apply`` endpoint, passing the search
-fields along with the page's own URL parameters (Fava's filters).
+fields along with the page's own URL parameters (Fava's filters). The search is
+kept in the page's URL, so it survives reloads and navigation. After applying,
+the page lists the edited transactions as they now are, since they often no
+longer match the search that found them (e.g. after changing their payee).
 
 - Regexes are case-insensitive and match from the start, e.g. ``coffee shop``
   or ``.*coffee`` to match anywhere.
@@ -40,7 +43,7 @@ from fava.core import FavaLedger
 from fava.core.file import get_entry_slice
 from fava.ext import FavaExtensionBase, extension_endpoint
 from fava.helpers import FavaAPIError
-from flask import Response, jsonify, request
+from flask import request
 
 from beancount_sg.batch_edit import (
     EditError,
@@ -53,6 +56,14 @@ from beancount_sg.batch_edit import (
 # The report's search fields, passed as URL query parameters. Their names must not
 # clash with Fava's own (e.g. ``account`` and ``filter`` filter the whole page).
 FIELDS = ("payee_regex", "narration_regex", "new_payee", "new_category")
+
+
+@dataclass(frozen=True)
+class Applied:
+    """The transactions an apply edited, reloaded from their files, and its errors."""
+
+    transactions: list[Transaction]
+    errors: list[str]
 
 
 @dataclass(frozen=True)
@@ -93,17 +104,18 @@ class BatchEdit(FavaExtensionBase):
         except re.error as error:
             return Preview([], error=f"Invalid regex: {error}")
 
-    def current_category(self, edit: PlannedEdit) -> str | None:
+    def current_category(self, txn: Transaction) -> str | None:
         """The transaction's category account, ``-SPLIT-``, or None."""
-        return current_category(edit.txn, self.account_types())
+        return current_category(txn, self.account_types())
 
     def account_types(self) -> AccountTypes:
         """The ledger's account root names."""
         return get_account_types(self.ledger.options)
 
     @staticmethod
-    def entry_hash(edit: PlannedEdit) -> str:
-        return hash_entry(edit.txn)
+    def entry_hash(txn: Transaction) -> str:
+        """Fava's id for the transaction, to link to it."""
+        return hash_entry(txn)
 
     @extension_endpoint
     def preview(self) -> str:
@@ -112,11 +124,12 @@ class BatchEdit(FavaExtensionBase):
         return template.render(extension=self, preview=self.plan())
 
     @extension_endpoint(methods=["POST"])
-    def apply(self) -> Response:
-        """Apply the request's search's edits to the source files."""
+    def apply(self) -> str:
+        """Apply the request's search's edits; the edited transactions as an HTML fragment."""
+        template = self.jinja_env.get_template("BatchEditApplied.html")
         preview = self.plan()
         if preview.error:
-            return jsonify({"changed": 0, "errors": [preview.error]})
+            return template.render(extension=self, applied=Applied([], [preview.error]))
         result = apply_edits(
             preview.edits, FavaBackend(self.ledger), account_types=self.account_types()
         )
@@ -124,7 +137,26 @@ class BatchEdit(FavaExtensionBase):
             f"{edit.txn.date} {edit.txn.payee or edit.txn.narration}: {error}"
             for edit, error in result.errors
         ]
-        return jsonify({"changed": len(result.changed), "errors": errors})
+        return template.render(
+            extension=self, applied=Applied(self._reloaded(result.changed), errors)
+        )
+
+    def _reloaded(self, edits: list[PlannedEdit]) -> list[Transaction]:
+        """The edited transactions as they are now, from the reloaded ledger.
+
+        Edits never change how many lines a transaction has, so each one is still
+        at its file and line.
+        """
+        if not edits:
+            return []
+        self.ledger.load_file()
+        by_position = {
+            (entry.meta.get("filename"), entry.meta.get("lineno")): entry
+            for entry in self.ledger.all_entries
+            if isinstance(entry, Transaction)
+        }
+        positions = [(edit.txn.meta["filename"], edit.txn.meta["lineno"]) for edit in edits]
+        return [by_position[position] for position in positions if position in by_position]
 
 
 class FavaBackend:

@@ -1,0 +1,37 @@
+{# The result of applying a search, rendered by the extension's apply endpoint. #}
+<h3>Edited {{ applied.transactions|length }} transactions</h3>
+
+{% if applied.errors %}
+<p class="error">These couldn't be edited:</p>
+<ul class="error">
+  {% for error in applied.errors %}
+  <li>{{ error }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if applied.transactions %}
+<p>As they are now (they may no longer match the search):</p>
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Date</th>
+      <th data-sort="string">Payee</th>
+      <th data-sort="string">Narration</th>
+      <th data-sort="string">Category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for txn in applied.transactions %}
+    <tr>
+      <td><a href="#context-{{ extension.entry_hash(txn) }}">{{ txn.date }}</a></td>
+      <td>{{ txn.payee or '' }}</td>
+      <td>{{ txn.narration or '' }}</td>
+      <td>{{ extension.current_category(txn) or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
+{% endif %}

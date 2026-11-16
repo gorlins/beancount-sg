@@ -20,11 +20,11 @@
   <tbody>
     {% for edit in preview.edits %}
     <tr>
-      <td><a href="#context-{{ extension.entry_hash(edit) }}">{{ edit.txn.date }}</a></td>
+      <td><a href="#context-{{ extension.entry_hash(edit.txn) }}">{{ edit.txn.date }}</a></td>
       <td>{{ edit.txn.payee or '' }}</td>
       <td>{{ edit.payee if edit.payee is not none else '' }}</td>
       <td>{{ edit.txn.narration or '' }}</td>
-      <td>{{ extension.current_category(edit) or '' }}</td>
+      <td>{{ extension.current_category(edit.txn) or '' }}</td>
       <td>{{ edit.account or '' }}</td>
     </tr>
     {% endfor %}

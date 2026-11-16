@@ -1,45 +1,70 @@
 // @ts-check
-// Batch Edit page: Search loads the preview table from the extension's `preview`
-// endpoint, and Apply posts to its `apply` endpoint, then reloads the preview. The
-// page itself never reloads, so its URL keeps only Fava's own parameters.
+// Batch Edit page. Search loads the preview table from the extension's `preview`
+// endpoint and records the search in the page's URL (so reloads and navigation
+// keep it); a URL with a search runs it when the page loads. Apply posts to the
+// `apply` endpoint and shows the transactions it edited, as they are now.
+
+const FIELDS = ["payee_regex", "narration_regex", "new_payee", "new_category"];
 
 /**
- * The search fields, plus the page's URL parameters (Fava's filters: time, account...).
+ * The page's URL parameters with the search fields replaced by the form's values:
+ * Fava's own filters (time, account...) plus the non-empty search fields.
  * @param {HTMLFormElement} form
- * @returns {Record<string, string>}
+ * @returns {URLSearchParams}
  */
-function requestParams(form) {
-  const params = Object.fromEntries(new URLSearchParams(window.location.search));
-  for (const [name, value] of new FormData(form)) {
-    params[name] = String(value);
+function searchParams(form) {
+  const params = new URLSearchParams(window.location.search);
+  const data = new FormData(form);
+  for (const field of FIELDS) {
+    const value = String(data.get(field) ?? "");
+    if (value) {
+      params.set(field, value);
+    } else {
+      params.delete(field);
+    }
   }
   return params;
+}
+
+/**
+ * Record the search in the page's URL without reloading or adding a history entry.
+ * @param {URLSearchParams} params
+ */
+function setUrlParams(params) {
+  const query = params.toString();
+  history.replaceState(history.state, "", window.location.pathname + (query ? `?${query}` : ""));
 }
 
 /** @type {import("fava/extension-api").ExtensionModule} */
 export default {
   onExtensionPageLoad(ctx) {
     const form = document.getElementById("batch-edit-form");
-    const preview = document.getElementById("batch-edit-preview");
-    if (!(form instanceof HTMLFormElement) || !preview) {
+    const results = document.getElementById("batch-edit-preview");
+    if (!(form instanceof HTMLFormElement) || !results) {
       return;
     }
 
-    const loadPreview = async () => {
-      const html = await ctx.api.request("preview", "GET", requestParams(form), undefined, "string");
-      preview.innerHTML = /** @type {string} */ (html);
+    /** @param {string} endpoint @param {"GET" | "POST"} method */
+    const load = async (endpoint, method) => {
+      const params = Object.fromEntries(searchParams(form));
+      const html = await ctx.api.request(endpoint, method, params, undefined, "string");
+      results.innerHTML = /** @type {string} */ (html);
     };
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      void loadPreview();
+      setUrlParams(searchParams(form));
+      void load("preview", "GET");
     });
     form.addEventListener("reset", () => {
-      preview.innerHTML = "";
+      results.innerHTML = "";
+      const params = new URLSearchParams(window.location.search);
+      FIELDS.forEach((field) => params.delete(field));
+      setUrlParams(params);
     });
 
     // The Apply button is part of the loaded preview, so listen on its container.
-    preview.addEventListener("click", async (event) => {
+    results.addEventListener("click", async (event) => {
       const button = event.target;
       if (!(button instanceof HTMLButtonElement) || button.id !== "batch-edit-apply") {
         return;
@@ -48,12 +73,19 @@ export default {
         return;
       }
       button.disabled = true;
-      const result = /** @type {{changed: number, errors: string[]}} */ (
-        await ctx.api.request("apply", "POST", requestParams(form))
-      );
-      const errors = result.errors.length ? `\n\nErrors:\n${result.errors.join("\n")}` : "";
-      alert(`Edited ${result.changed} transactions.${errors}`);
-      await loadPreview();
+      await load("apply", "POST");
     });
+
+    // Restore a search recorded in the URL, e.g. after a reload.
+    const params = new URLSearchParams(window.location.search);
+    for (const field of FIELDS) {
+      const input = form.elements.namedItem(field);
+      if (input instanceof HTMLInputElement) {
+        input.value = params.get(field) ?? "";
+      }
+    }
+    if (params.get("payee_regex") || params.get("narration_regex")) {
+      void load("preview", "GET");
+    }
   },
 };
