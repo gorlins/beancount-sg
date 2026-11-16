@@ -35,6 +35,7 @@ import re
 from dataclasses import dataclass
 
 from beancount.core.account_types import AccountTypes
+from beancount.core.amount import Amount
 from beancount.core.data import Transaction
 from beancount.parser.options import get_account_types
 from fava.beans.funcs import hash_entry
@@ -49,6 +50,7 @@ from beancount_sg.batch_edit import (
     EditError,
     PlannedEdit,
     apply_edits,
+    category_amounts,
     current_category,
     plan_edits,
 )
@@ -103,6 +105,10 @@ class BatchEdit(FavaExtensionBase):
             return Preview(edits)
         except re.error as error:
             return Preview([], error=f"Invalid regex: {error}")
+
+    def amounts(self, txn: Transaction) -> list[Amount]:
+        """The total of the transaction's category postings, per currency."""
+        return category_amounts(txn, self.account_types())
 
     def current_category(self, txn: Transaction) -> str | None:
         """The transaction's category account, ``-SPLIT-``, or None."""

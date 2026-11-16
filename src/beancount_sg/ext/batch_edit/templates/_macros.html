@@ -1,0 +1,8 @@
+{# Shared cells for the Batch Edit tables. #}
+
+{# A transaction's category amounts (one per currency), sorted by the first. #}
+{% macro amount_cell(amounts) -%}
+<td class="num" data-sort-value="{{ amounts[0].number if amounts else 0 }}">
+  {%- for amount in amounts %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
+</td>
+{%- endmacro %}

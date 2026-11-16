@@ -37,6 +37,7 @@ import io
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
@@ -47,6 +48,7 @@ from beancount.core.account_types import (
     AccountTypes,
     is_income_statement_account,
 )
+from beancount.core.amount import Amount
 from beancount.core.data import Directive, Posting, Transaction
 
 # How a split transaction's category is shown.
@@ -154,6 +156,21 @@ def category_posting(
     """The transaction's category posting, unless it's a split or has none."""
     postings = category_postings(txn, account_types)
     return postings[0] if len(postings) == 1 else None
+
+
+def category_amounts(
+    txn: Transaction, account_types: AccountTypes = DEFAULT_ACCOUNT_TYPES
+) -> list[Amount]:
+    """The total of the transaction's category postings, one amount per currency.
+
+    E.g. what an expense cost, including every part of a split, with Beancount's
+    signs (expenses positive, income negative). Empty if it has no category.
+    """
+    totals: dict[str, Decimal] = {}
+    for posting in category_postings(txn, account_types):
+        currency = posting.units.currency
+        totals[currency] = totals.get(currency, Decimal(0)) + posting.units.number
+    return [Amount(number, currency) for currency, number in totals.items()]
 
 
 def current_category(

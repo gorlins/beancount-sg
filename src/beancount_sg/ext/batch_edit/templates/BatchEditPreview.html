@@ -1,4 +1,5 @@
 {# The preview table, rendered by the extension's preview endpoint. #}
+{% from "_macros.html" import amount_cell %}
 {% set fields = extension.fields() %}
 {% if preview.error %}
 <p class="error">{{ preview.error }}</p>
@@ -13,6 +14,7 @@
       <th data-sort="string">Payee</th>
       <th data-sort="string">New payee</th>
       <th data-sort="string">Narration</th>
+      <th data-sort="num">Amount</th>
       <th data-sort="string">Category</th>
       <th data-sort="string">New category</th>
     </tr>
@@ -24,6 +26,7 @@
       <td>{{ edit.txn.payee or '' }}</td>
       <td>{{ edit.payee if edit.payee is not none else '' }}</td>
       <td>{{ edit.txn.narration or '' }}</td>
+      {{ amount_cell(extension.amounts(edit.txn)) }}
       <td>{{ extension.current_category(edit.txn) or '' }}</td>
       <td>{{ edit.account or '' }}</td>
     </tr>
