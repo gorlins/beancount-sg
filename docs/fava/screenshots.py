@@ -96,10 +96,8 @@ def main() -> None:
             save(page, "batch-edit")
 
             page.goto(f"{base}/CreditCardRewards/", wait_until="networkidle")
+            page.get_by_text("Icicle", exact=True).click()
             save(page, "rewards")
-            page.goto(f"{base}/CreditCardRewards/?chart=Value", wait_until="networkidle")
-            page.get_by_text("Sunburst", exact=True).click()
-            save(page, "rewards-sunburst", "svelte-component")
 
             browser.close()
     finally:

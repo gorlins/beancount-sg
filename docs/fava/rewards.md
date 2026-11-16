@@ -4,37 +4,47 @@
 2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 ```
 
-Totals each credit card's spending by category, with the rewards it earned and their cash value.
+Totals each credit card's spending by the card issuer's category, with the rewards it earned and
+their cash value.
 
-![Credit Card Rewards report](images/rewards.png)
+![Credit Card Rewards report, with its chart as an icicle](images/rewards.png)
 
 ## Setting up a card
 
-Configure a card's rewards with metadata on its `open` directive:
+Configure a card's rewards with metadata on its `open` directive. A cashback card needs only its
+rates:
+
+```beancount
+2020-01-01 open Liabilities:CreditCard:CashPlus USD
+  rewards: "cashback"
+  rewards-rate: 1.5            ; the default rate, for categories without their own
+  rewards-rate-groceries: 3    ; a category's rate
+```
+
+A points card can also name its points and give them a cash value:
 
 ```beancount
 2020-01-01 open Liabilities:CreditCard:Voyager USD
-  rewards: "points"            ; or "cashback"
-  rewards-rate: 1              ; the default rate, for categories without their own
-  rewards-rate-dining: 3       ; a category's rate
+  rewards: "points"
+  rewards-rate-dining: 3
   rewards-rate-travel: 2
-  rewards-unit: "VP"           ; points only: what the points are called
-  rewards-point-value: 0.0125  ; points only, optional: a point's value in cash
+  rewards-unit: "VP"           ; optional, defaults to POINTS
+  rewards-point-value: 0.0125  ; optional: a point's value in cash
 ```
 
 - **Rates:** for `cashback`, 3 means 3% back in the currency spent; for `points`, 3 points per unit
   spent. `rewards-rate` defaults to 1.
+- **Points' unit:** naming each program's points keeps points that aren't interchangeable, such as
+  two banks' programs, from being added together in the totals.
 - **Category keys** are the category slugified: `Food and Drink` uses
   `rewards-rate-food-and-drink`.
 - Configuration errors are listed at the top of the report.
 
-## What counts as spending
+## Categories
 
-The `Expenses` postings of transactions that post to the card, or one of its subaccounts, within
-the current Fava filter. Refunds count negatively. A transaction charging two configured cards is
-skipped, since its spending can't be attributed to one of them.
-
-A posting's category is its `category` metadata, or else its transaction's:
+Rates depend on the **card issuer's category** for a purchase, such as "Dining", which isn't
+necessarily the expense account you book it to. So the category comes from metadata, as an importer
+might record the bank's category: a posting's `category` metadata, or else its transaction's.
 
 ```beancount
 2024-02-14 * "Trattoria Roma" "Dinner"
@@ -43,15 +53,24 @@ A posting's category is its `category` metadata, or else its transaction's:
   Expenses:Food:Restaurants
 ```
 
+To read another metadata key, set it on the card: `rewards-category-key: "bank_category"`.
 Spending without a category is `uncategorized`, and earns the default rate.
 
-## Charts
+## What counts as spending
 
-The chart shows spending (**Spend**) or the rewards' cash value (**Value**) by card, then category,
-as a treemap, sunburst or icicle. Value puts cashback and points cards on the same scale; points
-without a `rewards-point-value` have no cash value, so they're left out of it.
+The `Expenses` postings of transactions that post to the card, or one of its subaccounts, within
+the current Fava filter. Refunds count negatively. A transaction charging two configured cards is
+skipped, since its spending can't be attributed to one of them.
 
-![Value of rewards, as a sunburst](images/rewards-sunburst.png)
+## The report
 
-Clicking a card opens its account page. Clicking a category opens a page for a non-existent
-`<card>:<category>` account, since Fava's charts link every node to an account.
+The table has a row per card and category: the rate, spend, rewards and their cash value, with
+totals per currency (so each program's points are totalled separately).
+
+The chart shows spending (**Spend**) or the rewards' cash value (**Value**) by card, then category;
+the icicle view shows this hierarchy most clearly. Value puts cashback and points cards on the
+same scale; points without a `rewards-point-value` have no cash value, so they're left out of it.
+
+Clicking a card opens its account page. Clicking a category, in the table or the chart, opens the
+card's account page filtered to that category's transactions, keeping the current time range and
+filter.
