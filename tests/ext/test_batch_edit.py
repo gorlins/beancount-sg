@@ -60,6 +60,8 @@ def test_preview_lists_matches_with_links_to_each_transaction(client, ledger_pat
         assert f'<a href="#context-{hash_entry(txn)}">{txn.date}</a>' in body
     assert "Grocer" not in body
     assert 'id="batch-edit-apply" data-count="1"' in body
+    # The category amount, sortable by number.
+    assert '<td class="num" data-sort-value="5.00">5.00 USD</td>' in body
 
 
 def test_preview_respects_the_fava_filter(client):
@@ -100,6 +102,7 @@ def test_apply_writes_the_previewed_edits_through_fava(client, ledger_path):
         assert f'<a href="#context-{hash_entry(txn)}">{txn.date}</a>' in body
     assert body.count("<td>Cafe</td>") == 2
     assert body.count("<td>Expenses:Coffee</td>") == 2
+    assert '<td class="num" data-sort-value="3.00">3.00 USD</td>' in body
 
 
 def test_apply_respects_the_fava_filter(client, ledger_path):
@@ -160,6 +163,7 @@ def test_split_shows_split_and_only_its_payee_changes(tmp_path):
 
     body = client.get(PREVIEW, query_string=search).get_data(as_text=True)
     assert "<td>-SPLIT-</td>" in body
+    assert '<td class="num" data-sort-value="9.00">9.00 USD</td>' in body  # the split's total
 
     body = client.post(URL + "apply", query_string=search).get_data(as_text=True)
     assert "Edited 1 transactions" in body

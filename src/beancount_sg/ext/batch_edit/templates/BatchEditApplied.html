@@ -1,4 +1,5 @@
 {# The result of applying a search, rendered by the extension's apply endpoint. #}
+{% from "_macros.html" import amount_cell %}
 <h3>Edited {{ applied.transactions|length }} transactions</h3>
 
 {% if applied.errors %}
@@ -19,6 +20,7 @@
       <th data-sort="string">Date</th>
       <th data-sort="string">Payee</th>
       <th data-sort="string">Narration</th>
+      <th data-sort="num">Amount</th>
       <th data-sort="string">Category</th>
     </tr>
   </thead>
@@ -28,6 +30,7 @@
       <td><a href="#context-{{ extension.entry_hash(txn) }}">{{ txn.date }}</a></td>
       <td>{{ txn.payee or '' }}</td>
       <td>{{ txn.narration or '' }}</td>
+      {{ amount_cell(extension.amounts(txn)) }}
       <td>{{ extension.current_category(txn) or '' }}</td>
     </tr>
     {% endfor %}

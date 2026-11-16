@@ -12,6 +12,7 @@ from beancount_sg.batch_edit import (
     FileBackend,
     PlannedEdit,
     apply_edits,
+    category_amounts,
     category_posting,
     current_category,
     find_transactions,
@@ -131,6 +132,30 @@ def test_current_category(ledger_file, postings, category):
     assert current_category(txn) == category
     posting = category_posting(txn)
     assert (posting.account if posting else None) == (None if category == SPLIT else category)
+
+
+@pytest.mark.parametrize(
+    ("postings", "amounts"),
+    [
+        # Beancount fills in the category's amount.
+        ("  Assets:Checking  -5.00 USD\n  Expenses:Coffee", ["5.00 USD"]),
+        # A split totals its categories.
+        (
+            "  Assets:Checking  -9.00 USD\n  Expenses:Coffee  5.00 USD\n  Expenses:Food",
+            ["9.00 USD"],
+        ),
+        ("  Assets:Checking  5.00 USD\n  Income:Refunds", ["-5.00 USD"]),
+        ("  Assets:Checking  -5.00 USD\n  Assets:Savings", []),  # a transfer
+        (
+            "  Assets:Checking  -5.00 USD\n  Expenses:Coffee  5.00 USD\n"
+            "  Assets:Checking  -2.00 EUR\n  Expenses:Food  2.00 EUR",
+            ["5.00 USD", "2.00 EUR"],
+        ),
+    ],
+)
+def test_category_amounts(ledger_file, postings, amounts):
+    _, [txn] = ledger_file(OPENS + '\n2024-01-05 * "Shop"\n' + postings + "\n")
+    assert [amount.to_string() for amount in category_amounts(txn)] == amounts
 
 
 # new_payee
