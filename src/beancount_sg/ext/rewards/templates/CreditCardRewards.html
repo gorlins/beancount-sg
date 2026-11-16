@@ -85,6 +85,10 @@
       metadata, or else the transaction's; <code>rewards-category-key: "bank_category"</code> on the
       card reads another key instead. Spending without a category is <code>uncategorized</code>
       and earns the default rate.</li>
+    <li>Refunds count as negative spending. Card payments booked to an expense account look like
+      refunds, so exclude that account (and its subaccounts) on its own <code>open</code>:
+      <pre>2020-01-01 open Expenses:LoanPayments:CreditCardPayment
+  rewards-exclude: TRUE</pre></li>
     <li>Category rate keys are the category in lowercase with dashes: <code>Food and Drink</code>
       uses <code>rewards-rate-food-and-drink</code>.</li>
     <li>Only transactions in the current Fava filter (e.g. the time range) are counted. Clicking a

@@ -62,6 +62,18 @@ The `Expenses` postings of transactions that post to the card, or one of its sub
 the current Fava filter. Refunds count negatively. A transaction charging two configured cards is
 skipped, since its spending can't be attributed to one of them.
 
+A card payment booked to an expense account looks just like a refund: the card is credited and an
+expense account debited. So expense accounts that aren't spending opt out on their own `open`
+directive, which also covers their subaccounts:
+
+```beancount
+2020-01-01 open Expenses:LoanPayments:CreditCardPayment
+  rewards-exclude: TRUE
+```
+
+None of this depends on categories: uncategorized spending, e.g. on a flat-rate card or before a
+category is synced, still counts at the card's default rate.
+
 ## The report
 
 The table has a row per card and category: the rate, spend, rewards and their cash value, with

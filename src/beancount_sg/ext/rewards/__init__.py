@@ -46,6 +46,7 @@ from beancount_sg.rewards import (
     Program,
     RewardsError,
     category_rewards,
+    excluded_accounts,
     programs,
 )
 
@@ -68,10 +69,18 @@ class CreditCardRewards(FavaExtensionBase):
         """Whether any card has rewards configured."""
         return bool(self._programs()[0])
 
+    def _excluded(self) -> list[str]:
+        return excluded_accounts(self.ledger.all_entries_by_type.Open)
+
     def rows(self) -> list[CategoryRewards]:
         """Spending and rewards per card and category, within the current Fava filter."""
         found, _ = self._programs()
-        return category_rewards(g.filtered.entries, found, get_account_types(self.ledger.options))
+        return category_rewards(
+            g.filtered.entries,
+            found,
+            get_account_types(self.ledger.options),
+            excluded=self._excluded(),
+        )
 
     @staticmethod
     def totals(amounts: Iterable[Amount | None]) -> list[Amount]:
@@ -96,6 +105,7 @@ class CreditCardRewards(FavaExtensionBase):
             row.program.category_key,
             row.category,
             get_account_types(self.ledger.options).expenses,
+            self._excluded(),
         )
         current = request.args.get("filter")
         return url_for(
@@ -117,7 +127,7 @@ class CreditCardRewards(FavaExtensionBase):
         ]
 
 
-def _category_filter(key: str, category: str, expenses: str) -> str:
+def _category_filter(key: str, category: str, expenses: str, excluded: list[str]) -> str:
     """A Fava filter for transactions with spending in a category.
 
     As in `beancount_sg.rewards.category_rewards`, an expense posting's category is
@@ -126,7 +136,9 @@ def _category_filter(key: str, category: str, expenses: str) -> str:
     itself and an expense posting without one. Uncategorized spending has the key
     on neither.
     """
-    expense = f'account:"^{re.escape(expenses)}(:|$)"'
+    # Spending accounts: the expenses root and its subaccounts, but not excluded ones.
+    not_excluded = "".join(f"(?!{re.escape(account)}(:|$))" for account in excluded)
+    expense = f'account:"^{not_excluded}{re.escape(expenses)}(:|$)"'
     if category == UNCATEGORIZED:
         return f'-{key}:"" any({expense} -{key}:"")'
     # Fava matches values as case-insensitive regexes; \x22 is a quote, which

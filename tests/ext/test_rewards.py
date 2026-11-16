@@ -118,6 +118,35 @@ def test_categories_link_to_the_card_filtered_by_category(tmp_path):
     assert matching(CATEGORIES, params["filter"]) == ["Deli", "Store"]
 
 
+PAYMENTS = (
+    CATEGORIES
+    + """
+2020-01-01 open Expenses:CardPayments
+  rewards-exclude: TRUE
+
+2024-03-10 * "Autopay"
+  Liabilities:CreditCard:Cash  70.00 USD
+  Expenses:CardPayments
+
+2024-03-11 * "Autopay with category"
+  category: "Groceries"
+  Liabilities:CreditCard:Cash  30.00 USD
+  Expenses:CardPayments
+"""
+)
+
+
+def test_excluded_payments_are_neither_counted_nor_linked(tmp_path):
+    body = page(tmp_path, PAYMENTS)
+    table = text(body)
+    assert "Liabilities:CreditCard:Cash Groceries 3% 120.00 USD" in table
+    assert "Liabilities:CreditCard:Cash uncategorized 1.5% 30.00 USD" in table
+    _, params = category_link(body, "Groceries")
+    assert matching(PAYMENTS, params["filter"]) == ["Deli", "Market"]
+    _, params = category_link(body, "uncategorized")
+    assert matching(PAYMENTS, params["filter"]) == ["Deli", "Store"]
+
+
 def test_category_links_keep_the_current_filter(tmp_path):
     body = page(tmp_path, CATEGORIES, query="?filter=Deli")
     _, params = category_link(body, "Groceries")

@@ -5,7 +5,14 @@ from decimal import Decimal
 import pytest
 
 from beancount_sg.builders import A
-from beancount_sg.rewards import CASHBACK, POINTS, Program, category_rewards, programs
+from beancount_sg.rewards import (
+    CASHBACK,
+    POINTS,
+    Program,
+    category_rewards,
+    excluded_accounts,
+    programs,
+)
 from beancount_sg.testing import load
 
 CARDS = """
@@ -88,7 +95,7 @@ def rows(ledger: str):
     entries, found, _ = load_programs(CARDS + ledger)
     return [
         (row.program.account.rsplit(":", 1)[-1], row.category, row.spend.to_string())
-        for row in category_rewards(entries, found)
+        for row in category_rewards(entries, found, excluded=excluded_accounts(entries))
     ]
 
 
@@ -166,6 +173,49 @@ def test_uncategorized_spend_and_refunds():
   Liabilities:CreditCard:Cash  25.00 USD
   Expenses:Shopping
 """) == [("Cash", "uncategorized", "75.00 USD")]
+
+
+def test_excluded_expense_accounts_are_not_spending():
+    assert rows("""
+2020-01-01 open Expenses:LoanPayments:CreditCardPayment
+  rewards-exclude: TRUE
+2020-01-01 open Expenses:LoanPayments:CreditCardPayment:Cash
+2020-01-01 open Expenses:LoanPaymentsOther
+
+2024-01-05 * "Shop"
+  category: "Shopping"
+  Liabilities:CreditCard:Cash  -100.00 USD
+  Expenses:Shopping
+
+2024-01-07 * "Shop" "Refund"
+  category: "Shopping"
+  Liabilities:CreditCard:Cash  25.00 USD
+  Expenses:Shopping
+
+2024-01-09 * "Card" "AUTOPAY PYMT"
+  category: "Payment/Credit"
+  Liabilities:CreditCard:Cash  123.45 USD
+  Expenses:LoanPayments:CreditCardPayment:Cash
+
+2024-01-10 * "Card" "Payment"
+  Liabilities:CreditCard:Cash  50.00 USD
+  Expenses:LoanPayments:CreditCardPayment
+
+2024-01-11 * "Other"
+  Liabilities:CreditCard:Cash  -10.00 USD
+  Expenses:LoanPaymentsOther
+""") == [("Cash", "Shopping", "75.00 USD"), ("Cash", "uncategorized", "10.00 USD")]
+
+
+def test_excluded_accounts_need_a_true_flag():
+    entries, _ = load("""
+2020-01-01 open Expenses:Payments
+  rewards-exclude: TRUE
+2020-01-01 open Expenses:Kept
+  rewards-exclude: FALSE
+2020-01-01 open Expenses:Plain
+""")
+    assert excluded_accounts(entries) == ["Expenses:Payments"]
 
 
 def test_only_expenses_on_rewards_cards_count():
