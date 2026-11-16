@@ -1,27 +1,59 @@
 // @ts-check
-// The Apply button posts the current search to the extension's `apply` endpoint,
-// which edits the source files, then reloads the page to show the result.
+// Batch Edit page: Search loads the preview table from the extension's `preview`
+// endpoint, and Apply posts to its `apply` endpoint, then reloads the preview. The
+// page itself never reloads, so its URL keeps only Fava's own parameters.
+
+/**
+ * The search fields, plus the page's URL parameters (Fava's filters: time, account...).
+ * @param {HTMLFormElement} form
+ * @returns {Record<string, string>}
+ */
+function requestParams(form) {
+  const params = Object.fromEntries(new URLSearchParams(window.location.search));
+  for (const [name, value] of new FormData(form)) {
+    params[name] = String(value);
+  }
+  return params;
+}
 
 /** @type {import("fava/extension-api").ExtensionModule} */
 export default {
   onExtensionPageLoad(ctx) {
-    const button = document.getElementById("batch-edit-apply");
-    if (!(button instanceof HTMLButtonElement)) {
+    const form = document.getElementById("batch-edit-form");
+    const preview = document.getElementById("batch-edit-preview");
+    if (!(form instanceof HTMLFormElement) || !preview) {
       return;
     }
-    button.addEventListener("click", async () => {
+
+    const loadPreview = async () => {
+      const html = await ctx.api.request("preview", "GET", requestParams(form), undefined, "string");
+      preview.innerHTML = /** @type {string} */ (html);
+    };
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void loadPreview();
+    });
+    form.addEventListener("reset", () => {
+      preview.innerHTML = "";
+    });
+
+    // The Apply button is part of the loaded preview, so listen on its container.
+    preview.addEventListener("click", async (event) => {
+      const button = event.target;
+      if (!(button instanceof HTMLButtonElement) || button.id !== "batch-edit-apply") {
+        return;
+      }
       if (!confirm(`Edit ${button.dataset.count} transactions in your ledger files?`)) {
         return;
       }
       button.disabled = true;
-      // The page's query parameters hold both the search and Fava's filters.
-      const params = Object.fromEntries(new URLSearchParams(window.location.search));
       const result = /** @type {{changed: number, errors: string[]}} */ (
-        await ctx.api.request("apply", "POST", params)
+        await ctx.api.request("apply", "POST", requestParams(form))
       );
       const errors = result.errors.length ? `\n\nErrors:\n${result.errors.join("\n")}` : "";
       alert(`Edited ${result.changed} transactions.${errors}`);
-      window.location.reload();
+      await loadPreview();
     });
   },
 };

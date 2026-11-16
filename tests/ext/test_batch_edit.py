@@ -36,6 +36,7 @@ SEARCH = {
     "new_category": "Expenses:Coffee",
 }
 URL = "/test/extension/BatchEdit/"
+PREVIEW = URL + "preview"
 
 
 @pytest.fixture
@@ -51,25 +52,23 @@ def client(ledger_path):
 
 
 def test_preview_lists_matches_with_links_to_each_transaction(client, ledger_path):
-    response = client.get(URL, query_string=SEARCH)
+    response = client.get(PREVIEW, query_string=SEARCH)
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    body = body[body.index("<h2>Batch Edit</h2>") : body.index("</sortable-table>")]
     assert "2 matching, 1 to change" in body
     for txn in list(filter_txns(FavaLedger(str(ledger_path)).all_entries))[:2]:
         assert f'<a href="#context-{hash_entry(txn)}">{txn.date}</a>' in body
     assert "Grocer" not in body
-    assert 'id="batch-edit-apply" data-count="1"' in response.get_data(as_text=True)
+    assert 'id="batch-edit-apply" data-count="1"' in body
 
 
-def test_form_keeps_the_search_and_fava_filters(client):
-    body = client.get(URL, query_string={**SEARCH, "time": "2024"}).get_data(as_text=True)
-    assert '<input name="payee_regex" value="coffee shop">' in body
-    assert '<input type="hidden" name="time" value="2024">' in body
+def test_preview_respects_the_fava_filter(client):
+    body = client.get(PREVIEW, query_string={**SEARCH, "time": "2023"}).get_data(as_text=True)
+    assert "0 matching, 0 to change" in body
 
 
 def test_invalid_regex_is_reported(client):
-    body = client.get(URL, query_string={"payee_regex": "("}).get_data(as_text=True)
+    body = client.get(PREVIEW, query_string={"payee_regex": "("}).get_data(as_text=True)
     assert "Invalid regex" in body
 
 
@@ -103,7 +102,7 @@ def test_apply_respects_the_fava_filter(client, ledger_path):
 
 
 def test_preview_does_not_edit(client, ledger_path):
-    client.get(URL, query_string=SEARCH)
+    client.get(PREVIEW, query_string=SEARCH)
     assert ledger_path.read_text() == LEDGER
 
 
@@ -144,7 +143,7 @@ def test_split_shows_split_and_only_its_payee_changes(tmp_path):
     client = create_app([path], load=True).test_client()
     search = {"payee_regex": "coffee", "new_payee": "Cafe", "new_category": "Expenses:Food"}
 
-    body = client.get(URL, query_string=search).get_data(as_text=True)
+    body = client.get(PREVIEW, query_string=search).get_data(as_text=True)
     assert "<td>-SPLIT-</td>" in body
 
     assert client.post(URL + "apply", query_string=search).get_json() == {
@@ -160,10 +159,9 @@ def test_page_explains_how_to_use_it(client):
     assert "-SPLIT-" in body
 
 
-def test_form_keeps_only_favas_filters(client):
-    # Fava fetches pages with partial=true when navigating; that must not end up in the form.
-    query = {**SEARCH, "time": "2024", "partial": "true", "unrelated": "x"}
-    body = client.get(URL, query_string=query).get_data(as_text=True)
-    assert '<input type="hidden" name="time" value="2024">' in body
-    assert 'name="partial"' not in body
-    assert 'name="unrelated"' not in body
+def test_page_is_just_the_form_and_an_empty_preview(client):
+    # The page doesn't depend on its URL; the script loads the preview.
+    body = client.get(URL, query_string={**SEARCH, "partial": "true"}).get_data(as_text=True)
+    assert '<form id="batch-edit-form">' in body
+    assert '<div id="batch-edit-preview"></div>' in body
+    assert "coffee shop" not in body

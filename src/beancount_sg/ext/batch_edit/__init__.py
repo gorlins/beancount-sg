@@ -9,6 +9,10 @@ filter) by payee and/or narration regex, and enter a new payee and/or category.
 The table previews each matching transaction and what would change; click a
 date to open the transaction. "Apply" then edits the source files.
 
+The page itself is static: its script loads the preview from the ``preview``
+endpoint and applies edits with the ``apply`` endpoint, passing the search
+fields along with the page's own URL parameters (Fava's filters).
+
 - Regexes are case-insensitive and match from the start, e.g. ``coffee shop``
   or ``.*coffee`` to match anywhere.
 - The new payee can use ``{key}`` placeholders filled from each transaction's
@@ -50,10 +54,6 @@ from beancount_sg.batch_edit import (
 # clash with Fava's own (e.g. ``account`` and ``filter`` filter the whole page).
 FIELDS = ("payee_regex", "narration_regex", "new_payee", "new_category")
 
-# Fava's own filter parameters, kept when searching. Other parameters, e.g. the
-# ``partial`` Fava adds when it loads a page's content, mustn't be carried over.
-FAVA_FILTERS = ("account", "conversion", "filter", "interval", "time")
-
 
 @dataclass(frozen=True)
 class Preview:
@@ -73,16 +73,12 @@ class BatchEdit(FavaExtensionBase):
     report_title = "Batch Edit"
     has_js_module = True
 
-    def fava_filters(self) -> dict[str, str]:
-        """Fava's filters in the current request, to keep when searching."""
-        return {name: request.args[name] for name in FAVA_FILTERS if name in request.args}
-
     def fields(self) -> dict[str, str]:
         """The search fields from the current request."""
         return {field: request.args.get(field, "") for field in FIELDS}
 
-    def preview(self) -> Preview:
-        """The planned edits for the current search, within the current Fava filter."""
+    def plan(self) -> Preview:
+        """The planned edits for the request's search, within its Fava filter."""
         try:
             fields = self.fields()
             edits = plan_edits(
@@ -109,10 +105,16 @@ class BatchEdit(FavaExtensionBase):
     def entry_hash(edit: PlannedEdit) -> str:
         return hash_entry(edit.txn)
 
+    @extension_endpoint
+    def preview(self) -> str:
+        """The preview table for the request's search, as an HTML fragment."""
+        template = self.jinja_env.get_template("BatchEditPreview.html")
+        return template.render(extension=self, preview=self.plan())
+
     @extension_endpoint(methods=["POST"])
     def apply(self) -> Response:
-        """Apply the current search's edits to the source files."""
-        preview = self.preview()
+        """Apply the request's search's edits to the source files."""
+        preview = self.plan()
         if preview.error:
             return jsonify({"changed": 0, "errors": [preview.error]})
         result = apply_edits(
