@@ -1,0 +1,73 @@
+<h2>Update Status</h2>
+
+{% set statuses = extension.statuses() %}
+{% if not statuses %}
+<p>No open accounts are tracked yet; see "How to use" below.</p>
+{% else %}
+{% set today = extension.today() %}
+<p>Up to date as of <strong>{{ extension.up_to_date_as_of(statuses) }}</strong>, the oldest
+  <em>Balanced as of</em> date below.</p>
+
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="num">Status</th>
+      <th data-sort="string">Account</th>
+      <th data-sort="string">Last entry</th>
+      <th data-sort="string">Balanced as of</th>
+      <th data-sort="num">Days since</th>
+      <th>Balance</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for status in statuses %}
+    {% set data = extension.account_data(status.account) %}
+    {% set dot = data.uptodate_status %}
+    <tr>
+      <td data-sort-value="{{ extension.status_order(dot) }}">
+        {%- if dot == "green" -%}
+        <span class="status-indicator status-green" title="The last entry is a passing balance check."></span>
+        {%- elif dot -%}
+        <copyable-text class="status-indicator status-{{ dot }}" data-clipboard-text="{{ data.balance_string or '' }}"
+          title="{{ 'The last entry is not a balance check.' if dot == 'yellow' else 'The last entry is a failing balance check.' }} Click to copy balance directives for today."></copyable-text>
+        {%- endif -%}
+      </td>
+      <td><a href="{{ url_for('account', name=status.account) }}">{{ status.account }}</a></td>
+      <td>{% if data.last_entry %}<a href="#context-{{ data.last_entry.entry_hash }}">{{ data.last_entry.date }}</a>{% endif %}</td>
+      <td>
+        {%- if status.last_balance -%}
+        <a href="#context-{{ extension.entry_hash(status.last_balance) }}">{{ status.balanced_as_of }}</a>
+        {%- else -%}
+        {{ status.balanced_as_of }} (opened)
+        {%- endif -%}
+      </td>
+      <td class="num">{{ status.days_since_balanced(today) }}</td>
+      <td class="num">
+        {%- for amount in status.balance %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
+{% endif %}
+
+<details>
+  <summary>How to use</summary>
+  <p>Track an account by adding Fava's <code>fava-uptodate-indication</code> metadata to its
+    <code>open</code> directive (the <code>beancount_sg.plugins.uptodate_subaccounts</code> plugin
+    extends it to an account's direct subaccounts):</p>
+  <pre>2020-01-01 open Assets:Bank:Checking USD
+  fava-uptodate-indication: TRUE</pre>
+  <ul>
+    <li>The status dot is green if the account's last entry is a passing balance assertion, yellow
+      if it's a transaction, and red if it's a failing balance assertion. Click a yellow or red dot
+      to copy balance directives for today.</li>
+    <li><em>Balanced as of</em> is the date of the account's last passing balance assertion, which
+      checks the balance at the start of that day; an account that's never been balanced shows the
+      date it was opened. <em>Up to date as of</em> is the oldest of these.</li>
+    <li>Click a date to open its entry, or a column header to sort. The report covers the whole
+      ledger, whatever Fava's filters.</li>
+  </ul>
+</details>

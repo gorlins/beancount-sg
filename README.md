@@ -156,6 +156,16 @@ issuer's category (`category` metadata), with its rate, rewards and cash value, 
 spend and value by card and category. Categories link to the card's transactions in that category.
 [Docs](docs/fava/rewards.md)
 
+### `beancount_sg.ext.update_status`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.update_status"
+```
+
+An "Update Status" report of the accounts with Fava's `fava-uptodate-indication`: each one's
+status, last entry, last passing balance assertion and current balance, and the oldest of those
+balance dates. [Docs](docs/fava/update-status.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`
