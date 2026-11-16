@@ -50,6 +50,10 @@ from beancount_sg.batch_edit import (
 # clash with Fava's own (e.g. ``account`` and ``filter`` filter the whole page).
 FIELDS = ("payee_regex", "narration_regex", "new_payee", "new_category")
 
+# Fava's own filter parameters, kept when searching. Other parameters, e.g. the
+# ``partial`` Fava adds when it loads a page's content, mustn't be carried over.
+FAVA_FILTERS = ("account", "conversion", "filter", "interval", "time")
+
 
 @dataclass(frozen=True)
 class Preview:
@@ -68,6 +72,10 @@ class BatchEdit(FavaExtensionBase):
 
     report_title = "Batch Edit"
     has_js_module = True
+
+    def fava_filters(self) -> dict[str, str]:
+        """Fava's filters in the current request, to keep when searching."""
+        return {name: request.args[name] for name in FAVA_FILTERS if name in request.args}
 
     def fields(self) -> dict[str, str]:
         """The search fields from the current request."""

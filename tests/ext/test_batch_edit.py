@@ -158,3 +158,12 @@ def test_page_explains_how_to_use_it(client):
     body = client.get(URL).get_data(as_text=True)
     assert "<summary>How to use</summary>" in body
     assert "-SPLIT-" in body
+
+
+def test_form_keeps_only_favas_filters(client):
+    # Fava fetches pages with partial=true when navigating; that must not end up in the form.
+    query = {**SEARCH, "time": "2024", "partial": "true", "unrelated": "x"}
+    body = client.get(URL, query_string=query).get_data(as_text=True)
+    assert '<input type="hidden" name="time" value="2024">' in body
+    assert 'name="partial"' not in body
+    assert 'name="unrelated"' not in body
