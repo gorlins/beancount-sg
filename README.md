@@ -116,7 +116,8 @@ trip tag such as `#new-york-city-2024`.
 
 ## Fava extensions
 
-These need the `fava` extra.
+These need the `fava` extra. See [`docs/fava`](docs/fava/README.md) for how to use each report,
+with screenshots.
 
 ### `beancount_sg.ext.checkbook`
 
@@ -125,7 +126,7 @@ These need the `fava` extra.
 ```
 
 A "Checkbook" report listing transactions with `check_no` metadata (see `add_check_numbers`): date,
-number, payee, paying account, category and amount.
+number, payee, paying account, category and amount. [Docs](docs/fava/checkbook.md)
 
 ### `beancount_sg.ext.batch_edit`
 
@@ -136,6 +137,24 @@ number, payee, paying account, category and amount.
 A "Batch Edit" report: find transactions by payee and/or narration regex, preview new payees
 (optionally from metadata, e.g. `{plaid_payee}`) and categories (income or expense accounts), then
 apply them to the ledger files. Split transactions show `-SPLIT-` and keep their categories.
+[Docs](docs/fava/batch-edit.md)
+
+### `beancount_sg.ext.rewards`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
+
+2020-01-01 open Liabilities:CreditCard:Voyager USD
+  rewards: "points"            ; or "cashback"
+  rewards-rate: 1              ; default rate
+  rewards-rate-dining: 3       ; per card issuer's category, from `category` metadata
+  rewards-point-value: 0.0125  ; optional
+```
+
+A "Credit Card Rewards" report: each configured card's expense spending grouped by the card
+issuer's category (`category` metadata), with its rate, rewards and cash value, plus charts of
+spend and value by card and category. Categories link to the card's transactions in that category.
+[Docs](docs/fava/rewards.md)
 
 ## Utilities
 
@@ -153,6 +172,11 @@ writing plugins that rewrite transactions or add directives next to them.
 
 The editing logic behind the Batch Edit report, independent of Fava: plan payee and category
 changes for matching transactions and apply them to their source text.
+
+### `beancount_sg.rewards`
+
+The logic behind the Credit Card Rewards report, independent of Fava: read cards' rewards programs
+from `open` metadata, and total spending and rewards per card and category.
 
 ## Development
 
