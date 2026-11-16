@@ -3,6 +3,7 @@ import json
 import re
 from urllib.parse import parse_qs, unquote, urlsplit
 
+import pytest
 from beancount import loader
 from beancount.core.data import filter_txns
 from fava.application import create_app
@@ -66,7 +67,7 @@ def leaves(node):
 
 
 def text(body):
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body))
+    return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body)))
 
 
 def test_table_shows_each_card_and_category_with_totals(tmp_path):
@@ -116,6 +117,59 @@ def test_categories_link_to_the_card_filtered_by_category(tmp_path):
     assert matching(CATEGORIES, params["filter"]) == ["Deli", "Market"]
     _, params = category_link(body, "uncategorized")
     assert matching(CATEGORIES, params["filter"]) == ["Deli", "Store"]
+
+
+ENABLE = 'custom "fava-extension" "beancount_sg.ext.rewards"'
+
+
+def with_config(ledger, config):
+    """The ledger with the extension enabled with a config string."""
+    return ledger.replace(ENABLE, f'{ENABLE} "{config}"')
+
+
+PAYMENTS = with_config(
+    CATEGORIES,
+    "{\n  'exclude_accounts': ['Expenses:CardPayments'],\n}",
+) + (
+    """
+2020-01-01 open Expenses:CardPayments
+
+2024-03-10 * "Autopay"
+  Liabilities:CreditCard:Cash  70.00 USD
+  Expenses:CardPayments
+
+2024-03-11 * "Autopay with category"
+  category: "Groceries"
+  Liabilities:CreditCard:Cash  30.00 USD
+  Expenses:CardPayments
+"""
+)
+
+
+def test_excluded_payments_are_neither_counted_nor_linked(tmp_path):
+    body = page(tmp_path, PAYMENTS)
+    table = text(body)
+    assert "Liabilities:CreditCard:Cash Groceries 3% 120.00 USD" in table
+    assert "Liabilities:CreditCard:Cash uncategorized 1.5% 30.00 USD" in table
+    _, params = category_link(body, "Groceries")
+    assert matching(PAYMENTS, params["filter"]) == ["Deli", "Market"]
+    _, params = category_link(body, "uncategorized")
+    assert matching(PAYMENTS, params["filter"]) == ["Deli", "Store"]
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ("['Expenses:CardPayments']", "the extension's config must be like"),
+        ("{'exclude': ['Expenses:CardPayments']}", "the extension's config must be like"),
+        ("{'exclude_accounts': 'Expenses:CardPayments'}", "exclude_accounts must be a list"),
+        ("{'exclude_accounts': ['card payments']}", "exclude_accounts must be a list"),
+    ],
+)
+def test_invalid_config_is_reported_and_excludes_nothing(tmp_path, config, message):
+    body = text(page(tmp_path, with_config(PAYMENTS, config)))
+    assert f"Credit Card Rewards: {message}" in body
+    assert "Liabilities:CreditCard:Cash uncategorized 1.5% -40.00 USD" in body
 
 
 def test_category_links_keep_the_current_filter(tmp_path):

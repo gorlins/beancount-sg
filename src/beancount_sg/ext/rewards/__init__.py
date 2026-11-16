@@ -5,6 +5,15 @@ directives (see `beancount_sg.rewards`):
 
     2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 
+Only expense postings count as spending, so payments from an ``Assets`` account
+never do. If card payments are booked to an expense account instead, they'd look
+like refunds; list such accounts (each with its subaccounts) in the extension's
+config to leave them out:
+
+    2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards" "{
+      'exclude_accounts': ['Expenses:LoanPayments:CreditCardPayment'],
+    }"
+
 The "Credit Card Rewards" report covers the transactions in the current Fava
 filter. Its table has a row per card and category: the rate, spend, reward and,
 where known, the reward's cash value. Its hierarchy charts (e.g. as an icicle)
@@ -49,6 +58,28 @@ from beancount_sg.rewards import (
     programs,
 )
 
+# The extension config's keys.
+EXCLUDE_ACCOUNTS = "exclude_accounts"
+CONFIG_EXAMPLE = f"{{'{EXCLUDE_ACCOUNTS}': ['Expenses:LoanPayments:CreditCardPayment']}}"
+
+
+def excluded_accounts(config: object) -> list[str]:
+    """The accounts that aren't spending, from the extension's config.
+
+    Raises:
+        ValueError: If the config isn't a dict with a list of account names.
+    """
+    if not config:
+        return []
+    if not isinstance(config, dict) or set(config) - {EXCLUDE_ACCOUNTS}:
+        raise ValueError(f"the extension's config must be like {CONFIG_EXAMPLE}, not {config!r}")
+    accounts = config.get(EXCLUDE_ACCOUNTS, [])
+    if not isinstance(accounts, list | tuple) or not all(
+        isinstance(account, str) and account_lib.is_valid(account) for account in accounts
+    ):
+        raise ValueError(f"{EXCLUDE_ACCOUNTS} must be a list of account names, not {accounts!r}")
+    return list(accounts)
+
 
 class CreditCardRewards(FavaExtensionBase):
     """Fava report of credit card rewards by card and category."""
@@ -60,18 +91,35 @@ class CreditCardRewards(FavaExtensionBase):
         # From all entries, so a card's configuration applies whatever the filter.
         return programs(self.ledger.all_entries_by_type.Open)
 
-    def errors(self) -> list[RewardsError]:
-        """Invalid rewards configurations."""
-        return self._programs()[1]
+    def errors(self) -> list[str]:
+        """Problems with the extension's config or cards' rewards configurations."""
+        messages = [error.message for error in self._programs()[1]]
+        try:
+            excluded_accounts(self.config)
+        except ValueError as error:
+            messages.insert(0, f"Credit Card Rewards: {error}")
+        return messages
 
     def configured(self) -> bool:
         """Whether any card has rewards configured."""
         return bool(self._programs()[0])
 
+    def _excluded(self) -> list[str]:
+        # An invalid config excludes nothing; errors() reports it.
+        try:
+            return excluded_accounts(self.config)
+        except ValueError:
+            return []
+
     def rows(self) -> list[CategoryRewards]:
         """Spending and rewards per card and category, within the current Fava filter."""
         found, _ = self._programs()
-        return category_rewards(g.filtered.entries, found, get_account_types(self.ledger.options))
+        return category_rewards(
+            g.filtered.entries,
+            found,
+            get_account_types(self.ledger.options),
+            excluded=self._excluded(),
+        )
 
     @staticmethod
     def totals(amounts: Iterable[Amount | None]) -> list[Amount]:
@@ -96,6 +144,7 @@ class CreditCardRewards(FavaExtensionBase):
             row.program.category_key,
             row.category,
             get_account_types(self.ledger.options).expenses,
+            self._excluded(),
         )
         current = request.args.get("filter")
         return url_for(
@@ -117,7 +166,7 @@ class CreditCardRewards(FavaExtensionBase):
         ]
 
 
-def _category_filter(key: str, category: str, expenses: str) -> str:
+def _category_filter(key: str, category: str, expenses: str, excluded: list[str]) -> str:
     """A Fava filter for transactions with spending in a category.
 
     As in `beancount_sg.rewards.category_rewards`, an expense posting's category is
@@ -126,7 +175,9 @@ def _category_filter(key: str, category: str, expenses: str) -> str:
     itself and an expense posting without one. Uncategorized spending has the key
     on neither.
     """
-    expense = f'account:"^{re.escape(expenses)}(:|$)"'
+    # Spending accounts: the expenses root and its subaccounts, but not excluded ones.
+    not_excluded = "".join(f"(?!{re.escape(account)}(:|$))" for account in excluded)
+    expense = f'account:"^{not_excluded}{re.escape(expenses)}(:|$)"'
     if category == UNCATEGORIZED:
         return f'-{key}:"" any({expense} -{key}:"")'
     # Fava matches values as case-insensitive regexes; \x22 is a quote, which
