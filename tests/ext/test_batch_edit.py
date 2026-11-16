@@ -87,17 +87,32 @@ def test_apply_writes_the_previewed_edits_through_fava(client, ledger_path):
             "new_category": "Expenses:Coffee",
         },
     )
-    assert response.get_json() == {"changed": 2, "errors": []}
     assert transactions(ledger_path) == [
         ("Cafe", "Expenses:Coffee"),
         ("Cafe", "Expenses:Coffee"),
         ("Grocer", "Expenses:Uncategorized"),
     ]
+    # The result lists the edited transactions as they are now, linking to them.
+    body = response.get_data(as_text=True)
+    assert "Edited 2 transactions" in body
+    edited = list(filter_txns(FavaLedger(str(ledger_path)).all_entries))[:2]
+    for txn in edited:
+        assert f'<a href="#context-{hash_entry(txn)}">{txn.date}</a>' in body
+    assert body.count("<td>Cafe</td>") == 2
+    assert body.count("<td>Expenses:Coffee</td>") == 2
 
 
 def test_apply_respects_the_fava_filter(client, ledger_path):
     response = client.post(URL + "apply", query_string={**SEARCH, "time": "2023"})
-    assert response.get_json() == {"changed": 0, "errors": []}
+    assert "Edited 0 transactions" in response.get_data(as_text=True)
+    assert ledger_path.read_text() == LEDGER
+
+
+def test_apply_reports_an_invalid_regex(client, ledger_path):
+    response = client.post(URL + "apply", query_string={"payee_regex": "(", "new_payee": "X"})
+    body = response.get_data(as_text=True)
+    assert "Edited 0 transactions" in body
+    assert "Invalid regex" in body
     assert ledger_path.read_text() == LEDGER
 
 
@@ -146,10 +161,8 @@ def test_split_shows_split_and_only_its_payee_changes(tmp_path):
     body = client.get(PREVIEW, query_string=search).get_data(as_text=True)
     assert "<td>-SPLIT-</td>" in body
 
-    assert client.post(URL + "apply", query_string=search).get_json() == {
-        "changed": 1,
-        "errors": [],
-    }
+    body = client.post(URL + "apply", query_string=search).get_data(as_text=True)
+    assert "Edited 1 transactions" in body
     assert path.read_text() == SPLIT_LEDGER.replace('"COFFEE SHOP #12"', '"Cafe"')
 
 
