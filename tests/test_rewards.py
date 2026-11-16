@@ -10,7 +10,6 @@ from beancount_sg.rewards import (
     POINTS,
     Program,
     category_rewards,
-    excluded_accounts,
     programs,
 )
 from beancount_sg.testing import load
@@ -91,11 +90,11 @@ def test_points_reward_is_in_its_unit_with_an_optional_value():
     assert valued.value(A("200", "UR"), "USD") == A("2.00", "USD")
 
 
-def rows(ledger: str):
+def rows(ledger: str, excluded=()):
     entries, found, _ = load_programs(CARDS + ledger)
     return [
         (row.program.account.rsplit(":", 1)[-1], row.category, row.spend.to_string())
-        for row in category_rewards(entries, found, excluded=excluded_accounts(entries))
+        for row in category_rewards(entries, found, excluded=excluded)
     ]
 
 
@@ -176,9 +175,8 @@ def test_uncategorized_spend_and_refunds():
 
 
 def test_excluded_expense_accounts_are_not_spending():
-    assert rows("""
+    ledger = """
 2020-01-01 open Expenses:LoanPayments:CreditCardPayment
-  rewards-exclude: TRUE
 2020-01-01 open Expenses:LoanPayments:CreditCardPayment:Cash
 2020-01-01 open Expenses:LoanPaymentsOther
 
@@ -204,18 +202,17 @@ def test_excluded_expense_accounts_are_not_spending():
 2024-01-11 * "Other"
   Liabilities:CreditCard:Cash  -10.00 USD
   Expenses:LoanPaymentsOther
-""") == [("Cash", "Shopping", "75.00 USD"), ("Cash", "uncategorized", "10.00 USD")]
-
-
-def test_excluded_accounts_need_a_true_flag():
-    entries, _ = load("""
-2020-01-01 open Expenses:Payments
-  rewards-exclude: TRUE
-2020-01-01 open Expenses:Kept
-  rewards-exclude: FALSE
-2020-01-01 open Expenses:Plain
-""")
-    assert excluded_accounts(entries) == ["Expenses:Payments"]
+"""
+    assert rows(ledger, excluded=["Expenses:LoanPayments:CreditCardPayment"]) == [
+        ("Cash", "Shopping", "75.00 USD"),
+        ("Cash", "uncategorized", "10.00 USD"),
+    ]
+    # Without the exclusion, the payments count as refunds.
+    assert rows(ledger) == [
+        ("Cash", "Payment/Credit", "-123.45 USD"),
+        ("Cash", "Shopping", "75.00 USD"),
+        ("Cash", "uncategorized", "-40.00 USD"),
+    ]
 
 
 def test_only_expenses_on_rewards_cards_count():

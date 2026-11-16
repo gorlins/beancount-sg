@@ -62,13 +62,14 @@ The `Expenses` postings of transactions that post to the card, or one of its sub
 the current Fava filter. Refunds count negatively. A transaction charging two configured cards is
 skipped, since its spending can't be attributed to one of them.
 
-A card payment booked to an expense account looks just like a refund: the card is credited and an
-expense account debited. So expense accounts that aren't spending opt out on their own `open`
-directive, which also covers their subaccounts:
+Only `Expenses` postings count, so a payment from an `Assets` account is never spending. But a card
+payment booked to an expense account looks just like a refund: the card is credited and an expense
+account debited. List such accounts once, in the extension's config; each covers its subaccounts:
 
 ```beancount
-2020-01-01 open Expenses:LoanPayments:CreditCardPayment
-  rewards-exclude: TRUE
+2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards" "{
+  'exclude_accounts': ['Expenses:LoanPayments:CreditCardPayment'],
+}"
 ```
 
 None of this depends on categories: uncategorized spending, e.g. on a flat-rate card or before a

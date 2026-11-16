@@ -23,14 +23,12 @@ unit spent. ``rewards-rate`` defaults to 1. ``rewards-unit`` defaults to
 interchangeable (e.g. two banks' programs) from being added together.
 
 Spending is a card's charges to expenses: the ``Expenses`` postings of each
-transaction that posts to the card (or one of its subaccounts). Refunds count
-negatively. A refund and a card payment booked to an expense account look alike
-(the card is credited and an expense account debited), so expense accounts that
-aren't spending, such as for card payments, are excluded on their own ``open``
-directive, with their subaccounts:
-
-    2020-01-01 open Expenses:LoanPayments:CreditCardPayment
-      rewards-exclude: TRUE
+transaction that posts to the card (or one of its subaccounts). Postings to other
+account types, such as a payment from an ``Assets`` account, aren't spending.
+Refunds count negatively. A refund and a card payment booked to an expense
+account look alike (the card is credited and an expense account debited), so
+expense accounts that aren't spending can be excluded, with their subaccounts:
+see `category_rewards`.
 
 Rates depend on the *card issuer's* category for a purchase (e.g. "Dining"), which
 isn't necessarily the expense account it's booked to, so it's read from
@@ -62,7 +60,6 @@ DEFAULT_UNIT = "POINTS"
 DEFAULT_CATEGORY_KEY = "category"
 UNCATEGORIZED = "uncategorized"
 META_PREFIX = "rewards"
-EXCLUDE_KEY = f"{META_PREFIX}-exclude"
 
 
 class RewardsError(NamedTuple):
@@ -117,15 +114,6 @@ def programs(entries: Iterable[Directive]) -> tuple[dict[str, Program], list[Rew
         except ValueError as error:
             errors.append(RewardsError(entry.meta, f"{entry.account}: {error}", entry))
     return found, errors
-
-
-def excluded_accounts(entries: Iterable[Directive]) -> list[str]:
-    """The accounts whose ``open`` sets ``rewards-exclude: TRUE``: not spending."""
-    return sorted(
-        entry.account
-        for entry in entries
-        if isinstance(entry, Open) and entry.meta.get(EXCLUDE_KEY)
-    )
 
 
 def _program(entry: Open) -> Program:
@@ -188,8 +176,9 @@ def category_rewards(
     """Spending and rewards per card, category and currency, sorted by card then category.
 
     A transaction posting to more than one rewards card is skipped, since its
-    spending can't be attributed to one of them. Postings to ``excluded`` accounts
-    (see `excluded_accounts`), or their subaccounts, aren't spending.
+    spending can't be attributed to one of them. Postings to ``excluded`` accounts,
+    or their subaccounts, aren't spending: e.g. an expense account that card
+    payments are booked to.
     """
     matchers = {account: account_lib.parent_matcher(account) for account in cards}
     excluded_matchers = [account_lib.parent_matcher(account) for account in excluded]

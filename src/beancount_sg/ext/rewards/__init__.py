@@ -5,6 +5,15 @@ directives (see `beancount_sg.rewards`):
 
     2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 
+Only expense postings count as spending, so payments from an ``Assets`` account
+never do. If card payments are booked to an expense account instead, they'd look
+like refunds; list such accounts (each with its subaccounts) in the extension's
+config to leave them out:
+
+    2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards" "{
+      'exclude_accounts': ['Expenses:LoanPayments:CreditCardPayment'],
+    }"
+
 The "Credit Card Rewards" report covers the transactions in the current Fava
 filter. Its table has a row per card and category: the rate, spend, reward and,
 where known, the reward's cash value. Its hierarchy charts (e.g. as an icicle)
@@ -46,9 +55,30 @@ from beancount_sg.rewards import (
     Program,
     RewardsError,
     category_rewards,
-    excluded_accounts,
     programs,
 )
+
+# The extension config's keys.
+EXCLUDE_ACCOUNTS = "exclude_accounts"
+CONFIG_EXAMPLE = f"{{'{EXCLUDE_ACCOUNTS}': ['Expenses:LoanPayments:CreditCardPayment']}}"
+
+
+def excluded_accounts(config: object) -> list[str]:
+    """The accounts that aren't spending, from the extension's config.
+
+    Raises:
+        ValueError: If the config isn't a dict with a list of account names.
+    """
+    if not config:
+        return []
+    if not isinstance(config, dict) or set(config) - {EXCLUDE_ACCOUNTS}:
+        raise ValueError(f"the extension's config must be like {CONFIG_EXAMPLE}, not {config!r}")
+    accounts = config.get(EXCLUDE_ACCOUNTS, [])
+    if not isinstance(accounts, list | tuple) or not all(
+        isinstance(account, str) and account_lib.is_valid(account) for account in accounts
+    ):
+        raise ValueError(f"{EXCLUDE_ACCOUNTS} must be a list of account names, not {accounts!r}")
+    return list(accounts)
 
 
 class CreditCardRewards(FavaExtensionBase):
@@ -61,16 +91,25 @@ class CreditCardRewards(FavaExtensionBase):
         # From all entries, so a card's configuration applies whatever the filter.
         return programs(self.ledger.all_entries_by_type.Open)
 
-    def errors(self) -> list[RewardsError]:
-        """Invalid rewards configurations."""
-        return self._programs()[1]
+    def errors(self) -> list[str]:
+        """Problems with the extension's config or cards' rewards configurations."""
+        messages = [error.message for error in self._programs()[1]]
+        try:
+            excluded_accounts(self.config)
+        except ValueError as error:
+            messages.insert(0, f"Credit Card Rewards: {error}")
+        return messages
 
     def configured(self) -> bool:
         """Whether any card has rewards configured."""
         return bool(self._programs()[0])
 
     def _excluded(self) -> list[str]:
-        return excluded_accounts(self.ledger.all_entries_by_type.Open)
+        # An invalid config excludes nothing; errors() reports it.
+        try:
+            return excluded_accounts(self.config)
+        except ValueError:
+            return []
 
     def rows(self) -> list[CategoryRewards]:
         """Spending and rewards per card and category, within the current Fava filter."""
