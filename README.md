@@ -142,17 +142,16 @@ apply them to the ledger files. Split transactions show `-SPLIT-` and keep their
 ```beancount
 2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 
-2020-01-01 open Liabilities:CreditCard:Sapphire USD
-  rewards: "points"        ; or "cashback"
-  rewards-rate: 1          ; default rate
-  rewards-rate-dining: 3   ; per `category` metadata value
-  rewards-unit: "UR"
-  rewards-point-value: 0.0125
+2020-01-01 open Liabilities:CreditCard:Voyager USD
+  rewards: "points"            ; or "cashback"
+  rewards-rate: 1              ; default rate
+  rewards-rate-dining: 3       ; per card issuer's category, from `category` metadata
+  rewards-point-value: 0.0125  ; optional
 ```
 
-A "Credit Card Rewards" report: each configured card's expense spending grouped by `category`
-metadata, with its rate, rewards and cash value, plus treemap/sunburst/icicle charts of spend and
-value by card and category.
+A "Credit Card Rewards" report: each configured card's expense spending grouped by the card
+issuer's category (`category` metadata), with its rate, rewards and cash value, plus charts of
+spend and value by card and category. Categories link to the card's transactions in that category.
 
 ## Utilities
 
