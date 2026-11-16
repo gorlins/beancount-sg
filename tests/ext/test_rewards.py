@@ -1,7 +1,12 @@
+import html
 import json
 import re
+from urllib.parse import parse_qs, unquote, urlsplit
 
+from beancount import loader
+from beancount.core.data import filter_txns
 from fava.application import create_app
+from fava.core.filter_parser import parse_filter
 
 LEDGER = """
 option "title" "Test"
@@ -64,12 +69,84 @@ def text(body):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body))
 
 
-def test_tables_show_spend_rewards_and_totals(tmp_path):
+def test_table_shows_each_card_and_category_with_totals(tmp_path):
     body = text(page(tmp_path))
-    assert "Groceries 3% 100.00 USD 3.00 USD 3.00 USD" in body
-    assert "uncategorized 1.5% 20.00 USD 0.30 USD 0.30 USD" in body
-    assert "Total 120.00 USD 3.30 USD 3.30 USD" in body
-    assert "Dining 3x 50.00 USD 150.00 UR 1.50 USD" in body
+    assert "Liabilities:CreditCard:Cash Groceries 3% 100.00 USD 3.00 USD 3.00 USD" in body
+    assert "Liabilities:CreditCard:Cash uncategorized 1.5% 20.00 USD 0.30 USD 0.30 USD" in body
+    assert "Liabilities:CreditCard:Sapphire Dining 3x 50.00 USD 150.00 UR 1.50 USD" in body
+    assert "Total 170.00 USD 3.30 USD 150.00 UR 4.80 USD" in body
+
+
+def test_setup_instructions_follow_the_report(tmp_path):
+    body = page(tmp_path)
+    assert body.index("<table") < body.index("How to set up")
+
+
+def category_link(body, category):
+    """The path and query parameters of the table's link for a category."""
+    [href] = re.findall(rf'<a href="([^"]+)">{category}</a>', body)
+    url = urlsplit(html.unescape(href))
+    return unquote(url.path), {key: value for key, [value] in parse_qs(url.query).items()}
+
+
+def matching(ledger_text, fava_filter):
+    """The narrations of the ledger's transactions that a Fava filter matches."""
+    entries, _, _ = loader.load_string(ledger_text)
+    expression = parse_filter(fava_filter)
+    return sorted(txn.narration for txn in filter_txns(entries) if expression(txn))
+
+
+CATEGORIES = (
+    LEDGER
+    + """
+2024-03-05 * "Deli"
+  Liabilities:CreditCard:Cash  -30.00 USD
+  Expenses:Food  20.00 USD
+    category: "Groceries"
+  Expenses:Shopping  10.00 USD
+"""
+)
+
+
+def test_categories_link_to_the_card_filtered_by_category(tmp_path):
+    body = page(tmp_path, CATEGORIES, query="?time=2024")
+    path, params = category_link(body, "Groceries")
+    assert path == "/test/account/Liabilities:CreditCard:Cash/"
+    assert params["time"] == "2024"
+    assert matching(CATEGORIES, params["filter"]) == ["Deli", "Market"]
+    _, params = category_link(body, "uncategorized")
+    assert matching(CATEGORIES, params["filter"]) == ["Deli", "Store"]
+
+
+def test_category_links_keep_the_current_filter(tmp_path):
+    body = page(tmp_path, CATEGORIES, query="?filter=Deli")
+    _, params = category_link(body, "Groceries")
+    assert matching(CATEGORIES, params["filter"]) == ["Deli"]
+
+
+def test_category_links_escape_the_category(tmp_path):
+    ledger = LEDGER.replace('"Groceries"', '"Food (and) \\"Drink\\""')
+    body = page(tmp_path, ledger)
+    [href] = re.findall(r'<a href="([^"]+)">Food \(and\) &#34;Drink&#34;</a>', body)
+    fava_filter = parse_qs(urlsplit(html.unescape(href)).query)["filter"][0]
+    assert matching(ledger, fava_filter) == ["Market"]
+
+
+def test_chart_category_nodes_have_links(tmp_path):
+    body = page(tmp_path)
+    [links] = re.findall(
+        r'<script type="application/json" id="rewards-category-links">(.*?)</script>', body
+    )
+    links = json.loads(links)
+    assert set(links) == {
+        "Liabilities:CreditCard:Cash:Groceries",
+        "Liabilities:CreditCard:Cash:uncategorized",
+        "Liabilities:CreditCard:Sapphire:Dining",
+    }
+    assert (
+        html.unescape(category_link(body, "Dining")[0])
+        in links["Liabilities:CreditCard:Sapphire:Dining"]
+    )
 
 
 def test_charts_show_spend_and_value_by_card_and_category(tmp_path):
@@ -102,7 +179,7 @@ def test_respects_the_time_filter(tmp_path):
     body = text(page(tmp_path, query="?time=2025"))
     assert "Dining" in body
     assert "Groceries" not in body
-    assert "No spending in the current filter." in body
+    assert "No spending in the current filter." in text(page(tmp_path, query="?time=2023"))
 
 
 def test_shows_configuration_errors(tmp_path):

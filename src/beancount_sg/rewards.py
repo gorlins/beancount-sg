@@ -1,25 +1,39 @@
 """Credit card rewards: spending per card and category, and the rewards it earns.
 
-Configure a card's rewards with metadata on its ``open`` directive:
+Configure a card's rewards with metadata on its ``open`` directive. A cashback
+card needs only its rates:
 
-    2020-01-01 open Liabilities:CreditCard:Sapphire USD
-      rewards: "points"            ; or "cashback"
-      rewards-rate: 1              ; the default rate, for categories without their own
-      rewards-rate-dining: 3       ; a category's rate
-      rewards-rate-travel: 2
-      rewards-unit: "UR"           ; points only: what the points are called
-      rewards-point-value: 0.0125  ; points only, optional: a point's value in cash
+    2020-01-01 open Liabilities:CreditCard:CashPlus USD
+      rewards: "cashback"
+      rewards-rate: 1.5            ; the default rate, for categories without their own
+      rewards-rate-groceries: 3    ; a category's rate
+
+A points card can also name its points and give them a cash value:
+
+    2020-01-01 open Liabilities:CreditCard:Voyager USD
+      rewards: "points"
+      rewards-rate-dining: 3
+      rewards-unit: "VP"           ; optional: what the points are called
+      rewards-point-value: 0.0125  ; optional: a point's value in cash
 
 Rates are written the same way for both kinds of rewards: for ``cashback`` a rate
 of 3 means 3% back, in the currency spent; for ``points`` it means 3 points per
-unit spent. ``rewards-rate`` defaults to 1; ``rewards-unit`` to ``points``.
+unit spent. ``rewards-rate`` defaults to 1. ``rewards-unit`` defaults to
+``POINTS``; naming each program's points keeps points that aren't
+interchangeable (e.g. two banks' programs) from being added together.
 
 Spending is a card's charges to expenses: the ``Expenses`` postings of each
 transaction that posts to the card (or one of its subaccounts). Refunds count
-negatively. A posting's *category* is its ``category`` metadata, or else its
-transaction's; spending without one is ``uncategorized`` and earns the default
-rate. A category's rate key is the category slugified, e.g. ``Food and Drink``
-uses ``rewards-rate-food-and-drink``.
+negatively.
+
+Rates depend on the *card issuer's* category for a purchase (e.g. "Dining"), which
+isn't necessarily the expense account it's booked to, so it's read from
+metadata: a posting's ``category`` metadata, or else its transaction's (as an
+importer might record the bank's category). ``rewards-category-key`` names a
+different metadata key, e.g. ``rewards-category-key: "bank_category"``. Spending
+without a category is ``uncategorized`` and earns the default rate. A
+category's rate key is the category slugified, e.g. ``Food and Drink`` uses
+``rewards-rate-food-and-drink``.
 """
 
 from __future__ import annotations
@@ -38,6 +52,8 @@ from slugify import slugify
 
 CASHBACK = "cashback"
 POINTS = "points"
+DEFAULT_UNIT = "POINTS"
+DEFAULT_CATEGORY_KEY = "category"
 UNCATEGORIZED = "uncategorized"
 META_PREFIX = "rewards"
 
@@ -58,8 +74,9 @@ class Program:
     kind: str  # CASHBACK or POINTS
     default_rate: Decimal = Decimal(1)
     rates: dict[str, Decimal] = field(default_factory=dict)  # slugified category -> rate
-    unit: str = POINTS
+    unit: str = DEFAULT_UNIT
     point_value: Decimal | None = None
+    category_key: str = DEFAULT_CATEGORY_KEY  # the metadata key holding the issuer's category
 
     def rate(self, category: str) -> Decimal:
         """The rate for a category, or the default rate."""
@@ -111,8 +128,9 @@ def _program(entry: Open) -> Program:
             for key in meta
             if key.startswith(rate_prefix)
         },
-        unit=str(meta.get(f"{META_PREFIX}-unit", POINTS)),
+        unit=str(meta.get(f"{META_PREFIX}-unit", DEFAULT_UNIT)),
         point_value=None if point_value is None else _number(meta, f"{META_PREFIX}-point-value"),
+        category_key=str(meta.get(f"{META_PREFIX}-category-key", DEFAULT_CATEGORY_KEY)),
     )
 
 
@@ -169,10 +187,11 @@ def category_rewards(
         if len(charged) != 1:
             continue
         [card] = charged
+        category_key = cards[card].category_key
         for posting in txn.postings:
             if get_account_type(posting.account) != account_types.expenses:
                 continue
-            category = (posting.meta or {}).get("category") or txn.meta.get("category")
+            category = (posting.meta or {}).get(category_key) or txn.meta.get(category_key)
             key = (card, str(category or UNCATEGORIZED), posting.units.currency)
             spend[key] += posting.units.number
     return [

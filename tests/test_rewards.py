@@ -92,6 +92,37 @@ def rows(ledger: str):
     ]
 
 
+def test_points_unit_and_category_key_defaults():
+    _, found, _ = load_programs("""
+2020-01-01 open Liabilities:CreditCard:Card
+  rewards: "points"
+""")
+    card = found["Liabilities:CreditCard:Card"]
+    assert (card.unit, card.category_key) == ("POINTS", "category")
+    assert card.reward(A("10", "USD"), "Dining") == A("10", "POINTS")
+
+
+def test_category_key_reads_another_metadata_key():
+    entries, found, _ = load_programs("""
+2020-01-01 open Liabilities:CreditCard:Card
+  rewards: "cashback"
+  rewards-category-key: "bank_category"
+2020-01-01 open Expenses:Food
+
+2024-01-05 * "Bistro"
+  category: "Groceries"
+  bank_category: "Dining"
+  Liabilities:CreditCard:Card  -40.00 USD
+  Expenses:Food  30.00 USD
+  Expenses:Food  10.00 USD
+    bank_category: "Bakery"
+""")
+    assert [(row.category, row.spend) for row in category_rewards(entries, found)] == [
+        ("Bakery", A("10.00", "USD")),
+        ("Dining", A("30.00", "USD")),
+    ]
+
+
 def test_spend_is_grouped_by_card_and_category():
     assert rows("""
 2024-01-05 * "Grocer"
