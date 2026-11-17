@@ -1,0 +1,91 @@
+{# Amounts, one per line, sorted by the first. #}
+{% macro amounts_cell(amounts, tag="td") -%}
+<{{ tag }} class="num" data-sort-value="{{ amounts[0].number if amounts else 0 }}">
+  {%- for amount in amounts %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
+</{{ tag }}>
+{%- endmacro %}
+
+{% macro amounts_text(amounts) -%}
+{%- for amount in amounts %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}, {% endif %}{% endfor -%}
+{%- endmacro %}
+
+<h2>Travel</h2>
+
+{% set error = extension.error() %}
+{% if error %}
+<ul class="error"><li>{{ error }}</li></ul>
+{% endif %}
+
+{% set report = extension.report() %}
+{% if not report.trips %}
+<p>No travel spending in the current filter; see "How to use" below.</p>
+{% else %}
+{% set untagged = report.untagged %}
+<p>
+  Travel spending: <strong>{{ amounts_text(report.total) }}</strong> on {{ report.tagged|length }}
+  trip{{ '' if report.tagged|length == 1 else 's' }}.
+  {% if untagged %}
+  <strong><a href="{{ report.trip_url(none) }}">{{ amounts_text(untagged.total) }}</a> of it
+    ({{ untagged.transactions }} transaction{{ '' if untagged.transactions == 1 else 's' }})
+    isn't tagged with a trip.</strong>
+  {% else %}
+  All of it is tagged with a trip.
+  {% endif %}
+</p>
+
+<svelte-component type="charts"><script type="application/json">{{ report.charts()|tojson }}</script></svelte-component>
+<script type="application/json" id="travel-chart-links">{{ report.chart_links()|tojson }}</script>
+
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Trip</th>
+      <th data-sort="string">First</th>
+      <th data-sort="string">Last</th>
+      <th data-sort="num">Transactions</th>
+      <th data-sort="num">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for trip in report.tagged + ([untagged] if untagged else []) %}
+    <tr>
+      <td>{% if not trip.tag %}<strong>{% endif %}<a href="{{ report.trip_url(trip.tag) }}">{{ trip.label }}</a>{% if not trip.tag %}</strong>{% endif %}</td>
+      <td>{{ trip.first }}</td>
+      <td>{{ trip.last }}</td>
+      <td class="num">{{ trip.transactions }}</td>
+      {{ amounts_cell(trip.total) }}
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th>Total</th>
+      <th></th>
+      <th></th>
+      <th class="num">{{ report.trips|sum(attribute="transactions") }}</th>
+      {{ amounts_cell(report.total, "th") }}
+    </tr>
+  </tfoot>
+</table>
+</sortable-table>
+{% endif %}
+
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>Travel spending is the expense postings of transactions tagged <code>#travel</code>, in the
+      current Fava filter; refunds count negatively.</li>
+    <li>A transaction's trip is its tag ending in a year, e.g. <code>#miami-2025</code>, as the
+      <code>beancount_sg.plugins.tag_travel</code> plugin adds. To recognize trip tags differently,
+      give the extension a regex: <code>2020-01-01 custom "fava-extension" "beancount_sg.ext.travel"
+      "{'trip_pattern': '^trip-'}"</code>. A transaction with several trip tags counts towards the
+      first, alphabetically.</li>
+    <li>Travel spending without a trip tag is called out above, and shown as "no trip".</li>
+    <li>The chart shows the spending <em>By trip</em> then expense account, or <em>By category</em>
+      (expense account) then trip; the icicle view shows the hierarchy most clearly.</li>
+    <li>Clicking a trip, in the table or the chart, opens the income statement filtered to its
+      transactions. Clicking an expense account in the chart opens its page, filtered to that
+      trip's travel transactions (or to all travel, when not under a trip).</li>
+  </ul>
+</details>
