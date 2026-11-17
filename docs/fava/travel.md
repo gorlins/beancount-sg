@@ -37,15 +37,21 @@ its trip. Two consequences:
 
 ## The report
 
+![Travel spending over time, stacked by trip](images/travel-over-time.png)
+
 - **Untagged travel:** the line above the chart says how much travel spending isn't tagged with a
   trip, linked to those transactions. It's shown as "no trip" in the chart and the table.
-- **Chart:** the spending **By trip**, then expense account, or **By category** (expense account),
-  then trip. The icicle view shows the hierarchy most clearly.
+- **Charts:** the spending **By trip**, then expense account, or **By category** (expense account),
+  then trip. The icicle view shows the hierarchy most clearly. **Over time** is a bar chart of the
+  spending in each period, stacked by trip. The period follows the chart's interval menu (e.g.
+  monthly or yearly), as in Fava's other bar charts; hover over a part of a bar to see its trip.
 - **Table:** each trip's first and last dates, number of transactions and total.
 
 Every click opens a Fava page filtered by tag, within the current filter:
 
 - A trip, in the table or the chart, opens the income statement filtered to `#travel #<trip>`.
 - "no trip" opens it filtered to `#travel` without any of the trip tags.
+- A trip's part of a bar in **Over time** opens the income statement filtered to it, and a bar's
+  date limits the report to that period.
 - An expense account in the chart opens the account's page, filtered to its trip's travel
   transactions, or to all `#travel` in the **By category** chart's upper levels.

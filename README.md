@@ -173,8 +173,8 @@ oldest of the balance dates. [Docs](docs/fava/update-status.md)
 ```
 
 A "Travel" report of `#travel` spending by trip (tags used only on travel transactions, e.g.
-`#miami-2025`, as `tag_travel` adds) and expense category, as charts and a table of trips, calling
-out travel spending without a trip. Every link opens Fava filtered by the trip's tag.
+`#miami-2025`, as `tag_travel` adds) and expense category, as charts (including spending over time,
+stacked by trip) and a table of trips, calling out travel spending without a trip. Every link opens Fava filtered by the trip's tag.
 [Docs](docs/fava/travel.md)
 
 ## Utilities

@@ -47,20 +47,22 @@ def wait_for(url: str, timeout: float = 30) -> None:
 
 # The bounds of an element's content, in page coordinates, so a screenshot covers
 # all of it without the empty space below: Fava's content area fills the window
-# and scrolls, so it can be taller or shorter than what's in it.
-CONTENT_BOUNDS = """(selector) => {
+# and scrolls, so it can be taller or shorter than what's in it. The margin adds
+# space to the right and below.
+CONTENT_BOUNDS = """([selector, margin]) => {
   const element = document.querySelector(selector);
   const box = element.getBoundingClientRect();
   const children = [...element.children].map((child) => child.getBoundingClientRect());
   const bottom = Math.max(...children.map((child) => child.bottom)) + element.scrollTop;
   const right = Math.max(box.right, ...children.map((child) => child.right));
-  return {x: box.left, y: box.top, width: right - box.left + 24, height: bottom - box.top + 24};
+  const width = right - box.left + margin;
+  return {x: box.left, y: box.top, width, height: bottom - box.top + margin};
 }"""
 
 
-def save(page: Page, name: str, selector: str = "article") -> None:
+def save(page: Page, name: str, selector: str = "article", margin: int = 24) -> None:
     """Save the element's content as ``images/<name>.png``."""
-    bounds = page.evaluate(CONTENT_BOUNDS, selector)
+    bounds = page.evaluate(CONTENT_BOUNDS, [selector, margin])
     viewport = page.viewport_size
     page.set_viewport_size(
         {
@@ -105,6 +107,9 @@ def main() -> None:
             page.goto(f"{base}/Travel/", wait_until="networkidle")
             page.get_by_text("Icicle", exact=True).click()
             save(page, "travel")
+            page.click('a[href*="chart=Over"]')
+            page.wait_for_load_state("networkidle")
+            save(page, "travel-over-time", "svelte-component", margin=0)
 
             browser.close()
     finally:

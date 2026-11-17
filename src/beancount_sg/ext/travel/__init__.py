@@ -18,35 +18,41 @@ it can be fixed. And a trip tag used once without ``#travel`` stops being a trip
 so its spending shows as "no trip".
 
 The report has hierarchy charts of the spending, by trip then expense account
-("By trip"), and by expense account then trip ("By category"), and a table of
+("By trip"), and by expense account then trip ("By category"); a bar chart of
+the spending in each of Fava's intervals (e.g. monthly, as chosen in the chart's
+interval menu), stacked by trip ("Over time"); and a table of
 trips with their dates, number of transactions and total. Every link, in the
 table or the charts, opens a Fava page filtered by the trip's tag (or, for
 spending without a trip, ``#travel`` without any trip tag): a trip opens the
 income statement, and an expense account opens that account's page.
 
-Fava's charts link every node to an account page, so the page's script
-(``Travel.js``) points chart nodes at these filtered pages instead.
+Fava's charts link every node, and every bar segment, to an account page, so the
+page's script (``Travel.js``) points them at these filtered pages instead. A bar
+group links to its interval, as in Fava.
 """
 
 from __future__ import annotations
 
+import bisect
 import datetime
 from collections import defaultdict
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 
 from beancount.core import account as account_lib
 from beancount.core.account_types import get_account_type
 from beancount.core.amount import Amount
-from beancount.core.data import Directive, Transaction
+from beancount.core.data import Directive, Posting, Transaction
 from beancount.parser.options import get_account_types
 from fava.beans.funcs import hash_entry
 from fava.context import g
+from fava.core.charts import DateAndBalanceWithBudget
 from fava.core.inventory import SimpleCounterInventory
 from fava.core.tree import SerialisedTreeNode
 from fava.ext import FavaExtensionBase
-from fava.internal_api import HierarchyChart
+from fava.internal_api import BarChart, HierarchyChart
+from fava.util.date import DateRange
 from flask import request, url_for
 
 from beancount_sg.plugins.tag_travel import TAG
@@ -128,9 +134,9 @@ def travel_spending(
     by_trip: dict[str | None, Trip] = {}
     several_trips: list[Transaction] = []
     for txn in entries:
-        if not isinstance(txn, Transaction) or TAG not in txn.tags:
+        if not isinstance(txn, Transaction):
             continue
-        postings = [p for p in txn.postings if get_account_type(p.account) == expenses]
+        postings = travel_postings(txn, expenses)
         if not postings:
             continue
         tags = trip_tags(txn, trips)
@@ -153,6 +159,49 @@ def travel_spending(
     return TravelSpending(
         rows, sorted(by_trip.values(), key=lambda trip: (trip.first, trip.tag or "")), several_trips
     )
+
+
+def travel_postings(txn: Transaction, expenses: str) -> list[Posting]:
+    """A transaction's travel spending: its expense postings, if it's tagged ``#travel``."""
+    if TAG not in txn.tags:
+        return []
+    return [posting for posting in txn.postings if get_account_type(posting.account) == expenses]
+
+
+def spending_over_time(
+    entries: Iterable[Directive],
+    expenses: str,
+    trips: Collection[str],
+    ranges: Sequence[DateRange],
+) -> list[DateAndBalanceWithBudget]:
+    """Travel spending in each date range, in total and per trip, for a bar chart.
+
+    Like Fava's own bar charts, each range is dated by its last day. The trips are
+    keyed by their tag, or `NO_TRIP`.
+    """
+    begins = [date_range.begin for date_range in ranges]
+    by_range: list[dict[str, dict[str, Decimal]]] = [{} for _ in ranges]
+    for txn in entries:
+        if not isinstance(txn, Transaction):
+            continue
+        index = bisect.bisect_right(begins, txn.date) - 1
+        if index < 0 or txn.date >= ranges[index].end:
+            continue
+        tags = trip_tags(txn, trips)
+        by_trip = by_range[index].setdefault(tags[0] if tags else NO_TRIP, defaultdict(Decimal))
+        for posting in travel_postings(txn, expenses):
+            by_trip[posting.units.currency] += posting.units.number
+    data = []
+    for date_range, by_trip in zip(ranges, by_range, strict=True):
+        total = SimpleCounterInventory()
+        for balance in by_trip.values():
+            for currency, number in balance.items():
+                total[currency] = total.get(currency, Decimal(0)) + number
+        account_balances = {
+            trip: SimpleCounterInventory(balance) for trip, balance in by_trip.items() if balance
+        }
+        data.append(DateAndBalanceWithBudget(date_range.end_inclusive, total, account_balances, {}))
+    return data
 
 
 def trip_filter(tag: str | None, trip_tags: Iterable[str]) -> str:
@@ -182,6 +231,15 @@ class Travel(FavaExtensionBase):
         return TravelReport(
             spending.rows, spending.trips, spending.several_trips, self._expenses(), trips
         )
+
+    def charts(self, report: TravelReport) -> list[HierarchyChart | BarChart]:
+        """The report's hierarchy charts, and its spending over Fava's intervals."""
+        # Like Fava's bar charts: its interval, and at most its last 100 periods.
+        ranges = g.filtered.interval_ranges(g.interval)[-100:]
+        over_time = spending_over_time(
+            g.filtered.entries, self._expenses(), report.ledger_trips, ranges
+        )
+        return [*report.charts(), BarChart(f"Over time ({g.interval.label})", over_time)]
 
 
 @dataclass(frozen=True)
@@ -247,7 +305,9 @@ class TravelReport:
         """Each chart node's name, and the filtered page it should link to."""
         _, trip_links = self._by_trip()
         _, category_links = self._by_category()
-        return {**trip_links, **category_links}
+        # The "Over time" chart's bars are stacked by trip, keyed by tag.
+        bar_links = {trip.tag or NO_TRIP: self.trip_url(trip.tag) for trip in self.trips}
+        return {**trip_links, **category_links, **bar_links}
 
     def _by_trip(self) -> tuple[SerialisedTreeNode, dict[str, str]]:
         amounts: dict[tuple[str, ...], dict[str, Decimal]] = {}
