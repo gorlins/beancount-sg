@@ -12,6 +12,7 @@ from fava.core.filter_parser import parse_filter
 
 from beancount_sg.builders import A, P, T
 from beancount_sg.ext.travel import (
+    ledger_trips,
     travel_spending,
     trip_filter,
     trip_tags,
@@ -45,7 +46,7 @@ option "title" "Test"
   Expenses:Travel:Flights  -50.00 USD
   Assets:Checking
 
-2025-06-01 * "Airline" "Flight to Paris" #travel #paris-2025
+2025-06-01 * "Airline" "Flight to Paris" #travel #paris-2025 #recurring
   Expenses:Travel:Flights  800.00 USD
   Assets:Checking
 
@@ -57,7 +58,7 @@ option "title" "Test"
   Expenses:Food  15.00 USD
   Assets:Checking
 
-2025-07-03 * "Grocer" "Not travel"
+2025-07-03 * "Grocer" "Not travel" #recurring
   Expenses:Food  100.00 USD
   Assets:Checking
 
@@ -73,14 +74,34 @@ def load():
     return entries
 
 
-def test_trip_tags_are_the_tags_other_than_travel():
-    txn = T("2025-01-01", tags={"travel", "work-offsite", "miami-2025"}, postings=[])
-    assert trip_tags(txn) == ["miami-2025", "work-offsite"]
-    assert trip_tags(T("2025-01-01", tags={"travel"}, postings=[])) == []
+def spend(entries=None):
+    entries = entries or load()
+    return travel_spending(entries, "Expenses", ledger_trips(entries))
+
+
+def test_trips_are_tags_only_used_on_travel():
+    # #recurring is also on a transaction without #travel, so it isn't a trip.
+    assert ledger_trips(load()) == {"miami-2025", "nyc-2024", "paris-2025", "reimbursable"}
+    txn = T("2025-01-01", tags={"travel", "recurring", "miami-2025"}, postings=[])
+    assert trip_tags(txn, ledger_trips(load())) == ["miami-2025"]
+
+
+def test_a_trip_tag_used_without_travel_is_not_a_trip():
+    entries, _, _ = loader.load_string(
+        LEDGER
+        + """
+2025-08-01 * "Cafe" "Forgot the travel tag" #paris-2025
+  Expenses:Food  5.00 USD
+  Assets:Checking
+"""
+    )
+    assert "paris-2025" not in ledger_trips(entries)
+    no_trip = next(trip for trip in spend(entries).trips if not trip.tag)
+    assert no_trip.total == [A("875.00", "USD")]  # with the Paris flight
 
 
 def test_spending_by_trip_and_account():
-    spending = travel_spending(load(), "Expenses")
+    spending = spend()
     rows, trips = spending.rows, spending.trips
     assert [(row.trip, row.account, row.amount) for row in rows] == [
         (None, "Expenses:Food", A("15.00", "USD")),
@@ -121,7 +142,7 @@ def test_only_expense_postings_count():
             P("Assets:Checking", A("-70.00", "USD")),
         ],
     )
-    rows = travel_spending([txn], "Expenses").rows
+    rows = travel_spending([txn], "Expenses", {"rome-2025"}).rows
     assert [(row.account, row.amount) for row in rows] == [
         ("Expenses:Travel:Flights", A("100.00", "USD"))
     ]
@@ -270,13 +291,25 @@ def test_any_other_tag_is_a_trip(tmp_path):
 
 
 def test_several_trip_tags_count_towards_the_first_and_are_listed(tmp_path):
-    spending = travel_spending(load(), "Expenses")
+    spending = spend()
+    # Not the Paris flight: #recurring is also used without #travel.
     assert [txn.narration for txn in spending.several_trips] == ["Miami hotel"]
     body = page(tmp_path)
     warning = text(body[body.index('<ul class="error">') : body.index("</ul>")])
     assert "Hotel Miami hotel: #miami-2025, #reimbursable" in warning
+    assert "Paris" not in warning
     # Counted towards #miami-2025; #reimbursable isn't a trip.
     assert "#reimbursable" not in text(body[body.index("<table") :])
+
+
+def test_trips_come_from_the_whole_ledger_whatever_the_filter(tmp_path):
+    # June 2025 has the Paris flight (#recurring) but not the grocer's, which makes
+    # #recurring a non-trip.
+    body = page(tmp_path, query="?time=2025-06")
+    report = text(body[body.index("<h2>Travel</h2>") : body.index("<details>")])
+    assert "#paris-2025 2025-06-01 2025-06-01 1 800.00 USD" in report
+    assert "#recurring" not in report
+    assert "several trip tags" not in report
 
 
 def test_without_travel(tmp_path):
