@@ -83,11 +83,10 @@ def test_green_has_no_difference():
 def test_red_difference_is_the_failing_assertions():
     found, _ = statuses()
     vti = found["Assets:Brokerage:VTI"]
-    # The failing assertion is the last balance, but not the last passing one.
     assert vti.last_balance_amounts == [A("2", "VTI")]
     assert vti.difference("red") == [A("1", "VTI")]  # the ledger has 3
-    assert vti.last_balance is None
-    assert vti.balanced_as_of == datetime.date(2020, 1, 1)
+    # A failing assertion still counts as the last balance.
+    assert vti.balanced_as_of == datetime.date(2024, 4, 1)
 
 
 def test_differences_are_per_currency():
@@ -149,7 +148,7 @@ def cells(row_html):
 
 def test_page_lists_accounts_with_status_and_dates(tmp_path):
     body = page(tmp_path)
-    assert "Up to date as of 2020-01-01" in text(body)
+    assert "Up to date as of 2024-03-01" in text(body)
     checking = row(body, "Assets:Checking")
     assert 'class="status-indicator status-yellow"' in checking
     assert cells(checking)[2:] == [
@@ -164,7 +163,7 @@ def test_page_lists_accounts_with_status_and_dates(tmp_path):
     assert cells(card)[-2:] == ["-50.00 USD", ""]
     vti = row(body, "Assets:Brokerage:VTI")
     assert 'class="status-indicator status-red"' in vti
-    assert cells(vti)[3] == "2020-01-01 (opened)"
+    assert cells(vti)[3] == "2024-04-01"  # the failing assertion
     assert cells(vti)[-2:] == ["2 VTI", "1 VTI"]
     table = body[body.index("<table") : body.index("</table>")]
     assert "Assets:Untracked" not in table
@@ -193,10 +192,11 @@ def test_yellow_dot_copies_balance_directives(tmp_path):
     assert re.search(r"balance Assets:Checking\s+980.00 USD", directives)
 
 
-def test_up_to_date_as_of_is_the_oldest_balance(tmp_path):
-    balanced = LEDGER + "2024-04-02 balance Assets:Brokerage:VTI  3 VTI\n"
-    body = text(page(tmp_path, balanced))
-    assert "Up to date as of 2024-03-01" in body
+def test_never_balanced_accounts_count_from_their_open(tmp_path):
+    never = LEDGER + "2022-06-01 open Assets:Savings USD\n  fava-uptodate-indication: TRUE\n"
+    body = page(tmp_path, never)
+    assert "Up to date as of 2022-06-01" in text(body)
+    assert cells(row(body, "Assets:Savings"))[3] == "2022-06-01 (opened)"
 
 
 def test_ignores_fava_filters(tmp_path):

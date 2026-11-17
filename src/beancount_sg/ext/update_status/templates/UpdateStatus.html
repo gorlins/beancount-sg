@@ -70,12 +70,12 @@
       if it's a transaction, and red if it's a failing balance assertion. Click a yellow or red dot
       to copy balance directives for today.</li>
     <li><em>Last balance</em> is the amount of the account's last balance assertion in each
-      currency, passing or not. <em>Difference</em> is the ledger's balance minus that: blank for a
+      currency, whether it passed or failed. <em>Difference</em> is the ledger's balance minus that: blank for a
       green dot, the failing assertion's difference for red, and the current balance minus the last
       balance for yellow (what a new assertion would need to confirm).</li>
-    <li><em>Balanced as of</em> is the date of the account's last passing balance assertion, which
-      checks the balance at the start of that day; an account that's never been balanced shows the
-      date it was opened. <em>Up to date as of</em> is the oldest of these.</li>
+    <li><em>Balanced as of</em> is the date of the account's last balance assertion, passing or
+      failing, which checks the balance at the start of that day; an account that's never been
+      balanced shows the date it was opened. <em>Up to date as of</em> is the oldest of these.</li>
     <li>Click a date to open its entry, or a column header to sort. The report covers the whole
       ledger, whatever Fava's filters.</li>
   </ul>

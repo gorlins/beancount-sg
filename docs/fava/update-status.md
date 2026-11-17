@@ -31,8 +31,8 @@ Each tracked account has:
   yellow if it's a transaction, and red if it's a failing balance assertion. Click a yellow or red
   dot to copy balance directives for today, as in Fava's sidebar.
 - **Last entry:** the date of the account's last entry.
-- **Balanced as of:** the date of its last passing balance assertion, or the date it was opened if
-  it's never been balanced.
+- **Balanced as of:** the date of its last balance assertion, passing or failing, or the date it
+  was opened if it's never been balanced.
 - **Days since:** days from that date to today.
 - **Last balance:** the amount of the account's last balance assertion in each currency, whether
   it passed or failed.

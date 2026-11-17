@@ -13,15 +13,15 @@ The "Update Status" report lists the open accounts with Fava's
   Clicking a yellow or red dot copies balance directives for today, as in
   Fava's sidebar.
 - The date of its last entry, linking to it.
-- The date of its last passing balance assertion, linking to it, and how many
+- The date of its last balance assertion, passing or failing, linking to it, and how many
   days ago that was. An account that's never been balanced counts from the
   day it was opened.
-- Its last balance: each currency's last asserted amount, passing or not.
+- Its last balance: each currency's last asserted amount.
 - The difference between the ledger and that: blank if the dot is green; for
   red, the failing assertion's difference; for yellow, the current balance
   minus the last asserted amount (what a new assertion would need to confirm).
 
-Above the table, "Up to date as of" is the oldest last passing assertion date. A balance
+Above the table, "Up to date as of" is the oldest of those assertion dates. A balance
 assertion checks the balance at the start of its day, so it confirms the
 transactions before that date.
 
@@ -59,18 +59,16 @@ class AccountStatus:
     opened: datetime.date
     # Each currency's last balance assertion, whether it passed or failed.
     last_assertions: dict[str, Balance]
-    # Each currency's last passing balance assertion.
-    last_passing: dict[str, Balance]
     balance: list[Amount]
 
     @property
     def last_balance(self) -> Balance | None:
-        """The account's last passing balance assertion, in any currency."""
-        return max(self.last_passing.values(), key=lambda entry: entry.date, default=None)
+        """The account's last balance assertion in any currency, passing or failing."""
+        return max(self.last_assertions.values(), key=lambda entry: entry.date, default=None)
 
     @property
     def balanced_as_of(self) -> datetime.date:
-        """The date of the last passing balance assertion, or else of the open."""
+        """The date of the last balance assertion, or else of the open."""
         last = self.last_balance
         return last.date if last else self.opened
 
@@ -109,12 +107,6 @@ class AccountStatus:
         ]
 
 
-def _keep_latest(by_currency: dict[str, Balance], entry: Balance) -> None:
-    previous = by_currency.get(entry.amount.currency)
-    if not previous or entry.date >= previous.date:
-        by_currency[entry.amount.currency] = entry
-
-
 def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
     """The open accounts with ``fava-uptodate-indication`` metadata, by account name."""
     entries = list(entries)
@@ -125,13 +117,12 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
         if isinstance(entry, Open) and entry.meta.get(UPTODATE_KEY) and entry.account not in closed
     }
     last_assertions: dict[str, dict[str, Balance]] = defaultdict(dict)
-    last_passing: dict[str, dict[str, Balance]] = defaultdict(dict)
     balances: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
     for entry in entries:
         if isinstance(entry, Balance) and entry.account in tracked:
-            _keep_latest(last_assertions[entry.account], entry)
-            if not entry.diff_amount:
-                _keep_latest(last_passing[entry.account], entry)
+            previous = last_assertions[entry.account].get(entry.amount.currency)
+            if not previous or entry.date >= previous.date:
+                last_assertions[entry.account][entry.amount.currency] = entry
         elif isinstance(entry, Transaction):
             for posting in entry.postings:
                 if posting.account in tracked:
@@ -141,7 +132,6 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
             account,
             opened,
             last_assertions[account],
-            last_passing[account],
             [
                 Amount(number, currency)
                 for currency, number in sorted(balances[account].items())
