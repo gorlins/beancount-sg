@@ -34,7 +34,9 @@ Each tracked account has:
 - **Balanced as of:** the date of its last passing balance assertion, or the date it was opened if
   it's never been balanced.
 - **Days since:** days from that date to today.
-- **Balance:** its current balance.
+- **Balance** and **Change**, only if the dot isn't green: the account's current balance, and how
+  much it changed since its last passing balance assertion, per currency. That's what a new
+  assertion needs to confirm. A currency that's never been asserted counts from zero.
 
 **Up to date as of**, above the table, is the oldest *Balanced as of* date. A balance assertion
 checks the balance at the start of its day, so it confirms the transactions before that date.

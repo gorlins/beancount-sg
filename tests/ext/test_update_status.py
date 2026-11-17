@@ -69,7 +69,10 @@ def test_last_passing_balance_and_current_balance():
     assert isinstance(checking.last_balance, Balance)
     assert checking.balance == [A("980.00", "USD")]
     assert checking.days_since_balanced(datetime.date(2024, 3, 11)) == 10
-    assert found["Liabilities:Card"].balance == [A("-50.00", "USD")]
+    assert checking.change == [A("-20.00", "USD")]
+    card = found["Liabilities:Card"]
+    assert card.balance == [A("-50.00", "USD")]
+    assert card.change == []
 
 
 def test_failing_balances_dont_count_and_never_balanced_uses_the_open_date():
@@ -78,6 +81,37 @@ def test_failing_balances_dont_count_and_never_balanced_uses_the_open_date():
     assert vti.last_balance is None
     assert vti.balanced_as_of == datetime.date(2020, 1, 1)
     assert vti.balance == [A("3", "VTI")]
+    assert vti.change == [A("3", "VTI")]
+
+
+def test_change_is_per_currency():
+    found, _ = statuses("""
+2020-01-01 open Equity:Opening
+2020-01-01 open Assets:Wallet
+  fava-uptodate-indication: TRUE
+
+2024-01-01 * "Opening"
+  Assets:Wallet  100 USD
+  Assets:Wallet  50 EUR
+  Equity:Opening  -100 USD
+  Equity:Opening  -50 EUR
+
+2024-02-01 balance Assets:Wallet  100 USD
+2024-01-15 balance Assets:Wallet  50 EUR
+
+2024-02-05 * "Spend"
+  Assets:Wallet  -10 USD
+  Assets:Wallet  -5 EUR
+  Equity:Opening  10 USD
+  Equity:Opening  5 EUR
+
+2024-02-06 * "New currency"
+  Assets:Wallet  7 GBP
+  Equity:Opening  -7 GBP
+""")
+    wallet = found["Assets:Wallet"]
+    assert wallet.balanced_as_of == datetime.date(2024, 2, 1)
+    assert wallet.change == [A("-5", "EUR"), A("7", "GBP"), A("-10", "USD")]
 
 
 def page(tmp_path, text=LEDGER, query=""):
@@ -106,12 +140,15 @@ def test_page_lists_accounts_with_status_and_dates(tmp_path):
     checking = row(body, "Assets:Checking")
     assert 'class="status-indicator status-yellow"' in checking
     assert "2024-03-05" in checking  # last entry
-    assert "980.00 USD" in checking
+    assert "980.00 USD" in checking  # balance
+    assert "-20.00 USD" in checking  # change since the last passing assertion
     card = row(body, "Liabilities:Card")
     assert 'class="status-indicator status-green"' in card
+    assert "USD" not in card  # no balance or change when green
     vti = row(body, "Assets:Brokerage:VTI")
     assert 'class="status-indicator status-red"' in vti
     assert "2020-01-01 (opened)" in text(vti)
+    assert text(vti).strip().endswith("3 VTI 3 VTI")  # balance, and change since opening
     table = body[body.index("<table") : body.index("</table>")]
     assert "Assets:Untracked" not in table
     assert "Assets:Old" not in table

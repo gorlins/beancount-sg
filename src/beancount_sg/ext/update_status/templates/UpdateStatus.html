@@ -1,3 +1,8 @@
+{# Amounts, one per line. #}
+{% macro amounts(values) -%}
+{%- for amount in values %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
+{%- endmacro %}
+
 <h2>Update Status</h2>
 
 {% set statuses = extension.statuses() %}
@@ -18,6 +23,7 @@
       <th data-sort="string">Balanced as of</th>
       <th data-sort="num">Days since</th>
       <th>Balance</th>
+      <th>Change</th>
     </tr>
   </thead>
   <tbody>
@@ -43,9 +49,13 @@
         {%- endif -%}
       </td>
       <td class="num">{{ status.days_since_balanced(today) }}</td>
-      <td class="num">
-        {%- for amount in status.balance %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}<br>{% endif %}{% endfor -%}
-      </td>
+      {% if dot == "green" %}
+      <td></td>
+      <td></td>
+      {% else %}
+      <td class="num">{{ amounts(status.balance) }}</td>
+      <td class="num">{{ amounts(status.change) }}</td>
+      {% endif %}
     </tr>
     {% endfor %}
   </tbody>
@@ -64,6 +74,9 @@
     <li>The status dot is green if the account's last entry is a passing balance assertion, yellow
       if it's a transaction, and red if it's a failing balance assertion. Click a yellow or red dot
       to copy balance directives for today.</li>
+    <li>For a yellow or red dot, <em>Balance</em> is the account's current balance and
+      <em>Change</em> is how much it changed since the last passing balance assertion (per
+      currency): what a new assertion would confirm. Both are blank for a green dot.</li>
     <li><em>Balanced as of</em> is the date of the account's last passing balance assertion, which
       checks the balance at the start of that day; an account that's never been balanced shows the
       date it was opened. <em>Up to date as of</em> is the oldest of these.</li>

@@ -16,7 +16,9 @@ The "Update Status" report lists the open accounts with Fava's
 - The date of its last passing balance assertion, linking to it, and how many
   days ago that was. An account that's never been balanced counts from the
   day it was opened.
-- Its current balance.
+- If its dot isn't green: its current balance, and the change since its last
+  passing balance assertion (per currency), i.e. what a new assertion would need
+  to confirm.
 
 Above the table, "Up to date as of" is the oldest of those dates. A balance
 assertion checks the balance at the start of its day, so it confirms the
@@ -50,20 +52,40 @@ STATUS_ORDER = {"red": 0, "yellow": 1, "green": 2}
 
 @dataclass(frozen=True)
 class AccountStatus:
-    """A tracked account's last passing balance assertion and current balance."""
+    """A tracked account's last passing balance assertions and current balance."""
 
     account: str
     opened: datetime.date
-    last_balance: Balance | None
+    # The last passing balance assertion of each of the account's currencies.
+    last_balances: dict[str, Balance]
     balance: list[Amount]
+
+    @property
+    def last_balance(self) -> Balance | None:
+        """The account's last passing balance assertion, in any currency."""
+        return max(self.last_balances.values(), key=lambda entry: entry.date, default=None)
 
     @property
     def balanced_as_of(self) -> datetime.date:
         """The date of the last passing balance assertion, or else of the open."""
-        return self.last_balance.date if self.last_balance else self.opened
+        last = self.last_balance
+        return last.date if last else self.opened
 
     def days_since_balanced(self, today: datetime.date) -> int:
         return (today - self.balanced_as_of).days
+
+    @property
+    def change(self) -> list[Amount]:
+        """The balance's change since each currency's last passing assertion.
+
+        A currency that's never been asserted changed from zero.
+        """
+        changes: dict[str, Decimal] = defaultdict(Decimal)
+        for amount in self.balance:
+            changes[amount.currency] += amount.number
+        for currency, entry in self.last_balances.items():
+            changes[currency] -= entry.amount.number
+        return [Amount(number, currency) for currency, number in sorted(changes.items()) if number]
 
 
 def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
@@ -75,13 +97,14 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
         for entry in entries
         if isinstance(entry, Open) and entry.meta.get(UPTODATE_KEY) and entry.account not in closed
     }
-    last_balance: dict[str, Balance] = {}
+    last_balances: dict[str, dict[str, Balance]] = defaultdict(dict)
     balances: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
     for entry in entries:
         if isinstance(entry, Balance) and entry.account in tracked and not entry.diff_amount:
-            previous = last_balance.get(entry.account)
+            by_currency = last_balances[entry.account]
+            previous = by_currency.get(entry.amount.currency)
             if not previous or entry.date >= previous.date:
-                last_balance[entry.account] = entry
+                by_currency[entry.amount.currency] = entry
         elif isinstance(entry, Transaction):
             for posting in entry.postings:
                 if posting.account in tracked:
@@ -90,7 +113,7 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
         AccountStatus(
             account,
             opened,
-            last_balance.get(account),
+            last_balances[account],
             [
                 Amount(number, currency)
                 for currency, number in sorted(balances[account].items())
