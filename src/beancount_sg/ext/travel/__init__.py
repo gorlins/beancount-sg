@@ -6,13 +6,16 @@ Enable it in the ledger:
 
 Travel spending is the expense postings of transactions tagged ``#travel``, in
 the current Fava filter (refunds count negatively). A transaction's *trip* is its
-other tag, e.g. ``#miami-2025``, as `beancount_sg.plugins.tag_travel` adds:
-the trips are the tags that occur on ``#travel`` transactions. Travel spending
-without another tag is counted as "no trip", and called out above the report.
+trip tag, e.g. ``#miami-2025``, as `beancount_sg.plugins.tag_travel` adds. The
+trips are the tags that occur on ``#travel`` transactions and on no other
+transactions, anywhere in the ledger: a tag also used without ``#travel``, such
+as ``#recurring``, isn't a trip. Travel spending without a trip tag is counted
+as "no trip", and called out above the report.
 
-A travel transaction should have only one other tag, its trip. One with several
-counts towards the first, alphabetically, and is listed in a warning on the
-page, so it can be fixed.
+A travel transaction should have only one trip tag. One with several counts
+towards the first, alphabetically, and is listed in a warning on the page, so
+it can be fixed. And a trip tag used once without ``#travel`` stops being a trip,
+so its spending shows as "no trip".
 
 The report has hierarchy charts of the spending, by trip then expense account
 ("By trip"), and by expense account then trip ("By category"), and a table of
@@ -29,7 +32,7 @@ from __future__ import annotations
 
 import datetime
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -82,9 +85,23 @@ class Spending:
     amount: Amount
 
 
-def trip_tags(txn: Transaction) -> list[str]:
-    """A travel transaction's trip tags: its tags but ``#travel``, sorted."""
-    return sorted(tag for tag in txn.tags if tag != TAG)
+def ledger_trips(entries: Iterable[Directive]) -> frozenset[str]:
+    """The trips: tags that occur on ``#travel`` transactions, and only on them.
+
+    A tag also used on a transaction without ``#travel``, e.g. ``#recurring``,
+    isn't a trip.
+    """
+    on_travel: set[str] = set()
+    elsewhere: set[str] = set()
+    for txn in entries:
+        if isinstance(txn, Transaction):
+            (on_travel if TAG in txn.tags else elsewhere).update(txn.tags)
+    return frozenset(on_travel - elsewhere - {TAG})
+
+
+def trip_tags(txn: Transaction, trips: Collection[str]) -> list[str]:
+    """A transaction's tags that are trips, sorted."""
+    return sorted(tag for tag in txn.tags if tag in trips)
 
 
 @dataclass(frozen=True)
@@ -97,15 +114,18 @@ class TravelSpending:
     several_trips: list[Transaction]
 
 
-def travel_spending(entries: Iterable[Directive], expenses: str) -> TravelSpending:
+def travel_spending(
+    entries: Iterable[Directive], expenses: str, trips: Collection[str]
+) -> TravelSpending:
     """Travel spending per trip, account and currency, and the trips.
 
     Args:
         entries: The entries to count.
         expenses: The expenses root account's name.
+        trips: The trip tags, from `ledger_trips`.
     """
     spending: dict[tuple[str | None, str, str], Decimal] = defaultdict(Decimal)
-    trips: dict[str | None, Trip] = {}
+    by_trip: dict[str | None, Trip] = {}
     several_trips: list[Transaction] = []
     for txn in entries:
         if not isinstance(txn, Transaction) or TAG not in txn.tags:
@@ -113,11 +133,11 @@ def travel_spending(entries: Iterable[Directive], expenses: str) -> TravelSpendi
         postings = [p for p in txn.postings if get_account_type(p.account) == expenses]
         if not postings:
             continue
-        tags = trip_tags(txn)
+        tags = trip_tags(txn, trips)
         if len(tags) > 1:
             several_trips.append(txn)
         tag = tags[0] if tags else None
-        trip = trips.setdefault(tag, Trip(tag, txn.date, txn.date))
+        trip = by_trip.setdefault(tag, Trip(tag, txn.date, txn.date))
         trip.first = min(trip.first, txn.date)
         trip.last = max(trip.last, txn.date)
         trip.transactions += 1
@@ -131,7 +151,7 @@ def travel_spending(entries: Iterable[Directive], expenses: str) -> TravelSpendi
         )
     ]
     return TravelSpending(
-        rows, sorted(trips.values(), key=lambda trip: (trip.first, trip.tag or "")), several_trips
+        rows, sorted(by_trip.values(), key=lambda trip: (trip.first, trip.tag or "")), several_trips
     )
 
 
@@ -156,8 +176,12 @@ class Travel(FavaExtensionBase):
 
     def report(self) -> TravelReport:
         """The travel spending in the current Fava filter."""
-        spending = travel_spending(g.filtered.entries, self._expenses())
-        return TravelReport(spending.rows, spending.trips, spending.several_trips, self._expenses())
+        # Which tags are trips depends on the whole ledger, whatever the filter.
+        trips = ledger_trips(self.ledger.all_entries)
+        spending = travel_spending(g.filtered.entries, self._expenses(), trips)
+        return TravelReport(
+            spending.rows, spending.trips, spending.several_trips, self._expenses(), trips
+        )
 
 
 @dataclass(frozen=True)
@@ -168,6 +192,7 @@ class TravelReport:
     trips: list[Trip]
     several_trips: list[Transaction]
     expenses: str
+    ledger_trips: frozenset[str]
 
     @property
     def trip_tags(self) -> list[str]:
@@ -196,10 +221,9 @@ class TravelReport:
         """Fava's id for a transaction, to link to it."""
         return hash_entry(txn)
 
-    @staticmethod
-    def transaction_trips(txn: Transaction) -> list[str]:
-        """A travel transaction's trip tags."""
-        return trip_tags(txn)
+    def transaction_trips(self, txn: Transaction) -> list[str]:
+        """A transaction's trip tags."""
+        return trip_tags(txn, self.ledger_trips)
 
     def trip_filter(self, tag: str | None) -> str:
         """The Fava filter for a trip's travel transactions (or those without a trip)."""

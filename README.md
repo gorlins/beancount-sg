@@ -172,9 +172,9 @@ oldest of the balance dates. [Docs](docs/fava/update-status.md)
 2020-01-01 custom "fava-extension" "beancount_sg.ext.travel"
 ```
 
-A "Travel" report of `#travel` spending by trip (the transactions' other tag, e.g. `#miami-2025`,
-as `tag_travel` adds) and expense category, as charts and a table of trips, calling out travel
-spending without a trip. Every link opens Fava filtered by the trip's tag.
+A "Travel" report of `#travel` spending by trip (tags used only on travel transactions, e.g.
+`#miami-2025`, as `tag_travel` adds) and expense category, as charts and a table of trips, calling
+out travel spending without a trip. Every link opens Fava filtered by the trip's tag.
 [Docs](docs/fava/travel.md)
 
 ## Utilities
