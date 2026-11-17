@@ -12,13 +12,10 @@ from fava.core.filter_parser import parse_filter
 
 from beancount_sg.builders import A, P, T
 from beancount_sg.ext.travel import (
-    DEFAULT_TRIP_PATTERN,
     travel_spending,
     trip_filter,
-    trip_tag,
+    trip_tags,
 )
-
-TRIP = re.compile(DEFAULT_TRIP_PATTERN)
 
 ENABLE = 'custom "fava-extension" "beancount_sg.ext.travel"'
 
@@ -76,15 +73,15 @@ def load():
     return entries
 
 
-def test_trip_tag_is_the_first_matching_tag_other_than_travel():
-    txn = T("2025-01-01", tags={"travel", "reimbursable", "rome-2025", "miami-2025"}, postings=[])
-    assert trip_tag(txn, TRIP) == "miami-2025"
-    assert trip_tag(T("2025-01-01", tags={"travel", "work"}, postings=[]), TRIP) is None
-    assert trip_tag(T("2025-01-01", tags={"travel", "work"}, postings=[]), re.compile("^work$"))
+def test_trip_tags_are_the_tags_other_than_travel():
+    txn = T("2025-01-01", tags={"travel", "work-offsite", "miami-2025"}, postings=[])
+    assert trip_tags(txn) == ["miami-2025", "work-offsite"]
+    assert trip_tags(T("2025-01-01", tags={"travel"}, postings=[])) == []
 
 
 def test_spending_by_trip_and_account():
-    rows, trips = travel_spending(load(), TRIP, "Expenses")
+    spending = travel_spending(load(), "Expenses")
+    rows, trips = spending.rows, spending.trips
     assert [(row.trip, row.account, row.amount) for row in rows] == [
         (None, "Expenses:Food", A("15.00", "USD")),
         (None, "Expenses:Travel:Flights", A("60.00", "USD")),
@@ -124,7 +121,7 @@ def test_only_expense_postings_count():
             P("Assets:Checking", A("-70.00", "USD")),
         ],
     )
-    rows, _ = travel_spending([txn], TRIP, "Expenses")
+    rows = travel_spending([txn], "Expenses").rows
     assert [(row.account, row.amount) for row in rows] == [
         ("Expenses:Travel:Flights", A("100.00", "USD"))
     ]
@@ -263,19 +260,23 @@ def test_respects_the_time_filter(tmp_path):
     body = text(page(tmp_path, query="?time=2024"))
     assert "Travel spending: 200.00 USD on 1 trip." in body
     assert "All of it is tagged with a trip." in body
+    assert "several trip tags" not in body
 
 
-def test_custom_trip_pattern(tmp_path):
-    ledger = LEDGER.replace(ENABLE, f"{ENABLE} \"{{'trip_pattern': '^reimbursable$'}}\"")
+def test_any_other_tag_is_a_trip(tmp_path):
+    ledger = LEDGER.replace("#paris-2025", "#work-offsite")
     body = text(page(tmp_path, ledger))
-    assert "#reimbursable 2025-02-01 2025-02-01 1 400.00 USD" in body
+    assert "#work-offsite 2025-06-01 2025-06-01 1 800.00 USD" in body
 
 
-def test_invalid_config_is_reported_and_the_default_used(tmp_path):
-    ledger = LEDGER.replace(ENABLE, f"{ENABLE} \"{{'trip_pattern': '('}}\"")
-    body = text(page(tmp_path, ledger))
-    assert "Travel: trip_pattern is not a valid regex" in body
-    assert "#miami-2025" in body
+def test_several_trip_tags_count_towards_the_first_and_are_listed(tmp_path):
+    spending = travel_spending(load(), "Expenses")
+    assert [txn.narration for txn in spending.several_trips] == ["Miami hotel"]
+    body = page(tmp_path)
+    warning = text(body[body.index('<ul class="error">') : body.index("</ul>")])
+    assert "Hotel Miami hotel: #miami-2025, #reimbursable" in warning
+    # Counted towards #miami-2025; #reimbursable isn't a trip.
+    assert "#reimbursable" not in text(body[body.index("<table") :])
 
 
 def test_without_travel(tmp_path):

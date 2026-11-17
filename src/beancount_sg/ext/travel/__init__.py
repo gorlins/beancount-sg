@@ -6,17 +6,13 @@ Enable it in the ledger:
 
 Travel spending is the expense postings of transactions tagged ``#travel``, in
 the current Fava filter (refunds count negatively). A transaction's *trip* is its
-other tag that looks like a trip: by default, one ending in a year, such as
-``#miami-2025``, as `beancount_sg.plugins.tag_travel` adds. Travel spending
-without a trip tag is counted as "no trip", and called out above the report.
-To recognize trip tags differently, give the extension a regex (searched in
-each tag):
+other tag, e.g. ``#miami-2025``, as `beancount_sg.plugins.tag_travel` adds:
+the trips are the tags that occur on ``#travel`` transactions. Travel spending
+without another tag is counted as "no trip", and called out above the report.
 
-    2020-01-01 custom "fava-extension" "beancount_sg.ext.travel" "{
-      'trip_pattern': '^trip-',
-    }"
-
-A transaction with several trip tags counts towards the first, alphabetically.
+A travel transaction should have only one other tag, its trip. One with several
+counts towards the first, alphabetically, and is listed in a warning on the
+page, so it can be fixed.
 
 The report has hierarchy charts of the spending, by trip then expense account
 ("By trip"), and by expense account then trip ("By category"), and a table of
@@ -32,7 +28,6 @@ Fava's charts link every node to an account page, so the page's script
 from __future__ import annotations
 
 import datetime
-import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -43,6 +38,7 @@ from beancount.core.account_types import get_account_type
 from beancount.core.amount import Amount
 from beancount.core.data import Directive, Transaction
 from beancount.parser.options import get_account_types
+from fava.beans.funcs import hash_entry
 from fava.context import g
 from fava.core.inventory import SimpleCounterInventory
 from fava.core.tree import SerialisedTreeNode
@@ -52,9 +48,6 @@ from flask import request, url_for
 
 from beancount_sg.plugins.tag_travel import TAG
 
-# The extension config's key, and its default: tags ending in a year.
-TRIP_PATTERN = "trip_pattern"
-DEFAULT_TRIP_PATTERN = r"-\d{4}$"
 # The chart node and table label for travel spending without a trip tag.
 NO_TRIP = "no trip"
 # The "By trip" chart's root node.
@@ -89,30 +82,41 @@ class Spending:
     amount: Amount
 
 
-def trip_tag(txn: Transaction, pattern: re.Pattern[str]) -> str | None:
-    """The transaction's trip: its first tag (but ``#travel``) matching the pattern."""
-    return min((tag for tag in txn.tags if tag != TAG and pattern.search(tag)), default=None)
+def trip_tags(txn: Transaction) -> list[str]:
+    """A travel transaction's trip tags: its tags but ``#travel``, sorted."""
+    return sorted(tag for tag in txn.tags if tag != TAG)
 
 
-def travel_spending(
-    entries: Iterable[Directive], pattern: re.Pattern[str], expenses: str
-) -> tuple[list[Spending], list[Trip]]:
-    """Travel spending per trip, account and currency, and the trips, by first date.
+@dataclass(frozen=True)
+class TravelSpending:
+    """Travel spending per trip, account and currency, and its trips."""
+
+    rows: list[Spending]
+    trips: list[Trip]  # by first date
+    # Travel transactions with several trip tags, counted towards the first.
+    several_trips: list[Transaction]
+
+
+def travel_spending(entries: Iterable[Directive], expenses: str) -> TravelSpending:
+    """Travel spending per trip, account and currency, and the trips.
 
     Args:
         entries: The entries to count.
-        pattern: Matches trip tags.
         expenses: The expenses root account's name.
     """
     spending: dict[tuple[str | None, str, str], Decimal] = defaultdict(Decimal)
     trips: dict[str | None, Trip] = {}
+    several_trips: list[Transaction] = []
     for txn in entries:
         if not isinstance(txn, Transaction) or TAG not in txn.tags:
             continue
         postings = [p for p in txn.postings if get_account_type(p.account) == expenses]
         if not postings:
             continue
-        tag = trip_tag(txn, pattern)
+        tags = trip_tags(txn)
+        if len(tags) > 1:
+            several_trips.append(txn)
+        tag = tags[0] if tags else None
         trip = trips.setdefault(tag, Trip(tag, txn.date, txn.date))
         trip.first = min(trip.first, txn.date)
         trip.last = max(trip.last, txn.date)
@@ -126,7 +130,9 @@ def travel_spending(
             spending.items(), key=lambda item: (item[0][0] or "", item[0][1], item[0][2])
         )
     ]
-    return rows, sorted(trips.values(), key=lambda trip: (trip.first, trip.tag or ""))
+    return TravelSpending(
+        rows, sorted(trips.values(), key=lambda trip: (trip.first, trip.tag or "")), several_trips
+    )
 
 
 def trip_filter(tag: str | None, trip_tags: Iterable[str]) -> str:
@@ -139,43 +145,19 @@ def trip_filter(tag: str | None, trip_tags: Iterable[str]) -> str:
     return " ".join([f"#{TAG}", *(f"-#{other}" for other in sorted(trip_tags))])
 
 
-def config_error(config: object) -> str | None:
-    """Why the extension's config is invalid, if it is."""
-    if not config:
-        return None
-    if not isinstance(config, dict) or set(config) - {TRIP_PATTERN}:
-        return f"the extension's config must be like {{'{TRIP_PATTERN}': '{DEFAULT_TRIP_PATTERN}'}}"
-    try:
-        re.compile(str(config.get(TRIP_PATTERN, DEFAULT_TRIP_PATTERN)))
-    except re.error as error:
-        return f"{TRIP_PATTERN} is not a valid regex: {error}"
-    return None
-
-
 class Travel(FavaExtensionBase):
     """Fava report of travel spending by trip and expense category."""
 
     report_title = "Travel"
     has_js_module = True
 
-    def error(self) -> str | None:
-        """Why the extension's config is invalid, if it is (the default is used)."""
-        error = config_error(self.config)
-        return f"Travel: {error}" if error else None
-
-    def _pattern(self) -> re.Pattern[str]:
-        pattern = DEFAULT_TRIP_PATTERN
-        if not self.error() and self.config:
-            pattern = str(self.config.get(TRIP_PATTERN, DEFAULT_TRIP_PATTERN))
-        return re.compile(pattern)
-
     def _expenses(self) -> str:
         return get_account_types(self.ledger.options).expenses
 
     def report(self) -> TravelReport:
         """The travel spending in the current Fava filter."""
-        rows, trips = travel_spending(g.filtered.entries, self._pattern(), self._expenses())
-        return TravelReport(rows, trips, self._expenses())
+        spending = travel_spending(g.filtered.entries, self._expenses())
+        return TravelReport(spending.rows, spending.trips, spending.several_trips, self._expenses())
 
 
 @dataclass(frozen=True)
@@ -184,6 +166,7 @@ class TravelReport:
 
     rows: list[Spending]
     trips: list[Trip]
+    several_trips: list[Transaction]
     expenses: str
 
     @property
@@ -207,6 +190,16 @@ class TravelReport:
             for currency, number in trip.totals.items():
                 totals[currency] += number
         return [Amount(number, currency) for currency, number in sorted(totals.items())]
+
+    @staticmethod
+    def entry_hash(txn: Transaction) -> str:
+        """Fava's id for a transaction, to link to it."""
+        return hash_entry(txn)
+
+    @staticmethod
+    def transaction_trips(txn: Transaction) -> list[str]:
+        """A travel transaction's trip tags."""
+        return trip_tags(txn)
 
     def trip_filter(self, tag: str | None) -> str:
         """The Fava filter for a trip's travel transactions (or those without a trip)."""

@@ -12,8 +12,8 @@ tagged with a trip.
 ## Trips
 
 Travel spending is the expense postings of transactions tagged `#travel`, within the current Fava
-filter. Refunds count negatively. A transaction's **trip** is its other tag ending in a year, such
-as `#miami-2025`:
+filter. Refunds count negatively. A transaction's **trip** is its other tag, such as
+`#miami-2025`: the trips are the tags that occur on `#travel` transactions.
 
 ```beancount
 2025-02-01 * "Hotel" "Two nights" #travel #miami-2025
@@ -22,16 +22,11 @@ as `#miami-2025`:
 ```
 
 The [`tag_travel`](../../README.md#beancount_sgpluginstag_travel) plugin adds both tags from
-`travel` events. To recognize trip tags differently, give the extension a regex, which is searched
-in each tag:
+`travel` events.
 
-```beancount
-2020-01-01 custom "fava-extension" "beancount_sg.ext.travel" "{
-  'trip_pattern': '^trip-',
-}"
-```
-
-A transaction with several trip tags counts towards the first, alphabetically.
+**Limitation:** a travel transaction should have only one tag besides `#travel`, its trip. Any other
+tag, such as `#reimbursable`, would be read as a second trip. A transaction with several counts
+towards the first, alphabetically, and the report lists it in a warning so it can be fixed.
 
 ## The report
 
