@@ -17,6 +17,7 @@ account and filter selection; Update Status covers the whole ledger.
 | [`beancount_sg.ext.batch_edit`](batch-edit.md) | Batch Edit | Change many transactions' payees and categories at once |
 | [`beancount_sg.ext.rewards`](rewards.md) | Credit Card Rewards | Spending and rewards per card and category |
 | [`beancount_sg.ext.update_status`](update-status.md) | Update Status | When each account was last balanced |
+| [`beancount_sg.ext.travel`](travel.md) | Travel | Travel spending by trip and category |
 
 ## Screenshots
 

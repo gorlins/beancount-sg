@@ -6,6 +6,7 @@ option "operating_currency" "USD"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.batch_edit"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.update_status"
+2024-01-01 custom "fava-extension" "beancount_sg.ext.travel"
 
 2024-01-01 open Assets:Bank:Checking USD
   fava-uptodate-indication: TRUE
@@ -28,6 +29,9 @@ option "operating_currency" "USD"
 2024-01-01 open Expenses:Home:Garden
 2024-01-01 open Expenses:Shopping
 2024-01-01 open Expenses:Travel
+2024-01-01 open Expenses:Travel:Lodging
+2024-01-01 open Expenses:Travel:Transport
+2024-01-01 open Assets:Cash USD
 2024-01-01 open Expenses:Uncategorized
 2024-01-01 open Income:Salary
 
@@ -80,12 +84,12 @@ option "operating_currency" "USD"
   Liabilities:CreditCard:Voyager  -96.40 USD
   Expenses:Food:Restaurants
 
-2024-02-20 * "Skyway Airlines" "Flights"
+2024-02-20 * "Skyway Airlines" "Flights" #travel #harbor-city-2024
   category: "Travel"
   Liabilities:CreditCard:Voyager  -412.00 USD
   Expenses:Travel
 
-2024-02-21 * "Harbor Hotel" "Two nights"
+2024-02-21 * "Harbor Hotel" "Two nights" #travel #harbor-city-2024
   category: "Travel"
   Liabilities:CreditCard:Voyager  -318.00 USD
   Expenses:Travel
@@ -121,3 +125,28 @@ option "operating_currency" "USD"
 ; Fails on purpose, so the Update Status screenshot shows a red status: the
 ; ledger has -393.39 USD.
 2024-02-26 balance Liabilities:CreditCard:CashPlus  -400.00 USD
+
+; Travel, paid in cash: a trip, and some travel not yet tagged with a trip
+2024-01-01 * "Opening cash"
+  Assets:Cash  1000.00 USD
+  Equity:Opening-Balances
+
+2024-03-08 * "Coastal Rail" "Train to Lakeside" #travel #lakeside-2024
+  Expenses:Travel:Transport  85.00 USD
+  Assets:Cash
+
+2024-03-08 * "Lakeside Inn" "Three nights" #travel #lakeside-2024
+  Expenses:Travel:Lodging  240.00 USD
+  Assets:Cash
+
+2024-03-09 * "Pier Diner" "Dinner" #travel #lakeside-2024
+  Expenses:Food:Restaurants  64.00 USD
+  Assets:Cash
+
+2024-03-20 * "City Airport" "Parking" #travel
+  Expenses:Travel:Transport  36.00 USD
+  Assets:Cash
+
+2024-03-21 * "Airport Cafe" "Coffee" #travel
+  Expenses:Food:Restaurants  7.50 USD
+  Assets:Cash
