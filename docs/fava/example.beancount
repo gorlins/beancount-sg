@@ -5,14 +5,18 @@ option "operating_currency" "USD"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.checkbook"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.batch_edit"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.rewards"
+2024-01-01 custom "fava-extension" "beancount_sg.ext.update_status"
 
 2024-01-01 open Assets:Bank:Checking USD
+  fava-uptodate-indication: TRUE
 2024-01-01 open Equity:Opening-Balances
 2024-01-01 open Liabilities:CreditCard:CashPlus USD
+  fava-uptodate-indication: TRUE
   rewards: "cashback"
   rewards-rate: 1.5
   rewards-rate-groceries: 3
 2024-01-01 open Liabilities:CreditCard:Voyager USD
+  fava-uptodate-indication: TRUE
   rewards: "points"
   rewards-rate-dining: 3
   rewards-rate-travel: 2
@@ -110,3 +114,10 @@ option "operating_currency" "USD"
   category: "Shopping"
   Liabilities:CreditCard:CashPlus  18.00 USD
   Expenses:Shopping
+
+; Balance assertions
+2024-02-15 balance Assets:Bank:Checking  11470.00 USD
+2024-02-22 balance Liabilities:CreditCard:Voyager  -850.65 USD
+; Fails on purpose, so the Update Status screenshot shows a red status: the
+; ledger has -393.39 USD.
+2024-02-26 balance Liabilities:CreditCard:CashPlus  -400.00 USD

@@ -99,6 +99,9 @@ def main() -> None:
             page.get_by_text("Icicle", exact=True).click()
             save(page, "rewards")
 
+            page.goto(f"{base}/UpdateStatus/", wait_until="networkidle")
+            save(page, "update-status")
+
             browser.close()
     finally:
         fava.terminate()
