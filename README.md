@@ -163,8 +163,8 @@ spend and value by card and category. Categories link to the card's transactions
 ```
 
 An "Update Status" report of the accounts with Fava's `fava-uptodate-indication`: each one's
-status, last entry and last passing balance assertion, the oldest of those balance dates, and for
-accounts that aren't up to date, the balance and its change since the last assertion. [Docs](docs/fava/update-status.md)
+status, last entry, last passing balance assertion, last asserted balance and the ledger's
+difference from it, plus the oldest of the balance dates. [Docs](docs/fava/update-status.md)
 
 ## Utilities
 

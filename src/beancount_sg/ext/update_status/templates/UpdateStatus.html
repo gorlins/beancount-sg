@@ -22,8 +22,8 @@
       <th data-sort="string">Last entry</th>
       <th data-sort="string">Balanced as of</th>
       <th data-sort="num">Days since</th>
-      <th>Balance</th>
-      <th>Change</th>
+      <th>Last balance</th>
+      <th>Difference</th>
     </tr>
   </thead>
   <tbody>
@@ -49,13 +49,8 @@
         {%- endif -%}
       </td>
       <td class="num">{{ status.days_since_balanced(today) }}</td>
-      {% if dot == "green" %}
-      <td></td>
-      <td></td>
-      {% else %}
-      <td class="num">{{ amounts(status.balance) }}</td>
-      <td class="num">{{ amounts(status.change) }}</td>
-      {% endif %}
+      <td class="num">{{ amounts(status.last_balance_amounts) }}</td>
+      <td class="num">{{ amounts(status.difference(dot)) }}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -74,9 +69,10 @@
     <li>The status dot is green if the account's last entry is a passing balance assertion, yellow
       if it's a transaction, and red if it's a failing balance assertion. Click a yellow or red dot
       to copy balance directives for today.</li>
-    <li>For a yellow or red dot, <em>Balance</em> is the account's current balance and
-      <em>Change</em> is how much it changed since the last passing balance assertion (per
-      currency): what a new assertion would confirm. Both are blank for a green dot.</li>
+    <li><em>Last balance</em> is the amount of the account's last balance assertion in each
+      currency, passing or not. <em>Difference</em> is the ledger's balance minus that: blank for a
+      green dot, the failing assertion's difference for red, and the current balance minus the last
+      balance for yellow (what a new assertion would need to confirm).</li>
     <li><em>Balanced as of</em> is the date of the account's last passing balance assertion, which
       checks the balance at the start of that day; an account that's never been balanced shows the
       date it was opened. <em>Up to date as of</em> is the oldest of these.</li>

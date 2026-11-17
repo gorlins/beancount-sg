@@ -118,3 +118,6 @@ option "operating_currency" "USD"
 ; Balance assertions
 2024-02-15 balance Assets:Bank:Checking  11470.00 USD
 2024-02-22 balance Liabilities:CreditCard:Voyager  -850.65 USD
+; Fails on purpose, so the Update Status screenshot shows a red status: the
+; ledger has -393.39 USD.
+2024-02-26 balance Liabilities:CreditCard:CashPlus  -400.00 USD

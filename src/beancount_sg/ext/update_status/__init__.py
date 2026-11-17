@@ -16,11 +16,12 @@ The "Update Status" report lists the open accounts with Fava's
 - The date of its last passing balance assertion, linking to it, and how many
   days ago that was. An account that's never been balanced counts from the
   day it was opened.
-- If its dot isn't green: its current balance, and the change since its last
-  passing balance assertion (per currency), i.e. what a new assertion would need
-  to confirm.
+- Its last balance: each currency's last asserted amount, passing or not.
+- The difference between the ledger and that: blank if the dot is green; for
+  red, the failing assertion's difference; for yellow, the current balance
+  minus the last asserted amount (what a new assertion would need to confirm).
 
-Above the table, "Up to date as of" is the oldest of those dates. A balance
+Above the table, "Up to date as of" is the oldest last passing assertion date. A balance
 assertion checks the balance at the start of its day, so it confirms the
 transactions before that date.
 
@@ -52,18 +53,20 @@ STATUS_ORDER = {"red": 0, "yellow": 1, "green": 2}
 
 @dataclass(frozen=True)
 class AccountStatus:
-    """A tracked account's last passing balance assertions and current balance."""
+    """A tracked account's last balance assertions and current balance."""
 
     account: str
     opened: datetime.date
-    # The last passing balance assertion of each of the account's currencies.
-    last_balances: dict[str, Balance]
+    # Each currency's last balance assertion, whether it passed or failed.
+    last_assertions: dict[str, Balance]
+    # Each currency's last passing balance assertion.
+    last_passing: dict[str, Balance]
     balance: list[Amount]
 
     @property
     def last_balance(self) -> Balance | None:
         """The account's last passing balance assertion, in any currency."""
-        return max(self.last_balances.values(), key=lambda entry: entry.date, default=None)
+        return max(self.last_passing.values(), key=lambda entry: entry.date, default=None)
 
     @property
     def balanced_as_of(self) -> datetime.date:
@@ -75,17 +78,41 @@ class AccountStatus:
         return (today - self.balanced_as_of).days
 
     @property
-    def change(self) -> list[Amount]:
-        """The balance's change since each currency's last passing assertion.
+    def last_balance_amounts(self) -> list[Amount]:
+        """The amounts of each currency's last balance assertion."""
+        return [self.last_assertions[currency].amount for currency in sorted(self.last_assertions)]
 
-        A currency that's never been asserted changed from zero.
+    def difference(self, status: str | None) -> list[Amount]:
+        """The ledger's balance minus the last asserted balance, per currency.
+
+        By Fava's status dot: none when ``green`` (the last entry is a passing
+        assertion); for ``red`` (a failing one), the failing assertions'
+        differences; otherwise the current balance minus each currency's last
+        asserted amount (or zero, if it's never been asserted). Either way, a
+        positive difference means the ledger has more than was asserted.
         """
-        changes: dict[str, Decimal] = defaultdict(Decimal)
+        if status == "green":
+            return []
+        if status == "red":
+            return [
+                entry.diff_amount
+                for _, entry in sorted(self.last_assertions.items())
+                if entry.diff_amount
+            ]
+        differences: dict[str, Decimal] = defaultdict(Decimal)
         for amount in self.balance:
-            changes[amount.currency] += amount.number
-        for currency, entry in self.last_balances.items():
-            changes[currency] -= entry.amount.number
-        return [Amount(number, currency) for currency, number in sorted(changes.items()) if number]
+            differences[amount.currency] += amount.number
+        for currency, entry in self.last_assertions.items():
+            differences[currency] -= entry.amount.number
+        return [
+            Amount(number, currency) for currency, number in sorted(differences.items()) if number
+        ]
+
+
+def _keep_latest(by_currency: dict[str, Balance], entry: Balance) -> None:
+    previous = by_currency.get(entry.amount.currency)
+    if not previous or entry.date >= previous.date:
+        by_currency[entry.amount.currency] = entry
 
 
 def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
@@ -97,14 +124,14 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
         for entry in entries
         if isinstance(entry, Open) and entry.meta.get(UPTODATE_KEY) and entry.account not in closed
     }
-    last_balances: dict[str, dict[str, Balance]] = defaultdict(dict)
+    last_assertions: dict[str, dict[str, Balance]] = defaultdict(dict)
+    last_passing: dict[str, dict[str, Balance]] = defaultdict(dict)
     balances: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
     for entry in entries:
-        if isinstance(entry, Balance) and entry.account in tracked and not entry.diff_amount:
-            by_currency = last_balances[entry.account]
-            previous = by_currency.get(entry.amount.currency)
-            if not previous or entry.date >= previous.date:
-                by_currency[entry.amount.currency] = entry
+        if isinstance(entry, Balance) and entry.account in tracked:
+            _keep_latest(last_assertions[entry.account], entry)
+            if not entry.diff_amount:
+                _keep_latest(last_passing[entry.account], entry)
         elif isinstance(entry, Transaction):
             for posting in entry.postings:
                 if posting.account in tracked:
@@ -113,7 +140,8 @@ def account_statuses(entries: Iterable[Directive]) -> list[AccountStatus]:
         AccountStatus(
             account,
             opened,
-            last_balances[account],
+            last_assertions[account],
+            last_passing[account],
             [
                 Amount(number, currency)
                 for currency, number in sorted(balances[account].items())

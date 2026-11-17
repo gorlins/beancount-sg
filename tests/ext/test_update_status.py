@@ -62,29 +62,35 @@ def test_only_open_tracked_accounts_are_listed():
     assert list(found) == ["Assets:Brokerage:VTI", "Assets:Checking", "Liabilities:Card"]
 
 
-def test_last_passing_balance_and_current_balance():
+def test_yellow_difference_is_the_current_minus_the_last_balance():
     found, _ = statuses()
     checking = found["Assets:Checking"]
     assert checking.balanced_as_of == datetime.date(2024, 3, 1)
     assert isinstance(checking.last_balance, Balance)
     assert checking.balance == [A("980.00", "USD")]
+    assert checking.last_balance_amounts == [A("1000.00", "USD")]
+    assert checking.difference("yellow") == [A("-20.00", "USD")]
     assert checking.days_since_balanced(datetime.date(2024, 3, 11)) == 10
-    assert checking.change == [A("-20.00", "USD")]
+
+
+def test_green_has_no_difference():
+    found, _ = statuses()
     card = found["Liabilities:Card"]
-    assert card.balance == [A("-50.00", "USD")]
-    assert card.change == []
+    assert card.last_balance_amounts == [A("-50.00", "USD")]
+    assert card.difference("green") == []
 
 
-def test_failing_balances_dont_count_and_never_balanced_uses_the_open_date():
+def test_red_difference_is_the_failing_assertions():
     found, _ = statuses()
     vti = found["Assets:Brokerage:VTI"]
+    # The failing assertion is the last balance, but not the last passing one.
+    assert vti.last_balance_amounts == [A("2", "VTI")]
+    assert vti.difference("red") == [A("1", "VTI")]  # the ledger has 3
     assert vti.last_balance is None
     assert vti.balanced_as_of == datetime.date(2020, 1, 1)
-    assert vti.balance == [A("3", "VTI")]
-    assert vti.change == [A("3", "VTI")]
 
 
-def test_change_is_per_currency():
+def test_differences_are_per_currency():
     found, _ = statuses("""
 2020-01-01 open Equity:Opening
 2020-01-01 open Assets:Wallet
@@ -111,7 +117,9 @@ def test_change_is_per_currency():
 """)
     wallet = found["Assets:Wallet"]
     assert wallet.balanced_as_of == datetime.date(2024, 2, 1)
-    assert wallet.change == [A("-5", "EUR"), A("7", "GBP"), A("-10", "USD")]
+    assert wallet.last_balance_amounts == [A("50", "EUR"), A("100", "USD")]
+    # A currency that's never been asserted differs by its whole balance.
+    assert wallet.difference("yellow") == [A("-5", "EUR"), A("7", "GBP"), A("-10", "USD")]
 
 
 def page(tmp_path, text=LEDGER, query=""):
@@ -134,21 +142,30 @@ def row(body, account):
     return match
 
 
+def cells(row_html):
+    """The text of a row's cells."""
+    return [text(cell).strip() for cell in re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL)]
+
+
 def test_page_lists_accounts_with_status_and_dates(tmp_path):
     body = page(tmp_path)
     assert "Up to date as of 2020-01-01" in text(body)
     checking = row(body, "Assets:Checking")
     assert 'class="status-indicator status-yellow"' in checking
-    assert "2024-03-05" in checking  # last entry
-    assert "980.00 USD" in checking  # balance
-    assert "-20.00 USD" in checking  # change since the last passing assertion
+    assert cells(checking)[2:] == [
+        "2024-03-05",
+        "2024-03-01",
+        cells(checking)[4],
+        "1000.00 USD",
+        "-20.00 USD",
+    ]
     card = row(body, "Liabilities:Card")
     assert 'class="status-indicator status-green"' in card
-    assert "USD" not in card  # no balance or change when green
+    assert cells(card)[-2:] == ["-50.00 USD", ""]
     vti = row(body, "Assets:Brokerage:VTI")
     assert 'class="status-indicator status-red"' in vti
-    assert "2020-01-01 (opened)" in text(vti)
-    assert text(vti).strip().endswith("3 VTI 3 VTI")  # balance, and change since opening
+    assert cells(vti)[3] == "2020-01-01 (opened)"
+    assert cells(vti)[-2:] == ["2 VTI", "1 VTI"]
     table = body[body.index("<table") : body.index("</table>")]
     assert "Assets:Untracked" not in table
     assert "Assets:Old" not in table

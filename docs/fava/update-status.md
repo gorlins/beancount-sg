@@ -34,9 +34,13 @@ Each tracked account has:
 - **Balanced as of:** the date of its last passing balance assertion, or the date it was opened if
   it's never been balanced.
 - **Days since:** days from that date to today.
-- **Balance** and **Change**, only if the dot isn't green: the account's current balance, and how
-  much it changed since its last passing balance assertion, per currency. That's what a new
-  assertion needs to confirm. A currency that's never been asserted counts from zero.
+- **Last balance:** the amount of the account's last balance assertion in each currency, whether
+  it passed or failed.
+- **Difference:** the ledger's balance minus the last balance, so positive means the ledger has
+  more than was asserted. It's blank for a green dot; for red, it's the failing assertion's
+  difference; for yellow, it's the current balance minus the last balance, which is what a new
+  assertion would need to confirm. A currency that's never been asserted differs by its whole
+  balance.
 
 **Up to date as of**, above the table, is the oldest *Balanced as of* date. A balance assertion
 checks the balance at the start of its day, so it confirms the transactions before that date.
