@@ -39,7 +39,7 @@
   {% endif %}
 </p>
 
-<svelte-component type="charts"><script type="application/json">{{ report.charts()|tojson }}</script></svelte-component>
+<svelte-component type="charts"><script type="application/json">{{ extension.charts(report)|tojson }}</script></svelte-component>
 <script type="application/json" id="travel-chart-links">{{ report.chart_links()|tojson }}</script>
 
 <sortable-table>
@@ -90,9 +90,13 @@
       several counts towards the first, alphabetically, and is listed in a warning above.</li>
     <li>Travel spending without a trip tag is called out above, and shown as "no trip".</li>
     <li>The chart shows the spending <em>By trip</em> then expense account, or <em>By category</em>
-      (expense account) then trip; the icicle view shows the hierarchy most clearly.</li>
+      (expense account) then trip; the icicle view shows the hierarchy most clearly. <em>Over
+      time</em> shows the spending in each period, stacked by trip; choose the period (e.g.
+      monthly) in the chart's interval menu.</li>
     <li>Clicking a trip, in the table or the chart, opens the income statement filtered to its
       transactions. Clicking an expense account in the chart opens its page, filtered to that
-      trip's travel transactions (or to all travel, when not under a trip).</li>
+      trip's travel transactions (or to all travel, when not under a trip). In <em>Over time</em>,
+      a trip's part of a bar opens its income statement, and a bar's date limits the report to that
+      period.</li>
   </ul>
 </details>

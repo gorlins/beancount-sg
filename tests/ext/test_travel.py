@@ -2,6 +2,7 @@ import datetime
 import html
 import json
 import re
+from decimal import Decimal
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
@@ -9,10 +10,12 @@ from beancount import loader
 from beancount.core.data import filter_txns
 from fava.application import create_app
 from fava.core.filter_parser import parse_filter
+from fava.util.date import DateRange
 
 from beancount_sg.builders import A, P, T
 from beancount_sg.ext.travel import (
     ledger_trips,
+    spending_over_time,
     travel_spending,
     trip_filter,
     trip_tags,
@@ -217,7 +220,7 @@ def test_table_lists_trips_then_untagged(tmp_path):
 
 def test_charts_by_trip_and_by_category(tmp_path):
     found = charts(page(tmp_path))
-    assert set(found) == {"By trip", "By category"}
+    assert set(found) == {"By trip", "By category", "Over time (Monthly)"}
     by_trip = found["By trip"]
     assert by_trip["account"] == "All trips"
     assert by_trip["balance_children"] == {"USD": "1750.00"}
@@ -266,8 +269,64 @@ def names(node):
 def test_every_chart_node_has_a_link(tmp_path):
     body = page(tmp_path)
     links = chart_links(body)
-    for chart in charts(body).values():
-        assert set(names(chart)) <= set(links)
+    for label, chart in charts(body).items():
+        if label.startswith("Over time"):  # bars, keyed by trip
+            keys = {key for bar in chart for key in bar["account_balances"]}
+            assert keys == {"miami-2025", "nyc-2024", "paris-2025", "no trip"}
+            assert keys <= set(links)
+        else:
+            assert set(names(chart)) <= set(links)
+
+
+def test_spending_over_time_by_trip():
+    entries = load()
+    ranges = [
+        DateRange(datetime.date(2025, 1, 1), datetime.date(2025, 2, 1)),
+        DateRange(datetime.date(2025, 2, 1), datetime.date(2025, 3, 1)),
+        DateRange(datetime.date(2025, 3, 1), datetime.date(2025, 7, 2)),
+    ]
+    data = spending_over_time(entries, "Expenses", ledger_trips(entries), ranges)
+    assert [bar.date for bar in data] == [
+        datetime.date(2025, 1, 31),
+        datetime.date(2025, 2, 28),
+        datetime.date(2025, 7, 1),  # each range's last day
+    ]
+    assert [dict(bar.balance) for bar in data] == [
+        {"USD": Decimal("300.00")},
+        {"USD": Decimal("375.00")},  # with the refund
+        {"USD": Decimal("860.00")},  # not the untagged lunch, after the last range
+    ]
+    assert [
+        {trip: dict(balance) for trip, balance in bar.account_balances.items()} for bar in data
+    ] == [
+        {"miami-2025": {"USD": Decimal("300.00")}},
+        {"miami-2025": {"USD": Decimal("375.00")}},
+        {"paris-2025": {"USD": Decimal("800.00")}, "no trip": {"USD": Decimal("60.00")}},
+    ]
+
+
+def test_over_time_chart_follows_the_interval(tmp_path):
+    found = charts(page(tmp_path, query="?interval=year"))
+    bars = found["Over time (Yearly)"]
+    assert [(bar["date"], bar["balance"]) for bar in bars] == [
+        ("2024-12-31", {"USD": "200.00"}),
+        ("2025-12-31", {"USD": "1550.00"}),
+    ]
+    assert bars[1]["account_balances"] == {
+        "miami-2025": {"USD": "675.00"},
+        "paris-2025": {"USD": "800.00"},
+        "no trip": {"USD": "75.00"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("key", "narrations"),
+    [("paris-2025", ["Flight to Paris"]), ("no trip", ["Untagged lunch", "Untagged trip"])],
+)
+def test_over_time_trips_link_to_tag_filtered_pages(tmp_path, key, narrations):
+    path, fava_filter = link_target(chart_links(page(tmp_path))[key])
+    assert path == "/test/income_statement/"
+    assert matching(fava_filter) == narrations
 
 
 def test_table_links_keep_the_current_filter(tmp_path):
