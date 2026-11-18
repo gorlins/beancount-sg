@@ -129,7 +129,7 @@ def with_config(ledger, config):
 
 PAYMENTS = with_config(
     CATEGORIES,
-    "{\n  'exclude-accounts': ['Expenses:CardPayments'],\n}",
+    "{\n  'exclude_accounts': ['Expenses:CardPayments'],\n}",
 ) + (
     """
 2020-01-01 open Expenses:CardPayments
@@ -162,8 +162,8 @@ def test_excluded_payments_are_neither_counted_nor_linked(tmp_path):
     [
         ("['Expenses:CardPayments']", "the extension's config must be like"),
         ("{'exclude': ['Expenses:CardPayments']}", "the extension's config must be like"),
-        ("{'exclude-accounts': 'Expenses:CardPayments'}", "exclude-accounts must be a list"),
-        ("{'exclude-accounts': ['card payments']}", "exclude-accounts must be a list"),
+        ("{'exclude_accounts': 'Expenses:CardPayments'}", "exclude_accounts must be a list"),
+        ("{'exclude_accounts': ['card payments']}", "exclude_accounts must be a list"),
     ],
 )
 def test_invalid_config_is_reported_and_excludes_nothing(tmp_path, config, message):

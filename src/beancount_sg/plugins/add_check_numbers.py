@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import functools
 import re
-from decimal import Decimal, InvalidOperation
 from typing import Any, NamedTuple
 
 from beancount.core.account_types import get_account_type
@@ -120,14 +119,15 @@ def record_check_number(
 
 
 def _as_int(value: object) -> int | None:
-    """A metadata value as a whole number, e.g. ``"01042"`` or ``Decimal(1042)``, or None."""
+    """A metadata value as a whole number, e.g. ``"01042"`` or ``Decimal(1042)``, or None.
+
+    Parsing its string, rather than ``int(value)``, rejects a non-integer like
+    ``Decimal("2.5")`` instead of truncating it.
+    """
     try:
-        number = Decimal(str(value).strip())
-    except InvalidOperation:
+        return int(str(value))
+    except ValueError:
         return None
-    if not number.is_finite() or number != number.to_integral_value():
-        return None
-    return int(number)
 
 
 def get_check_number(txn: Transaction, paying_roots: frozenset[str]) -> str | None:

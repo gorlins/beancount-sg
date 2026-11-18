@@ -131,6 +131,8 @@ def test_legacy_keys_matching_check_no_are_removed_and_it_is_kept():
         ("Deposit", '\n  check_no: "7"\n  checknum: "8"', "check_no '7', checknum '8'"),
         ("CHECK #1", '\n  check-no: "2"\n  checknum: "2.5"', "checknum '2.5', check-no '2'"),
         ("Deposit", '\n  check_no: "n/a"', "check_no 'n/a'"),
+        # A number, not truncated to 2.
+        ("CHECK #2", "\n  checknum: 2.5", "checknum '2.5', narration '2'"),
         ("CHECK #1042", "\n  check_no: 1043", "check_no '1043', narration '1042'"),
     ],
 )

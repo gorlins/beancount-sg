@@ -11,7 +11,7 @@ like refunds; list such accounts (each with its subaccounts) in the extension's
 config to leave them out:
 
     2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards" "{
-      'exclude-accounts': ['Expenses:LoanPayments:CreditCardPayment'],
+      'exclude_accounts': ['Expenses:LoanPayments:CreditCardPayment'],
     }"
 
 The "Credit Card Rewards" report covers the transactions in the current Fava
@@ -59,7 +59,7 @@ from beancount_sg.rewards import (
 )
 
 # The extension config's keys.
-EXCLUDE_ACCOUNTS = "exclude-accounts"
+EXCLUDE_ACCOUNTS = "exclude_accounts"
 CONFIG_EXAMPLE = f"{{'{EXCLUDE_ACCOUNTS}': ['Expenses:LoanPayments:CreditCardPayment']}}"
 
 

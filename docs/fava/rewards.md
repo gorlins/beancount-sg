@@ -68,7 +68,7 @@ account debited. List such accounts once, in the extension's config; each covers
 
 ```beancount
 2020-01-01 custom "fava-extension" "beancount_sg.ext.rewards" "{
-  'exclude-accounts': ['Expenses:LoanPayments:CreditCardPayment'],
+  'exclude_accounts': ['Expenses:LoanPayments:CreditCardPayment'],
 }"
 ```
 

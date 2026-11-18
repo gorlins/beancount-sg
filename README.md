@@ -109,7 +109,7 @@ payee's transactions.
 ### `beancount_sg.plugins.tag_travel`
 
 ```beancount
-plugin "beancount_sg.plugins.tag_travel" "{'travel-accounts': ['Expenses:Travel'], 'conditional-accounts': ['Expenses:Food']}"
+plugin "beancount_sg.plugins.tag_travel" "{'travel_accounts': ['Expenses:Travel'], 'conditional_accounts': ['Expenses:Food']}"
 ```
 
 Tags travel spending, and everyday spending while away (per `travel` events), with `#travel` and a
@@ -215,8 +215,9 @@ them on every supported Python version.
 Fava is an optional dependency (the `fava` extra), so code that imports `fava` must stay out of
 modules that plugin-only users import.
 
-Metadata keys and the keys of plugin and extension configs are kebab-case, e.g. `check-no` or
-`{'travel-accounts': [...]}`, like Fava's own (`fava-uptodate-indication`, `fava-option` names).
+Metadata keys are kebab-case, e.g. `check-no`, like Fava's own (`fava-uptodate-indication`).
+Plugin and extension configs are Python dict literals, so their keys are snake_case like Python
+names, e.g. `{'travel_accounts': [...]}`.
 
 ### Branches and pull requests
 

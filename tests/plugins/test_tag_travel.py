@@ -5,7 +5,7 @@ import pytest
 from beancount_sg.plugins.tag_travel import trip_tag
 from beancount_sg.testing import load_txns
 
-CONFIG = "{'travel-accounts': ['Expenses:Travel'], 'conditional-accounts': ['Expenses:Food']}"
+CONFIG = "{'travel_accounts': ['Expenses:Travel'], 'conditional_accounts': ['Expenses:Food']}"
 PLUGIN = ("beancount_sg.plugins.tag_travel", CONFIG)
 
 
@@ -117,8 +117,8 @@ def test_trip_tag(location, expected):
 
 def test_multiline_config_is_accepted():
     config = """{
-  'travel-accounts': ['Expenses:Travel'],
-  'conditional-accounts': ['Expenses:Food'],
+  'travel_accounts': ['Expenses:Travel'],
+  'conditional_accounts': ['Expenses:Food'],
 }"""
     assert tags(
         '2024-03-04 event "travel" "Boston"\n' + spend("2024-03-05", "Expenses:Food"),
