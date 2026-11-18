@@ -1,6 +1,6 @@
 import pytest
 
-from beancount_sg.plugins.add_check_numbers import META_KEY, add_check_numbers
+from beancount_sg.plugins.add_check_numbers import LEGACY_KEYS, META_KEY, add_check_numbers
 from beancount_sg.testing import load, load_txns
 
 PLUGIN = "beancount_sg.plugins.add_check_numbers"
@@ -92,3 +92,52 @@ def test_input_is_not_mutated():
     assert errors == []
     assert META_KEY not in entries[-1].meta
     assert new_entries[-1].meta[META_KEY] == "1042"
+
+
+def converted(narration: str, meta: str, *, plugin: bool = True) -> tuple[dict, list]:
+    """A transaction's check-number metadata after the plugin (or as written), and errors."""
+    entries, options_map = load(f"""
+2024-03-04 * "{narration}"{meta}
+  Assets:Checking  -250.00 USD
+  Expenses:Home
+""")
+    errors = []
+    if plugin:
+        entries, errors = add_check_numbers(entries, options_map)
+    keys = (META_KEY, *LEGACY_KEYS)
+    return {key: entries[-1].meta[key] for key in keys if key in entries[-1].meta}, errors
+
+
+@pytest.mark.parametrize("legacy", LEGACY_KEYS)
+@pytest.mark.parametrize("value", ['"1042"', '"01042"', "1042"])
+def test_legacy_key_matching_the_narration_is_converted(legacy, value):
+    assert converted("CHECK #1042", f"\n  {legacy}: {value}") == ({META_KEY: "1042"}, [])
+
+
+def test_legacy_key_without_a_number_in_the_narration_is_converted():
+    # E.g. a deposit, which isn't a payment by check.
+    assert converted("Deposit", '\n  checknum: "0517"') == ({META_KEY: "517"}, [])
+
+
+def test_legacy_keys_matching_check_no_are_removed_and_it_is_kept():
+    meta = '\n  check-no: "01042"\n  check_no: 1042\n  checknum: "1042"'
+    assert converted("CHECK #999", meta) == ({META_KEY: "01042"}, [])
+
+
+@pytest.mark.parametrize(
+    ("narration", "meta", "found"),
+    [
+        ("CHECK #1042", '\n  check_no: "1043"', "check_no '1043', narration '1042'"),
+        ("Deposit", '\n  check_no: "7"\n  checknum: "8"', "check_no '7', checknum '8'"),
+        ("CHECK #1", '\n  check-no: "2"\n  checknum: "2.5"', "checknum '2.5', check-no '2'"),
+        ("Deposit", '\n  check_no: "n/a"', "check_no 'n/a'"),
+        ("CHECK #1042", "\n  check_no: 1043", "check_no '1043', narration '1042'"),
+    ],
+)
+def test_mismatched_check_numbers_are_an_error_and_left_alone(narration, meta, found):
+    before, _ = converted(narration, meta, plugin=False)
+    after, errors = converted(narration, meta)
+    assert after == before
+    [error] = errors
+    assert error.message == f"Mismatched check numbers: {found}"
+    assert error.entry.narration == narration

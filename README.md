@@ -94,7 +94,8 @@ plugin "beancount_sg.plugins.add_check_numbers"
 ```
 
 Records the check number from narrations like `CHECK #1042` as `check-no` metadata on payments by
-check.
+check. Converts older `check_no` and `checknum` metadata to `check-no`, with an error if the numbers
+disagree.
 
 ### `beancount_sg.plugins.tag_recurring_payees`
 

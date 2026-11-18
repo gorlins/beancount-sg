@@ -6,7 +6,8 @@
 
 Lists the checks in the current Fava filter: transactions with `check-no` metadata, which
 [`add_check_numbers`](../../README.md#beancount_sgpluginsadd_check_numbers) can add from
-narrations like `CHECK #1042`.
+narrations like `CHECK #1042`. That plugin also converts older `check_no` and `checknum` metadata to
+`check-no`.
 
 ![Checkbook report](images/checkbook.png)
 
