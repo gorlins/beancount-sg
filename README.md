@@ -93,8 +93,9 @@ security under a brokerage account.
 plugin "beancount_sg.plugins.add_check_numbers"
 ```
 
-Records the check number from narrations like `CHECK #1042` as `check_no` metadata on payments by
-check.
+Records the check number from narrations like `CHECK #1042` as `check-no` metadata on payments by
+check. Converts older `check_no` and `checknum` metadata to `check-no`, with an error if the numbers
+disagree.
 
 ### `beancount_sg.plugins.tag_recurring_payees`
 
@@ -125,7 +126,7 @@ with screenshots.
 2020-01-01 custom "fava-extension" "beancount_sg.ext.checkbook"
 ```
 
-A "Checkbook" report listing transactions with `check_no` metadata (see `add_check_numbers`): date,
+A "Checkbook" report listing transactions with `check-no` metadata (see `add_check_numbers`): date,
 number, payee, paying account, category and amount. [Docs](docs/fava/checkbook.md)
 
 ### `beancount_sg.ext.batch_edit`
@@ -213,6 +214,10 @@ them on every supported Python version.
 
 Fava is an optional dependency (the `fava` extra), so code that imports `fava` must stay out of
 modules that plugin-only users import.
+
+Metadata keys are kebab-case, e.g. `check-no`, like Fava's own (`fava-uptodate-indication`).
+Plugin and extension configs are Python dict literals, so their keys are snake_case like Python
+names, e.g. `{'travel_accounts': [...]}`.
 
 ### Branches and pull requests
 

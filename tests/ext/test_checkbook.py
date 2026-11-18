@@ -16,7 +16,7 @@ def check(**kwargs):
     defaults = {
         "payee": "Plumber",
         "narration": "CHECK #1042",
-        "meta": {"check_no": "1042"},
+        "meta": {"check-no": "1042"},
         "postings": [
             P("Assets:Checking", A("-250.00", "USD")),
             P("Expenses:Home", A("250.00", "USD")),
@@ -45,7 +45,7 @@ def test_only_transactions_with_check_numbers_are_listed():
 
 
 def test_check_number_stored_as_a_number():
-    [row] = rows(check(meta={"check_no": Decimal(1042)}))
+    [row] = rows(check(meta={"check-no": Decimal(1042)}))
     assert row.check_no == 1042
 
 
@@ -99,7 +99,7 @@ option "title" "Test"
 2020-01-01 open Expenses:Home
 
 2024-03-04 * "Plumber" "CHECK #1042"
-  check_no: "1042"
+  check-no: "1042"
   Assets:Checking  -250.00 USD
   Expenses:Home
 """
