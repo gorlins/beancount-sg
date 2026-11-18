@@ -8,16 +8,16 @@ Record where you are with ``travel`` events, and ``home`` once you're back:
 Configure which accounts to tag, as a Python dict:
 
     plugin "beancount_sg.plugins.tag_travel" "{
-      'travel_accounts': ['Expenses:Travel'],
-      'conditional_accounts': ['Expenses:Food', 'Expenses:Transport'],
+      'travel-accounts': ['Expenses:Travel'],
+      'conditional-accounts': ['Expenses:Food', 'Expenses:Transport'],
     }"
 
 Then a transaction with a posting to (a subaccount of) one of these accounts
 is tagged:
 
-- ``travel_accounts``: always ``#travel``, plus the trip tag while away, so
+- ``travel-accounts``: always ``#travel``, plus the trip tag while away, so
   e.g. flights booked from home are still travel;
-- ``conditional_accounts``: ``#travel`` and the trip tag, only while away.
+- ``conditional-accounts``: ``#travel`` and the trip tag, only while away.
 
 The trip tag is the location and the year the trip started, slugified, e.g.
 ``#new-york-city-2024`` or ``#zurich-2024``.
@@ -30,7 +30,7 @@ airport), date ``home`` the day after, as above: the trip covers March 4 to 9.
 
 Usage::
 
-    plugin "beancount_sg.plugins.tag_travel" "{'travel_accounts': [...], ...}"
+    plugin "beancount_sg.plugins.tag_travel" "{'travel-accounts': [...], ...}"
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ TAG = "travel"
 EVENT_TYPE = "travel"
 HOME = "home"
 
-_CONFIG_KEYS = {"travel_accounts", "conditional_accounts"}
+_CONFIG_KEYS = {"travel-accounts", "conditional-accounts"}
 
 
 def tag_travel(
@@ -62,8 +62,8 @@ def tag_travel(
 ) -> tuple[list[Directive], list[Any]]:
     """Tag transactions in the configured accounts with #travel and the current trip."""
     settings = _parse_config(config)
-    travel = _matcher(settings.get("travel_accounts", []))
-    conditional = _matcher(settings.get("conditional_accounts", []))
+    travel = _matcher(settings.get("travel-accounts", []))
+    conditional = _matcher(settings.get("conditional-accounts", []))
     dates, trips = trip_timeline(entries)
     return map_transactions(
         entries,
@@ -122,7 +122,7 @@ def tag_transaction(
 def _parse_config(config: str | None) -> dict[str, Any]:
     if not config:
         raise ValueError(
-            "tag_travel requires a config, e.g. {'travel_accounts': ['Expenses:Travel']}"
+            "tag_travel requires a config, e.g. {'travel-accounts': ['Expenses:Travel']}"
         )
     settings = literal_eval(config)
     if not isinstance(settings, dict) or not set(settings) <= _CONFIG_KEYS:

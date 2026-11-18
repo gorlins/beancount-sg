@@ -79,7 +79,7 @@ def test_payment_from_an_income_account_is_ignored():
 
 
 def test_existing_check_number_is_kept():
-    assert check_no("CHECK #1042", meta='\n  check_no: "999"') == "999"
+    assert check_no("CHECK #1042", meta='\n  check-no: "999"') == "999"
 
 
 def test_input_is_not_mutated():

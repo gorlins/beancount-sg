@@ -1,4 +1,4 @@
-"""A Fava report listing checks, i.e. transactions with ``check_no`` metadata.
+"""A Fava report listing checks, i.e. transactions with ``check-no`` metadata.
 
 Enable it in the ledger:
 
@@ -6,7 +6,7 @@ Enable it in the ledger:
 
 The "Checkbook" report shows, for each check in the current Fava filter: its
 date, number, payee and narration, the account it was written from, the
-category it was spent on, and the amount. ``check_no`` metadata can be added
+category it was spent on, and the amount. ``check-no`` metadata can be added
 automatically with ``beancount_sg.plugins.add_check_numbers``.
 
 - The account is the one Assets or Liabilities posting that's negative, as in
@@ -66,7 +66,7 @@ class Checkbook(FavaExtensionBase):
 
 
 def checkbook_rows(entries: Iterable[Directive], paying_roots: frozenset[str]) -> list[CheckRow]:
-    """A row per transaction with check_no metadata, in entry order.
+    """A row per transaction with check-no metadata, in entry order.
 
     ``paying_roots`` are the root account names a check can be written from.
     """

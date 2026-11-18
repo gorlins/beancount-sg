@@ -1,7 +1,7 @@
 """Record check numbers from transaction narrations as metadata.
 
 Banks usually describe a cleared check like ``CHECK #1042``. For a payment by
-check, this plugin adds the number as ``check_no`` metadata, so checks can be
+check, this plugin adds the number as ``check-no`` metadata, so checks can be
 queried and reconciled by number:
 
     2024-03-04 * "CHECK #01042"
@@ -11,7 +11,7 @@ queried and reconciled by number:
 becomes
 
     2024-03-04 * "CHECK #01042"
-      check_no: "1042"
+      check-no: "1042"
       Assets:Checking  -250.00 USD
       Expenses:Home:Repairs
 
@@ -25,7 +25,7 @@ A transaction counts as a payment by check when:
   written against e.g. a line of credit. Posting order doesn't matter.
 
 The number is stored as a string without leading zeros. A transaction that
-already has ``check_no`` metadata, e.g. set by hand, is left alone.
+already has ``check-no`` metadata, e.g. set by hand, is left alone.
 
 Usage::
 
@@ -46,7 +46,7 @@ from .plugin_helpers import map_transactions
 
 __plugins__ = ("add_check_numbers",)
 
-META_KEY = "check_no"
+META_KEY = "check-no"
 
 # The word "check", then anything up to "#<number>".
 _CHECK_NUMBER = re.compile(r"\bcheck\b[^#]*#(\d+)", re.IGNORECASE)
@@ -55,7 +55,7 @@ _CHECK_NUMBER = re.compile(r"\bcheck\b[^#]*#(\d+)", re.IGNORECASE)
 def add_check_numbers(
     entries: list[Directive], options_map: dict[str, Any], config: str | None = None
 ) -> tuple[list[Directive], list[Any]]:
-    """Add ``check_no`` metadata to payments by check."""
+    """Add ``check-no`` metadata to payments by check."""
     # Root account names checks can be written from, e.g. {"Assets", "Liabilities"}.
     account_types = get_account_types(options_map)
     paying_roots = frozenset({account_types.assets, account_types.liabilities})
