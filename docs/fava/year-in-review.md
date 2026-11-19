@@ -30,9 +30,12 @@ left out and their currencies listed.
 
 - **Cards** across the top show the final year's headline metrics, each with its change from the
   previous year.
-- **Net worth**, with a chart of assets and liabilities per year (choose *Single Bars* for net
-  worth), and **Income & savings**.
-- **Expenses by category**, with a chart, and **Debt paydown**.
+- **Charts** of net worth per year, or switched below it to assets and liabilities stacked (Fava
+  can't draw net worth as a line over them), and of expenses by category.
+- **Net worth** and **Income & savings** tables.
+- **Expenses by category** and **Debt paydown** tables.
+
+On narrower screens, the tables of five years stack rather than sit side by side.
 
 Every change from the previous year has an arrow and a sign, in **green when it's good** and **red
 when it's bad**: more net worth, income or savings is good, and so is less spending or debt. A
@@ -64,10 +67,14 @@ category's share of the final year. Click an amount for the account's page for t
 | Group | Accounts |
 | --- | --- |
 | **Cash** | Assets with the `cash` [cash-flow role](#cash-flow-roles). |
-| **Investments** | Other assets, unless they're property. |
+| **Investments** | Assets with any other role (usually `investing`), unless they're property. |
 | **Property** | Assets you live in or use rather than invest, e.g. a home or a car. |
-| **Debt** | Loans: liabilities with the `financing` role, except credit cards. |
-| **Other** | Other liabilities, e.g. credit card balances. |
+| **Debt** | Loans: liabilities with the `financing` role (the default), except credit cards. |
+| **Other** | The remaining liabilities: credit cards without a declared role, and liabilities declared with another role, e.g. `operating`. |
+
+The roles say how an account's money flows; the groups say what it's worth to you. So `operating`,
+which marks everyday income and spending, matters here only for a liability: declaring a credit
+card (or any liability) `operating` keeps it out of debt, in *other*.
 
 An asset is **property** if its `open` directive (or a parent's) says `investable: FALSE`, or else
 if a liability is opened under the matching account path, which is how a secured loan is usually

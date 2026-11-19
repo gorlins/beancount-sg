@@ -53,3 +53,15 @@ def test_unknown_roles_are_errors():
         error.message == "Liabilities:CarLoan: unknown cash-flow-role 'invsting', using the default"
     )
     assert error.entry.account == "Liabilities:CarLoan"
+
+
+def test_inheritance_does_not_depend_on_open_order():
+    # The subaccount is opened, and listed, before its parent.
+    entries, _ = load("""
+2020-01-01 open Assets:Retirement:Cash
+2021-01-01 open Assets:Retirement
+  cash-flow-role: "investing"
+""")
+    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
+    assert roles["Assets:Retirement:Cash"].role == INVESTING
+    assert roles["Assets:Retirement:Cash"].declared_by == "Assets:Retirement"

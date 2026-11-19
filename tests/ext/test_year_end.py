@@ -197,12 +197,21 @@ def test_charts(tmp_path):
     found = re.findall(
         r'<svelte-component type="charts"><script type="application/json">(.*?)</script>', body
     )
+    # The net worth charts share a component, so Fava switches between them.
+    assert [chart["label"] for chart in json.loads(found[0])] == [
+        "Net worth",
+        "Assets & liabilities",
+    ]
     charts = {chart["label"]: chart for data in found for chart in json.loads(data)}
-    net_worth = charts["Assets, liabilities and net worth"]
-    assert net_worth["type"] == "bar"
+    net_worth = charts["Net worth"]
     assert [
         (bar["date"], bar["balance"], bar["account_balances"]) for bar in net_worth["data"]
     ] == [
+        ("2018-12-31", {"USD": "-47000"}, {}),
+        ("2019-12-31", {"USD": "-4100"}, {}),
+    ]
+    stacked = charts["Assets & liabilities"]
+    assert [(bar["date"], bar["balance"], bar["account_balances"]) for bar in stacked["data"]] == [
         (
             "2018-12-31",
             {"USD": "-47000"},

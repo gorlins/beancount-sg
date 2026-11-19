@@ -1,43 +1,1074 @@
 ; Example ledger for the Year in Review and Cash Flow screenshots (see
-; screenshots.py): two years of a household's pay, home and mortgage, savings,
+; screenshots.py): five years of a household's pay, home and mortgage, savings,
 ; investments and spending.
 option "title" "Household"
 option "operating_currency" "USD"
 
-2022-12-01 custom "fava-extension" "beancount_sg.ext.year_end"
-2022-12-01 custom "fava-extension" "beancount_sg.ext.cash_flow"
+2019-12-01 custom "fava-extension" "beancount_sg.ext.year_end"
+2019-12-01 custom "fava-extension" "beancount_sg.ext.cash_flow"
 
-2022-12-01 open Equity:Opening-Balances
-2022-12-01 open Income:Salary USD
-2022-12-01 open Liabilities:CreditCard USD
-2022-12-01 open Expenses:Food:Groceries USD
-2022-12-01 open Expenses:Food:Restaurants USD
-2022-12-01 open Expenses:Travel USD
-2022-12-01 open Expenses:Shopping USD
-
-2022-12-01 open Assets:Home USD
-2022-12-01 open Assets:Bank:Savings USD
-2022-12-01 open Assets:Brokerage
+2019-12-01 open Equity:Opening-Balances
+2019-12-01 open Income:Salary USD
+2019-12-01 open Assets:Home USD
+2019-12-01 open Assets:Bank:Savings USD
+2019-12-01 open Assets:Brokerage
   cash-flow-role: "investing"
-2022-12-01 open Liabilities:Home:Mortgage USD
-2022-12-01 open Expenses:Home:MortgageInterest USD
-2022-12-01 open Expenses:Home:Utilities USD
-2022-12-01 open Expenses:Insurance USD
+2019-12-01 open Liabilities:Home:Mortgage USD
+2019-12-01 open Liabilities:CreditCard USD
+2019-12-01 open Expenses:Food:Groceries USD
+2019-12-01 open Expenses:Food:Restaurants USD
+2019-12-01 open Expenses:Home:MortgageInterest USD
+2019-12-01 open Expenses:Home:Utilities USD
+2019-12-01 open Expenses:Insurance USD
+2019-12-01 open Expenses:Shopping USD
+2019-12-01 open Expenses:Travel USD
 
-2022-12-31 * "Opening balances"
-  Assets:Home  400000.00 USD
-  Liabilities:Home:Mortgage  -305000.00 USD
-  Assets:Bank:Savings  15000.00 USD
-  Assets:Brokerage  2000 VTI {180.00 USD}
+2019-12-31 * "Opening balances"
+  Assets:Home  380000.00 USD
+  Liabilities:Home:Mortgage  -320000.00 USD
+  Assets:Bank:Savings  12000.00 USD
+  Assets:Brokerage  1200 VTI {150.00 USD}
   Equity:Opening-Balances
 
-2023-01-01 * "Employer" "Payroll"
+2020-01-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-01-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1000.00 USD
+  Expenses:Home:MortgageInterest  1400.00 USD
+  Assets:Bank:Savings
+
+2020-01-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2020-01-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-01-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2020-01-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  130.00 USD
+  Assets:Bank:Savings
+
+2020-02-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-02-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1005.00 USD
+  Expenses:Home:MortgageInterest  1395.00 USD
+  Assets:Bank:Savings
+
+2020-02-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2020-02-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-02-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2020-02-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2020-03-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-03-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1010.00 USD
+  Expenses:Home:MortgageInterest  1390.00 USD
+  Assets:Bank:Savings
+
+2020-03-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2020-03-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-03-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2020-03-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2020-03-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {135.00 USD}
+  Assets:Bank:Savings
+
+2020-03-28 price VTI  135.00 USD
+
+2020-04-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-04-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1015.00 USD
+  Expenses:Home:MortgageInterest  1385.00 USD
+  Assets:Bank:Savings
+
+2020-04-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2020-04-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-04-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  120.00 USD
+  Liabilities:CreditCard
+
+2020-04-12 * "Department Store" "Household goods"
+  Expenses:Shopping  250.00 USD
+  Liabilities:CreditCard
+
+2020-04-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  370.00 USD
+  Assets:Bank:Savings
+
+2020-05-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-05-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1020.00 USD
+  Expenses:Home:MortgageInterest  1380.00 USD
+  Assets:Bank:Savings
+
+2020-05-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2020-05-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-05-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2020-05-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  130.00 USD
+  Assets:Bank:Savings
+
+2020-06-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-06-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1025.00 USD
+  Expenses:Home:MortgageInterest  1375.00 USD
+  Assets:Bank:Savings
+
+2020-06-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2020-06-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-06-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2020-06-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2020-06-05 * "Insurer" "Home insurance"
+  Expenses:Insurance  1300.00 USD
+  Assets:Bank:Savings
+
+2020-06-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {160.00 USD}
+  Assets:Bank:Savings
+
+2020-06-28 price VTI  160.00 USD
+
+2020-07-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-07-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1030.00 USD
+  Expenses:Home:MortgageInterest  1370.00 USD
+  Assets:Bank:Savings
+
+2020-07-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2020-07-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-07-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2020-07-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2020-08-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-08-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1035.00 USD
+  Expenses:Home:MortgageInterest  1365.00 USD
+  Assets:Bank:Savings
+
+2020-08-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2020-08-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-08-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  120.00 USD
+  Liabilities:CreditCard
+
+2020-08-14 * "Airline" "Summer trip"
+  Expenses:Travel  600.00 USD
+  Liabilities:CreditCard
+
+2020-08-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  720.00 USD
+  Assets:Bank:Savings
+
+2020-09-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-09-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1040.00 USD
+  Expenses:Home:MortgageInterest  1360.00 USD
+  Assets:Bank:Savings
+
+2020-09-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2020-09-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-09-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2020-09-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  130.00 USD
+  Assets:Bank:Savings
+
+2020-09-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {172.00 USD}
+  Assets:Bank:Savings
+
+2020-09-28 price VTI  172.00 USD
+
+2020-10-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-10-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1045.00 USD
+  Expenses:Home:MortgageInterest  1355.00 USD
+  Assets:Bank:Savings
+
+2020-10-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2020-10-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-10-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2020-10-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2020-11-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-11-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1050.00 USD
+  Expenses:Home:MortgageInterest  1350.00 USD
+  Assets:Bank:Savings
+
+2020-11-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2020-11-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-11-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2020-11-12 * "Department Store" "Household goods"
+  Expenses:Shopping  250.00 USD
+  Liabilities:CreditCard
+
+2020-11-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  400.00 USD
+  Assets:Bank:Savings
+
+2020-12-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
+2020-12-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1055.00 USD
+  Expenses:Home:MortgageInterest  1345.00 USD
+  Assets:Bank:Savings
+
+2020-12-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2020-12-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  360.00 USD
+  Assets:Bank:Savings
+
+2020-12-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  120.00 USD
+  Liabilities:CreditCard
+
+2020-12-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  120.00 USD
+  Assets:Bank:Savings
+
+2020-12-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {190.00 USD}
+  Assets:Bank:Savings
+
+2020-12-28 price VTI  190.00 USD
+
+2020-12-15 * "Employer" "Year-end bonus"
+  Assets:Bank:Savings  2500.00 USD
+  Income:Salary
+
+2021-01-01 * "Employer" "Payroll"
   Assets:Bank:Savings  4200.00 USD
   Income:Salary
 
-2023-01-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1050.00 USD
+2021-01-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1060.00 USD
+  Expenses:Home:MortgageInterest  1340.00 USD
+  Assets:Bank:Savings
+
+2021-01-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2021-01-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-01-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2021-01-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2021-02-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-02-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1065.00 USD
+  Expenses:Home:MortgageInterest  1335.00 USD
+  Assets:Bank:Savings
+
+2021-02-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2021-02-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-02-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2021-02-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2021-03-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-03-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1070.00 USD
+  Expenses:Home:MortgageInterest  1330.00 USD
+  Assets:Bank:Savings
+
+2021-03-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2021-03-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-03-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2021-03-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
+  Assets:Bank:Savings
+
+2021-03-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {205.00 USD}
+  Assets:Bank:Savings
+
+2021-03-28 price VTI  205.00 USD
+
+2021-04-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-04-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1075.00 USD
+  Expenses:Home:MortgageInterest  1325.00 USD
+  Assets:Bank:Savings
+
+2021-04-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2021-04-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-04-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2021-04-12 * "Department Store" "Household goods"
+  Expenses:Shopping  270.00 USD
+  Liabilities:CreditCard
+
+2021-04-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  400.00 USD
+  Assets:Bank:Savings
+
+2021-05-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-05-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1080.00 USD
+  Expenses:Home:MortgageInterest  1320.00 USD
+  Assets:Bank:Savings
+
+2021-05-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2021-05-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-05-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2021-05-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2021-06-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-06-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1085.00 USD
+  Expenses:Home:MortgageInterest  1315.00 USD
+  Assets:Bank:Savings
+
+2021-06-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2021-06-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-06-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2021-06-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2021-06-05 * "Insurer" "Home insurance"
+  Expenses:Insurance  1340.00 USD
+  Assets:Bank:Savings
+
+2021-06-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {215.00 USD}
+  Assets:Bank:Savings
+
+2021-06-28 price VTI  215.00 USD
+
+2021-07-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-07-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1090.00 USD
+  Expenses:Home:MortgageInterest  1310.00 USD
+  Assets:Bank:Savings
+
+2021-07-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2021-07-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-07-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2021-07-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
+  Assets:Bank:Savings
+
+2021-08-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-08-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1095.00 USD
+  Expenses:Home:MortgageInterest  1305.00 USD
+  Assets:Bank:Savings
+
+2021-08-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2021-08-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-08-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2021-08-14 * "Airline" "Summer trip"
+  Expenses:Travel  1200.00 USD
+  Liabilities:CreditCard
+
+2021-08-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  1330.00 USD
+  Assets:Bank:Savings
+
+2021-09-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-09-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1100.00 USD
   Expenses:Home:MortgageInterest  1300.00 USD
+  Assets:Bank:Savings
+
+2021-09-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2021-09-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-09-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2021-09-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2021-09-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {220.00 USD}
+  Assets:Bank:Savings
+
+2021-09-28 price VTI  220.00 USD
+
+2021-10-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-10-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1105.00 USD
+  Expenses:Home:MortgageInterest  1295.00 USD
+  Assets:Bank:Savings
+
+2021-10-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2021-10-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-10-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2021-10-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2021-11-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-11-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1110.00 USD
+  Expenses:Home:MortgageInterest  1290.00 USD
+  Assets:Bank:Savings
+
+2021-11-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2021-11-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-11-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2021-11-12 * "Department Store" "Household goods"
+  Expenses:Shopping  270.00 USD
+  Liabilities:CreditCard
+
+2021-11-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  430.00 USD
+  Assets:Bank:Savings
+
+2021-12-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4200.00 USD
+  Income:Salary
+
+2021-12-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1115.00 USD
+  Expenses:Home:MortgageInterest  1285.00 USD
+  Assets:Bank:Savings
+
+2021-12-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2021-12-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  375.00 USD
+  Assets:Bank:Savings
+
+2021-12-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  130.00 USD
+  Liabilities:CreditCard
+
+2021-12-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  130.00 USD
+  Assets:Bank:Savings
+
+2021-12-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {235.00 USD}
+  Assets:Bank:Savings
+
+2021-12-28 price VTI  235.00 USD
+
+2021-12-15 * "Employer" "Year-end bonus"
+  Assets:Bank:Savings  3000.00 USD
+  Income:Salary
+
+2022-01-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-01-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1120.00 USD
+  Expenses:Home:MortgageInterest  1280.00 USD
+  Assets:Bank:Savings
+
+2022-01-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2022-01-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-01-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2022-01-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2022-02-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-02-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1125.00 USD
+  Expenses:Home:MortgageInterest  1275.00 USD
+  Assets:Bank:Savings
+
+2022-02-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2022-02-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-02-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2022-02-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
+  Assets:Bank:Savings
+
+2022-03-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-03-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1130.00 USD
+  Expenses:Home:MortgageInterest  1270.00 USD
+  Assets:Bank:Savings
+
+2022-03-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2022-03-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-03-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2022-03-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
+  Assets:Bank:Savings
+
+2022-03-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {215.00 USD}
+  Assets:Bank:Savings
+
+2022-03-28 price VTI  215.00 USD
+
+2022-04-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-04-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1135.00 USD
+  Expenses:Home:MortgageInterest  1265.00 USD
+  Assets:Bank:Savings
+
+2022-04-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2022-04-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-04-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2022-04-12 * "Department Store" "Household goods"
+  Expenses:Shopping  290.00 USD
+  Liabilities:CreditCard
+
+2022-04-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  430.00 USD
+  Assets:Bank:Savings
+
+2022-05-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-05-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1140.00 USD
+  Expenses:Home:MortgageInterest  1260.00 USD
+  Assets:Bank:Savings
+
+2022-05-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2022-05-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-05-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2022-05-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2022-06-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-06-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1145.00 USD
+  Expenses:Home:MortgageInterest  1255.00 USD
+  Assets:Bank:Savings
+
+2022-06-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2022-06-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-06-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2022-06-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
+  Assets:Bank:Savings
+
+2022-06-05 * "Insurer" "Home insurance"
+  Expenses:Insurance  1380.00 USD
+  Assets:Bank:Savings
+
+2022-06-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {185.00 USD}
+  Assets:Bank:Savings
+
+2022-06-28 price VTI  185.00 USD
+
+2022-07-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-07-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1150.00 USD
+  Expenses:Home:MortgageInterest  1250.00 USD
+  Assets:Bank:Savings
+
+2022-07-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2022-07-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-07-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2022-07-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
+  Assets:Bank:Savings
+
+2022-08-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-08-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1155.00 USD
+  Expenses:Home:MortgageInterest  1245.00 USD
+  Assets:Bank:Savings
+
+2022-08-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2022-08-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-08-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2022-08-14 * "Airline" "Summer trip"
+  Expenses:Travel  2000.00 USD
+  Liabilities:CreditCard
+
+2022-08-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  2140.00 USD
+  Assets:Bank:Savings
+
+2022-09-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-09-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1160.00 USD
+  Expenses:Home:MortgageInterest  1240.00 USD
+  Assets:Bank:Savings
+
+2022-09-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2022-09-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-09-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2022-09-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
+  Assets:Bank:Savings
+
+2022-09-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {180.00 USD}
+  Assets:Bank:Savings
+
+2022-09-28 price VTI  180.00 USD
+
+2022-10-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-10-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1165.00 USD
+  Expenses:Home:MortgageInterest  1235.00 USD
+  Assets:Bank:Savings
+
+2022-10-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  180.00 USD
+  Assets:Bank:Savings
+
+2022-10-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-10-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2022-10-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
+  Assets:Bank:Savings
+
+2022-11-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-11-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1170.00 USD
+  Expenses:Home:MortgageInterest  1230.00 USD
+  Assets:Bank:Savings
+
+2022-11-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  200.00 USD
+  Assets:Bank:Savings
+
+2022-11-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-11-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2022-11-12 * "Department Store" "Household goods"
+  Expenses:Shopping  290.00 USD
+  Liabilities:CreditCard
+
+2022-11-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  460.00 USD
+  Assets:Bank:Savings
+
+2022-12-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4410.00 USD
+  Income:Salary
+
+2022-12-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1175.00 USD
+  Expenses:Home:MortgageInterest  1225.00 USD
+  Assets:Bank:Savings
+
+2022-12-15 * "City Utilities" "Utilities"
+  Expenses:Home:Utilities  220.00 USD
+  Assets:Bank:Savings
+
+2022-12-20 * "Market" "Groceries"
+  Expenses:Food:Groceries  390.00 USD
+  Assets:Bank:Savings
+
+2022-12-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  140.00 USD
+  Liabilities:CreditCard
+
+2022-12-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  140.00 USD
+  Assets:Bank:Savings
+
+2022-12-28 * "Brokerage" "Buy VTI"
+  Assets:Brokerage  10 VTI {195.00 USD}
+  Assets:Bank:Savings
+
+2022-12-28 price VTI  195.00 USD
+
+2022-12-15 * "Employer" "Year-end bonus"
+  Assets:Bank:Savings  3500.00 USD
+  Income:Salary
+
+2023-01-01 * "Employer" "Payroll"
+  Assets:Bank:Savings  4631.00 USD
+  Income:Salary
+
+2023-01-02 * "Lender" "Mortgage payment"
+  Liabilities:Home:Mortgage  1180.00 USD
+  Expenses:Home:MortgageInterest  1220.00 USD
   Assets:Bank:Savings
 
 2023-01-15 * "City Utilities" "Utilities"
@@ -45,16 +1076,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-01-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-01-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2023-01-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
   Assets:Bank:Savings
 
 2023-02-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-02-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1055.00 USD
-  Expenses:Home:MortgageInterest  1295.00 USD
+  Liabilities:Home:Mortgage  1185.00 USD
+  Expenses:Home:MortgageInterest  1215.00 USD
   Assets:Bank:Savings
 
 2023-02-15 * "City Utilities" "Utilities"
@@ -62,16 +1101,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-02-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-02-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2023-02-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2023-03-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-03-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1060.00 USD
-  Expenses:Home:MortgageInterest  1290.00 USD
+  Liabilities:Home:Mortgage  1190.00 USD
+  Expenses:Home:MortgageInterest  1210.00 USD
   Assets:Bank:Savings
 
 2023-03-15 * "City Utilities" "Utilities"
@@ -79,7 +1126,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-03-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-03-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2023-03-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  180.00 USD
   Assets:Bank:Savings
 
 2023-03-28 * "Brokerage" "Buy VTI"
@@ -89,12 +1144,12 @@ option "operating_currency" "USD"
 2023-03-28 price VTI  205.00 USD
 
 2023-04-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-04-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1065.00 USD
-  Expenses:Home:MortgageInterest  1285.00 USD
+  Liabilities:Home:Mortgage  1195.00 USD
+  Expenses:Home:MortgageInterest  1205.00 USD
   Assets:Bank:Savings
 
 2023-04-15 * "City Utilities" "Utilities"
@@ -102,16 +1157,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-04-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-04-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2023-04-12 * "Department Store" "Household goods"
+  Expenses:Shopping  310.00 USD
+  Liabilities:CreditCard
+
+2023-04-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  460.00 USD
   Assets:Bank:Savings
 
 2023-05-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-05-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1070.00 USD
-  Expenses:Home:MortgageInterest  1280.00 USD
+  Liabilities:Home:Mortgage  1200.00 USD
+  Expenses:Home:MortgageInterest  1200.00 USD
   Assets:Bank:Savings
 
 2023-05-15 * "City Utilities" "Utilities"
@@ -119,16 +1186,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-05-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-05-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2023-05-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
   Assets:Bank:Savings
 
 2023-06-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-06-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1075.00 USD
-  Expenses:Home:MortgageInterest  1275.00 USD
+  Liabilities:Home:Mortgage  1205.00 USD
+  Expenses:Home:MortgageInterest  1195.00 USD
   Assets:Bank:Savings
 
 2023-06-15 * "City Utilities" "Utilities"
@@ -136,11 +1211,19 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-06-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-06-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2023-06-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2023-06-05 * "Insurer" "Home insurance"
-  Expenses:Insurance  1400.00 USD
+  Expenses:Insurance  1420.00 USD
   Assets:Bank:Savings
 
 2023-06-28 * "Brokerage" "Buy VTI"
@@ -150,12 +1233,12 @@ option "operating_currency" "USD"
 2023-06-28 price VTI  212.00 USD
 
 2023-07-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-07-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1080.00 USD
-  Expenses:Home:MortgageInterest  1270.00 USD
+  Liabilities:Home:Mortgage  1210.00 USD
+  Expenses:Home:MortgageInterest  1190.00 USD
   Assets:Bank:Savings
 
 2023-07-15 * "City Utilities" "Utilities"
@@ -163,16 +1246,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-07-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-07-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2023-07-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  180.00 USD
   Assets:Bank:Savings
 
 2023-08-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-08-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1085.00 USD
-  Expenses:Home:MortgageInterest  1265.00 USD
+  Liabilities:Home:Mortgage  1215.00 USD
+  Expenses:Home:MortgageInterest  1185.00 USD
   Assets:Bank:Savings
 
 2023-08-15 * "City Utilities" "Utilities"
@@ -180,16 +1271,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-08-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-08-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2023-08-14 * "Airline" "Summer trip"
+  Expenses:Travel  1800.00 USD
+  Liabilities:CreditCard
+
+2023-08-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  1950.00 USD
   Assets:Bank:Savings
 
 2023-09-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-09-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1090.00 USD
-  Expenses:Home:MortgageInterest  1260.00 USD
+  Liabilities:Home:Mortgage  1220.00 USD
+  Expenses:Home:MortgageInterest  1180.00 USD
   Assets:Bank:Savings
 
 2023-09-15 * "City Utilities" "Utilities"
@@ -197,7 +1300,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-09-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-09-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2023-09-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
   Assets:Bank:Savings
 
 2023-09-28 * "Brokerage" "Buy VTI"
@@ -207,12 +1318,12 @@ option "operating_currency" "USD"
 2023-09-28 price VTI  208.00 USD
 
 2023-10-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-10-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1095.00 USD
-  Expenses:Home:MortgageInterest  1255.00 USD
+  Liabilities:Home:Mortgage  1225.00 USD
+  Expenses:Home:MortgageInterest  1175.00 USD
   Assets:Bank:Savings
 
 2023-10-15 * "City Utilities" "Utilities"
@@ -220,16 +1331,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-10-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-10-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2023-10-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2023-11-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-11-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1100.00 USD
-  Expenses:Home:MortgageInterest  1250.00 USD
+  Liabilities:Home:Mortgage  1230.00 USD
+  Expenses:Home:MortgageInterest  1170.00 USD
   Assets:Bank:Savings
 
 2023-11-15 * "City Utilities" "Utilities"
@@ -237,16 +1356,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-11-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-11-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2023-11-12 * "Department Store" "Household goods"
+  Expenses:Shopping  310.00 USD
+  Liabilities:CreditCard
+
+2023-11-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  490.00 USD
   Assets:Bank:Savings
 
 2023-12-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
 2023-12-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1105.00 USD
-  Expenses:Home:MortgageInterest  1245.00 USD
+  Liabilities:Home:Mortgage  1235.00 USD
+  Expenses:Home:MortgageInterest  1165.00 USD
   Assets:Bank:Savings
 
 2023-12-15 * "City Utilities" "Utilities"
@@ -254,7 +1385,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2023-12-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  405.00 USD
+  Assets:Bank:Savings
+
+2023-12-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  150.00 USD
+  Liabilities:CreditCard
+
+2023-12-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  150.00 USD
   Assets:Bank:Savings
 
 2023-12-28 * "Brokerage" "Buy VTI"
@@ -263,13 +1402,17 @@ option "operating_currency" "USD"
 
 2023-12-28 price VTI  220.00 USD
 
+2023-12-15 * "Employer" "Year-end bonus"
+  Assets:Bank:Savings  4000.00 USD
+  Income:Salary
+
 2024-01-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-01-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1110.00 USD
-  Expenses:Home:MortgageInterest  1240.00 USD
+  Liabilities:Home:Mortgage  1240.00 USD
+  Expenses:Home:MortgageInterest  1160.00 USD
   Assets:Bank:Savings
 
 2024-01-15 * "City Utilities" "Utilities"
@@ -277,16 +1420,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-01-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-01-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2024-01-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2024-02-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-02-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1115.00 USD
-  Expenses:Home:MortgageInterest  1235.00 USD
+  Liabilities:Home:Mortgage  1245.00 USD
+  Expenses:Home:MortgageInterest  1155.00 USD
   Assets:Bank:Savings
 
 2024-02-15 * "City Utilities" "Utilities"
@@ -294,16 +1445,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-02-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-02-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2024-02-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  180.00 USD
   Assets:Bank:Savings
 
 2024-03-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-03-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1120.00 USD
-  Expenses:Home:MortgageInterest  1230.00 USD
+  Liabilities:Home:Mortgage  1250.00 USD
+  Expenses:Home:MortgageInterest  1150.00 USD
   Assets:Bank:Savings
 
 2024-03-15 * "City Utilities" "Utilities"
@@ -311,7 +1470,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-03-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-03-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  190.00 USD
+  Liabilities:CreditCard
+
+2024-03-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  190.00 USD
   Assets:Bank:Savings
 
 2024-03-28 * "Brokerage" "Buy VTI"
@@ -321,12 +1488,12 @@ option "operating_currency" "USD"
 2024-03-28 price VTI  230.00 USD
 
 2024-04-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-04-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1125.00 USD
-  Expenses:Home:MortgageInterest  1225.00 USD
+  Liabilities:Home:Mortgage  1255.00 USD
+  Expenses:Home:MortgageInterest  1145.00 USD
   Assets:Bank:Savings
 
 2024-04-15 * "City Utilities" "Utilities"
@@ -334,16 +1501,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-04-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-04-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2024-04-12 * "Department Store" "Household goods"
+  Expenses:Shopping  330.00 USD
+  Liabilities:CreditCard
+
+2024-04-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  490.00 USD
   Assets:Bank:Savings
 
 2024-05-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-05-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1130.00 USD
-  Expenses:Home:MortgageInterest  1220.00 USD
+  Liabilities:Home:Mortgage  1260.00 USD
+  Expenses:Home:MortgageInterest  1140.00 USD
   Assets:Bank:Savings
 
 2024-05-15 * "City Utilities" "Utilities"
@@ -351,16 +1530,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-05-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-05-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2024-05-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2024-06-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-06-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1135.00 USD
-  Expenses:Home:MortgageInterest  1215.00 USD
+  Liabilities:Home:Mortgage  1265.00 USD
+  Expenses:Home:MortgageInterest  1135.00 USD
   Assets:Bank:Savings
 
 2024-06-15 * "City Utilities" "Utilities"
@@ -368,11 +1555,19 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-06-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-06-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2024-06-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  180.00 USD
   Assets:Bank:Savings
 
 2024-06-05 * "Insurer" "Home insurance"
-  Expenses:Insurance  1480.00 USD
+  Expenses:Insurance  1460.00 USD
   Assets:Bank:Savings
 
 2024-06-28 * "Brokerage" "Buy VTI"
@@ -382,12 +1577,12 @@ option "operating_currency" "USD"
 2024-06-28 price VTI  238.00 USD
 
 2024-07-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-07-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1140.00 USD
-  Expenses:Home:MortgageInterest  1210.00 USD
+  Liabilities:Home:Mortgage  1270.00 USD
+  Expenses:Home:MortgageInterest  1130.00 USD
   Assets:Bank:Savings
 
 2024-07-15 * "City Utilities" "Utilities"
@@ -395,16 +1590,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-07-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-07-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  190.00 USD
+  Liabilities:CreditCard
+
+2024-07-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  190.00 USD
   Assets:Bank:Savings
 
 2024-08-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-08-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1145.00 USD
-  Expenses:Home:MortgageInterest  1205.00 USD
+  Liabilities:Home:Mortgage  1275.00 USD
+  Expenses:Home:MortgageInterest  1125.00 USD
   Assets:Bank:Savings
 
 2024-08-15 * "City Utilities" "Utilities"
@@ -412,16 +1615,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-08-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-08-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2024-08-14 * "Airline" "Summer trip"
+  Expenses:Travel  2600.00 USD
+  Liabilities:CreditCard
+
+2024-08-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
   Assets:Bank:Savings
 
 2024-09-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-09-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1150.00 USD
-  Expenses:Home:MortgageInterest  1200.00 USD
+  Liabilities:Home:Mortgage  1280.00 USD
+  Expenses:Home:MortgageInterest  1120.00 USD
   Assets:Bank:Savings
 
 2024-09-15 * "City Utilities" "Utilities"
@@ -429,7 +1644,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-09-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-09-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  170.00 USD
+  Liabilities:CreditCard
+
+2024-09-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  170.00 USD
   Assets:Bank:Savings
 
 2024-09-28 * "Brokerage" "Buy VTI"
@@ -439,12 +1662,12 @@ option "operating_currency" "USD"
 2024-09-28 price VTI  244.00 USD
 
 2024-10-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-10-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1155.00 USD
-  Expenses:Home:MortgageInterest  1195.00 USD
+  Liabilities:Home:Mortgage  1285.00 USD
+  Expenses:Home:MortgageInterest  1115.00 USD
   Assets:Bank:Savings
 
 2024-10-15 * "City Utilities" "Utilities"
@@ -452,16 +1675,24 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-10-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-10-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  180.00 USD
+  Liabilities:CreditCard
+
+2024-10-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  180.00 USD
   Assets:Bank:Savings
 
 2024-11-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-11-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1160.00 USD
-  Expenses:Home:MortgageInterest  1190.00 USD
+  Liabilities:Home:Mortgage  1290.00 USD
+  Expenses:Home:MortgageInterest  1110.00 USD
   Assets:Bank:Savings
 
 2024-11-15 * "City Utilities" "Utilities"
@@ -469,16 +1700,28 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-11-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-11-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  190.00 USD
+  Liabilities:CreditCard
+
+2024-11-12 * "Department Store" "Household goods"
+  Expenses:Shopping  330.00 USD
+  Liabilities:CreditCard
+
+2024-11-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  520.00 USD
   Assets:Bank:Savings
 
 2024-12-01 * "Employer" "Payroll"
-  Assets:Bank:Savings  4200.00 USD
+  Assets:Bank:Savings  4862.00 USD
   Income:Salary
 
 2024-12-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1165.00 USD
-  Expenses:Home:MortgageInterest  1185.00 USD
+  Liabilities:Home:Mortgage  1295.00 USD
+  Expenses:Home:MortgageInterest  1105.00 USD
   Assets:Bank:Savings
 
 2024-12-15 * "City Utilities" "Utilities"
@@ -486,7 +1729,15 @@ option "operating_currency" "USD"
   Assets:Bank:Savings
 
 2024-12-20 * "Market" "Groceries"
-  Expenses:Food:Groceries  380.00 USD
+  Expenses:Food:Groceries  420.00 USD
+  Assets:Bank:Savings
+
+2024-12-10 * "Bistro" "Dinner out"
+  Expenses:Food:Restaurants  160.00 USD
+  Liabilities:CreditCard
+
+2024-12-25 * "Card issuer" "Card payment"
+  Liabilities:CreditCard  160.00 USD
   Assets:Bank:Savings
 
 2024-12-28 * "Brokerage" "Buy VTI"
@@ -495,226 +1746,6 @@ option "operating_currency" "USD"
 
 2024-12-28 price VTI  252.00 USD
 
-2023-01-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  150.00 USD
-  Liabilities:CreditCard
-
-2023-01-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  150.00 USD
-  Assets:Bank:Savings
-
-2023-02-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  160.00 USD
-  Liabilities:CreditCard
-
-2023-02-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  160.00 USD
-  Assets:Bank:Savings
-
-2023-03-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  170.00 USD
-  Liabilities:CreditCard
-
-2023-03-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  170.00 USD
-  Assets:Bank:Savings
-
-2023-04-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  140.00 USD
-  Liabilities:CreditCard
-
-2023-04-12 * "Department Store" "Household goods"
-  Expenses:Shopping  300.00 USD
-  Liabilities:CreditCard
-
-2023-04-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  440.00 USD
-  Assets:Bank:Savings
-
-2023-05-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  150.00 USD
-  Liabilities:CreditCard
-
-2023-05-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  150.00 USD
-  Assets:Bank:Savings
-
-2023-06-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  160.00 USD
-  Liabilities:CreditCard
-
-2023-06-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  160.00 USD
-  Assets:Bank:Savings
-
-2023-07-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  170.00 USD
-  Liabilities:CreditCard
-
-2023-07-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  170.00 USD
-  Assets:Bank:Savings
-
-2023-08-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  140.00 USD
-  Liabilities:CreditCard
-
-2023-08-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  140.00 USD
-  Assets:Bank:Savings
-
-2023-09-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  150.00 USD
-  Liabilities:CreditCard
-
-2023-09-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  150.00 USD
-  Assets:Bank:Savings
-
-2023-10-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  160.00 USD
-  Liabilities:CreditCard
-
-2023-10-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  160.00 USD
-  Assets:Bank:Savings
-
-2023-11-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  170.00 USD
-  Liabilities:CreditCard
-
-2023-11-12 * "Department Store" "Household goods"
-  Expenses:Shopping  300.00 USD
-  Liabilities:CreditCard
-
-2023-11-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  470.00 USD
-  Assets:Bank:Savings
-
-2023-12-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  140.00 USD
-  Liabilities:CreditCard
-
-2023-12-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  140.00 USD
-  Assets:Bank:Savings
-
-2023-08-14 * "Airline" "Summer trip"
-  Expenses:Travel  1800.00 USD
-  Liabilities:CreditCard
-
-2024-01-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  175.00 USD
-  Liabilities:CreditCard
-
-2024-01-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  175.00 USD
-  Assets:Bank:Savings
-
-2024-02-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  185.00 USD
-  Liabilities:CreditCard
-
-2024-02-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  185.00 USD
-  Assets:Bank:Savings
-
-2024-03-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  195.00 USD
-  Liabilities:CreditCard
-
-2024-03-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  195.00 USD
-  Assets:Bank:Savings
-
-2024-04-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  165.00 USD
-  Liabilities:CreditCard
-
-2024-04-12 * "Department Store" "Household goods"
-  Expenses:Shopping  260.00 USD
-  Liabilities:CreditCard
-
-2024-04-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  425.00 USD
-  Assets:Bank:Savings
-
-2024-05-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  175.00 USD
-  Liabilities:CreditCard
-
-2024-05-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  175.00 USD
-  Assets:Bank:Savings
-
-2024-06-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  185.00 USD
-  Liabilities:CreditCard
-
-2024-06-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  185.00 USD
-  Assets:Bank:Savings
-
-2024-07-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  195.00 USD
-  Liabilities:CreditCard
-
-2024-07-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  195.00 USD
-  Assets:Bank:Savings
-
-2024-08-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  165.00 USD
-  Liabilities:CreditCard
-
-2024-08-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  165.00 USD
-  Assets:Bank:Savings
-
-2024-09-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  175.00 USD
-  Liabilities:CreditCard
-
-2024-09-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  175.00 USD
-  Assets:Bank:Savings
-
-2024-10-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  185.00 USD
-  Liabilities:CreditCard
-
-2024-10-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  185.00 USD
-  Assets:Bank:Savings
-
-2024-11-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  195.00 USD
-  Liabilities:CreditCard
-
-2024-11-12 * "Department Store" "Household goods"
-  Expenses:Shopping  260.00 USD
-  Liabilities:CreditCard
-
-2024-11-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  455.00 USD
-  Assets:Bank:Savings
-
-2024-12-10 * "Bistro" "Dinner out"
-  Expenses:Food:Restaurants  165.00 USD
-  Liabilities:CreditCard
-
-2024-12-25 * "Card issuer" "Card payment"
-  Liabilities:CreditCard  165.00 USD
-  Assets:Bank:Savings
-
-2024-08-14 * "Airline" "Summer trip"
-  Expenses:Travel  2600.00 USD
-  Liabilities:CreditCard
-
-2023-08-25 * "Card issuer" "Trip payment"
-  Liabilities:CreditCard  1800.00 USD
-  Assets:Bank:Savings
-
 2024-12-15 * "Employer" "Year-end bonus"
-  Assets:Bank:Savings  3000.00 USD
+  Assets:Bank:Savings  4500.00 USD
   Income:Salary

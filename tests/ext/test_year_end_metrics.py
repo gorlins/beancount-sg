@@ -104,6 +104,20 @@ def test_investable_metadata_overrides_the_inference():
     assert found["Assets:Brokerage"].reason == "investable: False on Assets:Brokerage"
 
 
+def test_investable_inheritance_does_not_depend_on_open_order():
+    ledger = (
+        LEDGER
+        + """
+2019-01-01 open Assets:Vehicles:Car USD
+2021-01-01 open Assets:Vehicles
+  investable: FALSE
+"""
+    )
+    _, found = classes(ledger)
+    assert found["Assets:Vehicles:Car"].group == PROPERTY
+    assert found["Assets:Vehicles:Car"].reason == "investable: False on Assets:Vehicles"
+
+
 def test_a_declared_financing_card_is_debt():
     ledger = LEDGER.replace(
         "2020-01-01 open Liabilities:CreditCard USD",
