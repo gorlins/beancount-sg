@@ -41,8 +41,8 @@ cash, but it's savings going into investments.
 
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
-income and expenses `operating`. An unknown role is reported, and the default used. The page's
-"How accounts are classified" section lists each account's role and where it came from.
+income and expenses `operating`. A declared value that isn't a role (e.g. a typo) is reported as
+an error and ignored. The page's "How accounts are classified" section lists each account's role and where it came from.
 
 **Declare credit cards `operating`.** The default for every liability, credit cards included, is
 `financing`: the convention doesn't single cards out, and neither does this report's inference. So

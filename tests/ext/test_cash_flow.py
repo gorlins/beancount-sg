@@ -157,8 +157,9 @@ def test_unknown_role_is_reported(tmp_path):
         "2020-01-01 open Assets:Brokerage",
         '2020-01-01 open Assets:Brokerage\n  cash-flow-role: "invsting"',
     )
-    assert "Assets:Brokerage: unknown cash-flow-role 'invsting', using the default" in text(
-        page(tmp_path, ledger)
+    assert (
+        "Assets:Brokerage: cash-flow-role 'invsting' isn't one of"
+        " cash, operating, investing, financing; it's ignored" in text(page(tmp_path, ledger))
     )
 
 

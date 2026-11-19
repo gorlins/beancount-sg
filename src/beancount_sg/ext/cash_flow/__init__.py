@@ -23,7 +23,7 @@ account and advanced filters apply, as on Fava's own reports. The page has:
 - A chart of each activity's flows per interval (Fava's interval menu).
 - The reconciliation: each cash account at the start and end, with the change
   the activities explain.
-- How each account is classified, declared or by its name, and any unknown roles.
+- How each account is classified, declared or by its name, and any invalid roles.
 """
 
 from __future__ import annotations
