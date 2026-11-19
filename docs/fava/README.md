@@ -9,8 +9,7 @@ extension with a `custom` directive in your ledger:
 ```
 
 Each report then appears in Fava's sidebar. Most cover the transactions in Fava's current time,
-account and filter selection; Update Status covers the whole ledger, and Year in Review takes only
-the time filter's last year.
+account and filter selection; Update Status covers the whole ledger.
 
 | Extension | Report | |
 | --- | --- | --- |
@@ -21,19 +20,3 @@ the time filter's last year.
 | [`beancount_sg.ext.travel`](travel.md) | Travel | Travel spending by trip and category |
 | [`beancount_sg.ext.payees`](payees.md) | Payee Review | Payees likely miscategorized or duplicated |
 | [`beancount_sg.ext.year_end`](year-in-review.md) | Year in Review | Year-end dashboard of key metrics |
-
-## Screenshots
-
-The screenshots in [`images/`](images) are of [`example.beancount`](example.beancount), or for
-the Year in Review, which needs years of history, [`year-in-review.beancount`](year-in-review.beancount).
-After changing a report's page, regenerate its screenshots from the repository root, by name, so
-the other reports' screenshots don't change:
-
-```bash
-uv run --with playwright python docs/fava/screenshots.py year-in-review
-```
-
-Without names, it regenerates them all.
-
-If Playwright has no browser installed yet, first run
-`uv run --with playwright playwright install chromium`.

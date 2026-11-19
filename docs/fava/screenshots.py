@@ -1,18 +1,15 @@
 """Regenerate the Fava extension screenshots in ``images/`` from the example ledgers.
 
-Run from the repository root, naming the screenshots to regenerate (all of them
-without names), so that changing one extension doesn't touch the others':
+Run ``make screenshots`` from the repository root to regenerate them all, or
+``make screenshots NAMES=year-in-review`` for only the named ones, so that
+changing one extension doesn't touch the others' screenshots. (If Playwright has
+no browser yet, first run ``uv run --with playwright playwright install
+chromium``.)
 
-    uv run --with playwright python docs/fava/screenshots.py year-in-review
-
-(If Playwright has no browser yet, first run
-``uv run --with playwright playwright install chromium``.)
-
-It serves the example ledgers with Fava on a free port, opens each extension's
-page in headless Chromium and saves the page's content area as a PNG. It only
-looks at pages: Batch Edit's search is previewed, never applied.
-
-``example.beancount`` holds the data for most screenshots. An extension whose
+It serves the example ledgers in ``ledgers/`` with Fava on a free port, opens
+each extension's page in headless Chromium and saves the page's content area as
+a PNG. It only looks at pages: Batch Edit's search is previewed, never applied.
+``example.beancount`` holds the data for most screenshots; an extension whose
 data would change the others' (e.g. years of history) has a ledger of its own.
 """
 
@@ -30,8 +27,8 @@ from playwright.sync_api import Page, sync_playwright
 HERE = Path(__file__).parent
 # The example ledgers, by the URL slug Fava gives them (from their titles).
 LEDGERS = {
-    "example": HERE / "example.beancount",
-    "household": HERE / "year-in-review.beancount",
+    "example": HERE / "ledgers" / "example.beancount",
+    "household": HERE / "ledgers" / "year-in-review.beancount",
 }
 IMAGES = HERE / "images"
 

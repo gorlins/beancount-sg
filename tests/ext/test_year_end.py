@@ -9,7 +9,7 @@ from fava.application import create_app
 
 import beancount_sg.ext.year_end as year_end_ext
 from beancount_sg.ext.year_end import change, changes
-from beancount_sg.year_end import YearSummary
+from beancount_sg.ext.year_end.metrics import YearSummary
 
 ENABLE = 'custom "fava-extension" "beancount_sg.ext.year_end"'
 
@@ -94,15 +94,34 @@ def test_defaults_to_five_years_ending_this_year(tmp_path):
     assert "2025 is year-to-date, through 2025-07-01" in text(body)
 
 
-def test_ends_with_the_time_filters_last_year(tmp_path):
+def test_a_single_year_filter_shows_up_to_five_years_ending_with_it(tmp_path):
     assert year_headers(page(tmp_path, query="?time=2019")) == ["2018", "2019"]
-    assert year_headers(page(tmp_path, query="?time=2020-2023")) == [
+    assert year_headers(page(tmp_path, query="?time=2023-06")) == [
         "2019",
         "2020",
         "2021",
         "2022",
         "2023",
     ]
+
+
+def test_a_range_filter_shows_its_years(tmp_path):
+    assert year_headers(page(tmp_path, query="?time=2020+-+2022")) == ["2020", "2021", "2022"]
+    # At most five: the latest.
+    assert year_headers(page(tmp_path, query="?time=2018+-+2024")) == [
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+    ]
+
+
+def test_account_and_advanced_filters_apply(tmp_path):
+    body = page(tmp_path, query="?time=2019&filter=-Groceries")
+    assert "Expenses 1,000 1,000 ■ no change" in panel(body, "Income &amp; savings")
+    # Balances still include everything before the years shown.
+    assert "Cash 54,000 98,000" in panel(body, "Net worth")
 
 
 def test_years_start_with_the_first_income_or_expenses(tmp_path):
@@ -115,8 +134,11 @@ def test_years_start_with_the_first_income_or_expenses(tmp_path):
 def test_cards_show_the_last_year_and_its_change(tmp_path):
     found = cards(page(tmp_path, query="?time=2019"))
     # 2019 ends at checking 98000 - mortgage 90000 - card 12100.
-    assert "Net worth -4,100 ▲ +42,900 (+91.3%) vs 2018" in found
+    assert "Net worth -4,100 ▲ +42,900 (+91.3%) vs 2018 assets minus liabilities" in found
+    assert "Investable assets 98,000 ▲ +44,000 (+81.5%) vs 2018 cash and investments" in found
     assert "Savings rate 85.8% ▼ −0.2 pts vs 2018 42,900 saved" in found
+    # 2019's spending, 7100, against 2018's ending cash, 54000; 2018 started with nothing.
+    assert "Withdrawal rate 13.15% spending ÷ investable assets" in found
     assert "Income 50,000 ■ no change vs 2018" in found
     assert "Expenses 7,100 ▲ +100 (+1.4%) vs 2018" in found
     assert "Emergency fund 165.6 mo ▲ +73.1 vs 2018 98,000 in cash" in found
@@ -142,15 +164,19 @@ def test_net_worth_and_income_panels(tmp_path):
     body = page(tmp_path, query="?time=2019")
     net_worth = panel(body, "Net worth")
     assert "Cash 54,000 98,000 ▲ +44,000 (+81.5%)" in net_worth
+    assert "Property 0 0 ■ no change" in net_worth
     assert "Debt -95,000 -90,000 ▲ +5,000 (+5.3%)" in net_worth
     assert "Other -6,000 -12,100 ▼ −6,100 (−101.7%)" in net_worth
     assert "Net worth -47,000 -4,100 ▲ +42,900 (+91.3%)" in net_worth
+    assert "Investable assets 54,000 98,000" in net_worth
     income = panel(body, "Income &amp; savings")
     assert "Income 50,000 50,000 ■ no change" in income
     assert "Savings 43,000 42,900 ▼ −100 (−0.2%)" in income
     assert "Savings rate 86.0% 85.8% ▼ −0.2 pts" in income
-    # Without a positive net worth, the ratios to it aren't meaningful.
-    assert "Spending / net worth — — Years of spending — —" in income
+    # Without a positive net worth at the start, spending / net worth isn't meaningful.
+    assert "Spending / net worth — —" in income
+    # 2018 starts with nothing; 2019 with 54000 of cash.
+    assert "Withdrawal rate — 13.1%" in income
 
 
 def test_a_year_to_dates_flows_are_not_compared(tmp_path):
@@ -164,21 +190,29 @@ def test_spending_ratios_with_a_positive_net_worth(tmp_path):
     income = panel(page(tmp_path, ledger, query="?time=2019"), "Income &amp; savings")
     # 2018 ends at 54000 (checking) - 15000 (mortgage) - 6000 (card) = 33000: 2019's start.
     assert "Spending / net worth — 21.5%" in income  # 7100 / 33000
-    # 2018 ends at 33000, 4.7 years of 7000; 2019 at 98000 - 10000 - 12100 = 75900, 10.7 of 7100.
-    assert "Years of spending 4.7 10.7 ▲ +6.0" in income
 
 
 def test_charts(tmp_path):
     body = page(tmp_path, query="?time=2019")
-    [data] = re.findall(
+    found = re.findall(
         r'<svelte-component type="charts"><script type="application/json">(.*?)</script>', body
     )
-    charts = {chart["label"]: chart for chart in json.loads(data)}
-    net_worth = charts["Net worth"]
+    charts = {chart["label"]: chart for data in found for chart in json.loads(data)}
+    net_worth = charts["Assets, liabilities and net worth"]
     assert net_worth["type"] == "bar"
-    assert [(bar["date"], bar["balance"]) for bar in net_worth["data"]] == [
-        ("2018-12-31", {"USD": "-47000"}),
-        ("2019-12-31", {"USD": "-4100"}),
+    assert [
+        (bar["date"], bar["balance"], bar["account_balances"]) for bar in net_worth["data"]
+    ] == [
+        (
+            "2018-12-31",
+            {"USD": "-47000"},
+            {"Assets": {"USD": "54000"}, "Liabilities": {"USD": "-101000"}},
+        ),
+        (
+            "2019-12-31",
+            {"USD": "-4100"},
+            {"Assets": {"USD": "98000"}, "Liabilities": {"USD": "-102100"}},
+        ),
     ]
     bars = charts["Expenses by category"]["data"]
     assert bars[1]["account_balances"] == {
@@ -202,10 +236,10 @@ def test_debt_paydown_in_the_last_year(tmp_path):
 
 def test_classification_is_shown(tmp_path):
     body = text(page(tmp_path))
-    assert "Assets:Bank:Checking cash name and type" in body
-    assert "Assets:Brokerage investing declared" in body
-    assert "Liabilities:CreditCard operating name and type" in body
-    assert "Liabilities:Mortgage financing name and type" in body
+    assert "Assets:Bank:Checking cash cash, by default" in body
+    assert "Assets:Brokerage investments investing, declared on Assets:Brokerage" in body
+    assert "Liabilities:CreditCard other a credit card, by its name" in body
+    assert "Liabilities:Mortgage debt financing, by default" in body
 
 
 def test_unknown_role_is_reported(tmp_path):

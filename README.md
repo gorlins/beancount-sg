@@ -195,10 +195,9 @@ Batch Edit enabled, to the fix. [Docs](docs/fava/payees.md)
 2020-01-01 custom "fava-extension" "beancount_sg.ext.year_end"
 ```
 
-A "Year in Review" dashboard of up to five years, ending with the time filter's last year: net
-worth (cash, investments, debt), income, expenses and savings rate, spending as a share of net
-worth, expenses by top-level category, and debt paydown. Accounts are classified by
-`cash-flow-role` metadata or their names. [Docs](docs/fava/year-in-review.md)
+A "Year in Review" dashboard of up to five years, picked with Fava's time filter: net worth
+(cash, investments, property, debt), income, expenses and savings rate, withdrawal rate, expenses
+by top-level category, and debt paydown, with year-over-year changes. [Docs](docs/fava/year-in-review.md)
 
 ## Utilities
 
@@ -212,10 +211,11 @@ assertions in importers, plugins and tests.
 `map_transactions` and `flat_map_transactions` run a per-transaction function over a ledger, for
 writing plugins that rewrite transactions or add directives next to them.
 
-### `beancount_sg.year_end`
+### `beancount_sg.cash_flow_roles`
 
-The calculations behind the Year in Review report, independent of Fava: account roles and yearly
-summaries.
+Accounts' cash-flow roles (`cash`, `operating`, `investing`, `financing`) from `cash-flow-role`
+metadata on their `open` directives, or their names: the convention Beancount.io's cash-flow report
+uses.
 
 ### `beancount_sg.batch_edit`
 

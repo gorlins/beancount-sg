@@ -89,7 +89,7 @@
 {% if result is none %}
 <ul class="error"><li>Set an <code>operating_currency</code> option: the review shows values in the ledger's first operating currency.</li></ul>
 {% elif not result.years %}
-<p>No transactions up to {{ extension.end_year() }}.</p>
+<p>No transactions up to {{ extension.years_filtered()[1] }}.</p>
 {% else %}
 {% set years = result.years %}
 {% set currency = result.currency %}
@@ -100,7 +100,7 @@
   {{ years[0].year }}{% if years|length > 1 %}&ndash;{{ last.year }}{% endif %}, in {{ currency }}.
   {% if not last.complete %}{{ last.year }} is year-to-date, through {{ last.end - extension.one_day }}: its
   spending ratios are annualized, and its income and spending aren't compared with whole years.{% endif %}
-  Pick another final year with Fava's time filter.
+  Pick the years with Fava's time filter.
 </p>
 {% if role_errors or result.unconverted %}
 <ul class="error">
@@ -118,37 +118,48 @@
   {% if note %}<div class="ye-card-note">{{ note }}</div>{% endif %}
 </div>
 {%- endmacro %}
+{% set pair = [previous, last] if previous else none %}
 <div class="ye-cards">
-  {{ card("Net worth", extension.money(last.net_worth), extension.changes([previous.net_worth, last.net_worth], [previous, last])[1] if previous else none) }}
-  {{ card("Savings rate", ratio(last.savings_rate, '%'), extension.changes([previous.savings_rate, last.savings_rate], [previous, last], flow=true)[1] if previous else none, "points",
+  {{ card("Net worth", extension.money(last.net_worth), extension.changes([previous.net_worth, last.net_worth], pair)[1] if previous else none,
+          note="assets minus liabilities") }}
+  {{ card("Investable assets", extension.money(last.investable), extension.changes([previous.investable, last.investable], pair)[1] if previous else none,
+          note="cash and investments") }}
+  {{ card("Savings rate", ratio(last.savings_rate, '%'), extension.changes([previous.savings_rate, last.savings_rate], pair, flow=true)[1] if previous else none, "points",
           extension.money(last.savings) ~ " saved") }}
-  {{ card("Income", extension.money(last.income), extension.changes([previous.income, last.income], [previous, last], flow=true)[1] if previous else none,
+  {{ card("Withdrawal rate", ratio(last.withdrawal_rate, '%', 2), extension.changes([previous.withdrawal_rate, last.withdrawal_rate], pair, higher_is_better=false)[1] if previous else none, "points",
+          "spending ÷ investable assets at the year's start",
+          "A year's spending as a share of the cash and investments it could be drawn from, like a withdrawal rate in retirement") }}
+  {{ card("Income", extension.money(last.income), extension.changes([previous.income, last.income], pair, flow=true)[1] if previous else none,
           note=("year to date" if not last.complete else "")) }}
-  {{ card("Expenses", extension.money(last.expenses), extension.changes([previous.expenses, last.expenses], [previous, last], higher_is_better=false, flow=true)[1] if previous else none,
+  {{ card("Expenses", extension.money(last.expenses), extension.changes([previous.expenses, last.expenses], pair, higher_is_better=false, flow=true)[1] if previous else none,
           note=("year to date" if not last.complete else "")) }}
-  {{ card("Spending / net worth", ratio(last.spending_rate, '%', 2), extension.changes([previous.spending_rate, last.spending_rate], [previous, last], higher_is_better=false)[1] if previous else none, "points",
-          "of net worth at the year's start", "A year's spending as a share of net worth at its start, like a withdrawal rate in retirement") }}
-  {{ card("Years of spending", ratio(last.years_of_spending), extension.changes([previous.years_of_spending, last.years_of_spending], [previous, last])[1] if previous else none, "number",
-          "net worth ÷ a year's spending (25 = 4%)") }}
-  {{ card("Emergency fund", ratio(last.months_of_cash) ~ " mo", extension.changes([previous.months_of_cash, last.months_of_cash], [previous, last])[1] if previous else none, "number",
-          extension.money(last.holdings["cash"]) ~ " in cash") }}
+  {{ card("Emergency fund", ratio(last.months_of_cash) ~ " mo", extension.changes([previous.months_of_cash, last.months_of_cash], pair)[1] if previous else none, "number",
+          extension.money(last.holdings["cash"]) ~ " in cash: months of spending") }}
   {{ card("Debt paid down", extension.money(last.debts|sum(attribute='paid')), none, note=extension.money(last.debts|sum(attribute='end')) ~ " still owed") }}
 </div>
 
 <div class="ye-columns">
   <section class="ye-panel">
+    <svelte-component type="charts"><script type="application/json">{{ [extension.net_worth_chart(result)]|tojson }}</script></svelte-component>
+  </section>
+  <section class="ye-panel">
     <h3>Net worth</h3>
     <table>
       {{ year_header() }}
       <tbody>
-        {{ yearly_row("Cash", years|map(attribute="holdings.cash")|list, title="Accounts with the cash role") }}
-        {{ yearly_row("Investments", years|map(attribute="holdings.investing")|list, title="Assets with the investing role, at market value") }}
-        {{ yearly_row("Debt", years|map(attribute="holdings.debt")|list, title="Loans: liabilities with the financing role") }}
-        {{ yearly_row("Other", years|map(attribute="holdings.other")|list, title="E.g. credit card balances") }}
-        {{ yearly_row("Net worth", years|map(attribute="net_worth")|list, total=true) }}
+        {{ yearly_row("Cash", years|map(attribute="holdings.cash")|list, title="Assets with the cash role") }}
+        {{ yearly_row("Investments", years|map(attribute="holdings.investments")|list, title="Other assets, at market value") }}
+        {{ yearly_row("Property", years|map(attribute="holdings.property")|list, title="Assets that aren't investable, e.g. a home") }}
+        {{ yearly_row("Debt", years|map(attribute="holdings.debt")|list, higher=true, title="Loans (as negative amounts owed)") }}
+        {{ yearly_row("Other", years|map(attribute="holdings.other")|list, title="Other liabilities, e.g. credit card balances") }}
+        {{ yearly_row("Net worth", years|map(attribute="net_worth")|list, total=true, title="Assets minus liabilities") }}
+        {{ yearly_row("Investable assets", years|map(attribute="investable")|list, title="Cash and investments") }}
       </tbody>
     </table>
   </section>
+</div>
+
+<div class="ye-columns">
   <section class="ye-panel">
     <h3>Income &amp; savings</h3>
     <table>
@@ -157,21 +168,20 @@
         {{ yearly_row("Income", years|map(attribute="income")|list, flow=true) }}
         {{ yearly_row("Expenses", years|map(attribute="expenses")|list, higher=false, flow=true) }}
         {{ yearly_row("Savings", years|map(attribute="savings")|list, flow=true, title="Income minus expenses") }}
-        {{ yearly_row("Savings rate", years|map(attribute="savings_rate")|list, "points", flow=true) }}
+        {{ yearly_row("Savings rate", years|map(attribute="savings_rate")|list, "points", flow=true, title="Savings as a share of income") }}
         {{ yearly_row("Spending / net worth", years|map(attribute="spending_rate")|list, "points", higher=false,
-                      title="A year's spending as a share of net worth at its start, like a withdrawal rate in retirement") }}
-        {{ yearly_row("Years of spending", years|map(attribute="years_of_spending")|list, "number",
-                      title="Net worth at the year's end, divided by a year's spending") }}
+                      title="A year's spending as a share of net worth at its start") }}
+        {{ yearly_row("Withdrawal rate", years|map(attribute="withdrawal_rate")|list, "points", higher=false,
+                      title="A year's spending as a share of investable assets (cash and investments) at its start") }}
       </tbody>
     </table>
   </section>
+  <section class="ye-panel">
+    <svelte-component type="charts"><script type="application/json">{{ [extension.expenses_chart(result)]|tojson }}</script></svelte-component>
+  </section>
 </div>
 
-<section class="ye-panel">
-  <svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
-</section>
-
-<div class="ye-columns" style="margin-top: 1rem">
+<div class="ye-columns">
   <section class="ye-panel">
     <h3>Expenses by category</h3>
     {% set categories = extension.categories(result) %}
@@ -204,7 +214,7 @@
     <h3>Debt paydown in {{ last.year }}</h3>
     {% if last.debts %}
     <table>
-      <thead><tr><th>Loan</th><th class="num">Owed at start</th><th class="num">Borrowed</th><th class="num">Paid down</th><th class="num">Owed at end</th></tr></thead>
+      <thead><tr><th>Loan</th><th class="num" title="Owed at the start of the year">Start</th><th class="num">Borrowed</th><th class="num" title="Principal paid down">Paid</th><th class="num" title="Owed at the end of the year">End</th></tr></thead>
       <tbody>
         {% for debt in last.debts %}
         <tr>
@@ -237,21 +247,28 @@
 
 <details>
   <summary>How accounts are classified</summary>
-  <p>Each asset and liability account's <code>cash-flow-role</code>, as used above. Declare one on
-    the account's <code>open</code> directive, where it also applies to subaccounts:</p>
+  <p>Each asset and liability account's <code>cash-flow-role</code> and net worth group. Declare a
+    role on the account's <code>open</code> directive, where it also applies to subaccounts;
+    without one, assets are <code>cash</code> if their name contains Cash, Checking, Savings or
+    Bank, else <code>investing</code>, and liabilities are <code>financing</code>.</p>
   <pre>2020-01-01 open Assets:Bank:CD
-  cash-flow-role: "investing"</pre>
-  <p>Without one, assets are <code>cash</code> if their name contains Cash, Checking, Savings or
-    Bank, else <code>investing</code>; liabilities are <code>operating</code> (e.g. credit cards,
-    not debt) if their name contains Card, else <code>financing</code> (loans).</p>
+  cash-flow-role: "investing"
+
+2020-01-01 open Assets:Car
+  investable: FALSE</pre>
+  <p>Assets are cash, investments, or property: an asset that isn't investable, e.g. a home, marked
+    <code>investable: FALSE</code> or with a loan under the matching account (e.g.
+    <code>Assets:Home</code> and <code>Liabilities:Home:Mortgage</code>). Liabilities with the
+    <code>financing</code> role are debt, except credit cards: those without a declared role and
+    named with Card.</p>
   <table>
-    <thead><tr><th>Account</th><th>Role</th><th>From</th></tr></thead>
+    <thead><tr><th>Account</th><th>Counted as</th><th>Because</th></tr></thead>
     <tbody>
-      {% for account, role in extension.classified() %}
+      {% for account, role, classification in extension.classified() %}
       <tr>
         <td>{{ account }}</td>
-        <td>{{ role.role }}</td>
-        <td>{% if role.declared_by == account %}declared{% elif role.declared_by %}{{ role.declared_by }}{% else %}name and type{% endif %}</td>
+        <td>{{ classification.group }}</td>
+        <td>{{ classification.reason }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -261,20 +278,21 @@
 <details>
   <summary>How to use</summary>
   <ul>
-    <li>The review shows up to five years, ending with the last year of Fava's time filter, or this
-      year without one. Other filters don't apply: it always covers whole years of the whole
-      ledger.</li>
+    <li>The review shows the years of Fava's time filter, or up to five years ending with its year
+      (or this year, without one), at most five. Fava's account and advanced filters apply, but
+      balances always include everything before the years shown.</li>
     <li>Values are in the first operating currency, rounded to whole units: holdings at market
       value at each year's end (or at cost without a price), income and expenses at their value on
       each transaction's date.</li>
     <li>Changes from the previous year are green when they're good (e.g. more savings, less
       spending or debt) and red when they're bad. A year-to-date year's income and spending
-      aren't compared with whole years.</li>
-    <li><em>Spending / net worth</em> is a year's expenses as a share of net worth at its start,
-      like a withdrawal rate in retirement. <em>Years of spending</em> is its inverse, at the
-      year's end (25 years is a 4% rate).</li>
-    <li>Click a year for its income statement, a category or loan for its account page, or a bar
-      in the charts to make that the final year.</li>
+      aren't compared with whole years, and its spending ratios are annualized.</li>
+    <li>The <em>withdrawal rate</em> is a year's spending as a share of investable assets (cash and
+      investments) at its start, like a withdrawal rate in retirement; <em>spending / net
+      worth</em> also counts property and debt.</li>
+    <li>Click a year for its income statement, a category or loan for its account page, or a bar's
+      date in a chart to make that the final year. In the net worth chart, <em>Single Bars</em>
+      shows net worth.</li>
   </ul>
 </details>
 </div>

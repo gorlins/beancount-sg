@@ -1,31 +1,25 @@
-"""Yearly financial metrics: net worth, income and spending, savings, and debt.
+"""The Year in Review's calculations: net worth groups and yearly summaries.
 
-Accounts are classified by their *cash-flow role*, declared with metadata on
-their ``open`` directive, the same key Beancount.io's cash-flow report uses:
+Net worth is assets minus liabilities (what's owed), in groups:
 
-    2020-01-01 open Assets:Brokerage
-      cash-flow-role: "investing"
+- **Cash**: assets with the ``cash`` cash-flow role (see
+  `beancount_sg.cash_flow_roles`).
+- **Investments**: other assets, unless they're property.
+- **Property**: assets you live in or use rather than invest, e.g. a home. An
+  asset is property if its ``open`` directive (or a parent's) says
+  ``investable: FALSE``, or else if a liability is opened under the matching
+  path, e.g. ``Assets:Home`` and ``Liabilities:Home:Mortgage`` (a secured loan).
+  ``investable: TRUE`` makes it an investment, whatever liabilities match it.
+- **Debt**: loans, i.e. liabilities with the ``financing`` role, except credit
+  cards: those without a declared role and named with Card.
+- **Other**: the remaining liabilities, e.g. credit card balances.
 
-The roles are ``cash`` (cash and equivalents), ``investing``, ``financing`` and
-``operating``. An account without a declaration takes its nearest parent's, or
-else a default from its name and type:
+Investable assets are cash and investments: what spending could be drawn from.
 
-- Assets: ``cash`` if the name contains Cash, Checking, Savings or Bank, else
-  ``investing``.
-- Liabilities: ``operating`` if the name contains Card (credit cards, which are
-  everyday spending), else ``financing`` (loans: debt).
-- Equity: ``financing``. Income and Expenses: ``operating``.
-
-An unknown role is reported as an error and the default used. The roles group
-net worth into cash, investments, debt (financing liabilities, e.g. a mortgage)
-and other (e.g. credit card balances), and pick out the debt whose paydown is
-shown.
-
-All values are in one currency (the ledger's first operating currency): holdings
-at their market value on the date (or at cost, if they have no price yet), and
-income and spending at their value on each transaction's date. Amounts that
-can't be converted, for lack of prices, are left out and their currencies
-reported.
+All values are in one currency: holdings at their market value on the date (or
+at cost, if they have no price yet), and income and spending at their value on
+each transaction's date. Amounts that can't be converted, for lack of prices,
+are left out and their currencies reported.
 """
 
 from __future__ import annotations
@@ -36,84 +30,92 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import NamedTuple
 
 from beancount.core import account as account_lib
 from beancount.core import convert, prices
 from beancount.core.account_types import AccountTypes, get_account_type
-from beancount.core.data import Directive, Meta, Open, Posting, Transaction
+from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
-ROLE_KEY = "cash-flow-role"
-CASH, OPERATING, INVESTING, FINANCING = "cash", "operating", "investing", "financing"
-ROLES = (CASH, OPERATING, INVESTING, FINANCING)
-# Names of asset accounts that default to cash, and of liabilities that default
-# to operating (credit cards).
-CASH_NAMES = re.compile(r"cash|checking|savings|bank", re.IGNORECASE)
+from beancount_sg.cash_flow_roles import CASH, FINANCING, Role, self_and_parents
+
+INVESTABLE_KEY = "investable"
+# Names of liabilities that are credit cards, rather than loans, by default.
 CARD_NAMES = re.compile(r"card", re.IGNORECASE)
+INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
+GROUPS = (CASH, INVESTMENTS, PROPERTY, DEBT, OTHER)
 MAX_YEARS = 5
 ONE_DAY = datetime.timedelta(days=1)
 
 
-class RoleError(NamedTuple):
-    """Conforms to `beancount.core.data.BeancountError`."""
-
-    source: Meta
-    message: str
-    entry: Directive
-
-
 @dataclass(frozen=True)
-class Role:
-    """An account's cash-flow role, and the account that declared it, if any."""
+class Classification:
+    """An asset or liability's net worth group, and why."""
 
-    role: str
-    declared_by: str | None = None  # None when inferred from the name and type
-
-
-def account_roles(
-    entries: Iterable[Directive], account_types: AccountTypes
-) -> tuple[dict[str, Role], list[RoleError]]:
-    """Every opened account's role: declared, inherited from a parent, or inferred."""
-    opens = {entry.account: entry for entry in entries if isinstance(entry, Open)}
-    declared: dict[str, str] = {}
-    errors: list[RoleError] = []
-    for account, entry in opens.items():
-        value = entry.meta.get(ROLE_KEY)
-        if value is None:
-            continue
-        if value in ROLES:
-            declared[account] = value
-        else:
-            message = f"{account}: unknown {ROLE_KEY} {value!r}, using the default"
-            errors.append(RoleError(entry.meta, message, entry))
-    roles = {}
-    for account in opens:
-        declarer = next(
-            (parent for parent in _self_and_parents(account) if parent in declared), None
-        )
-        if declarer:
-            roles[account] = Role(declared[declarer], declarer)
-        else:
-            roles[account] = Role(_default_role(account, account_types))
-    return roles, errors
+    group: str
+    reason: str
 
 
-def _self_and_parents(account: str) -> Iterable[str]:
-    while account:
-        yield account
-        account = account_lib.parent(account)
+def classify(
+    opens: Iterable[Open], roles: Mapping[str, Role], account_types: AccountTypes
+) -> dict[str, Classification]:
+    """Each asset and liability's net worth group."""
+    opens = list(opens)
+    investable = {
+        entry.account: entry.meta[INVESTABLE_KEY] for entry in opens if INVESTABLE_KEY in entry.meta
+    }
+    liabilities = [
+        entry.account
+        for entry in opens
+        if get_account_type(entry.account) == account_types.liabilities
+    ]
+    found = {}
+    for entry in opens:
+        account = entry.account
+        root = get_account_type(account)
+        role = roles[account]
+        if root == account_types.assets:
+            found[account] = _asset(account, role, investable, liabilities)
+        elif root == account_types.liabilities:
+            found[account] = _liability(account, role)
+    return found
 
 
-def _default_role(account: str, account_types: AccountTypes) -> str:
-    root = get_account_type(account)
-    if root == account_types.assets:
-        return CASH if CASH_NAMES.search(account) else INVESTING
-    if root == account_types.liabilities:
-        return OPERATING if CARD_NAMES.search(account) else FINANCING
-    if root == account_types.equity:
-        return FINANCING
-    return OPERATING
+def _asset(
+    account: str, role: Role, investable: Mapping[str, object], liabilities: list[str]
+) -> Classification:
+    if role.role == CASH:
+        return Classification(CASH, _role_reason(role))
+    declarer = next((parent for parent in self_and_parents(account) if parent in investable), None)
+    if declarer:
+        group = INVESTMENTS if investable[declarer] else PROPERTY
+        return Classification(group, f"{INVESTABLE_KEY}: {investable[declarer]} on {declarer}")
+    path = account_lib.split(account)[1:]
+    secured_by = next(
+        (
+            liability
+            for liability in liabilities
+            if path and account_lib.split(liability)[1 : len(path) + 1] == path
+        ),
+        None,
+    )
+    if secured_by:
+        return Classification(PROPERTY, f"secures {secured_by}")
+    return Classification(INVESTMENTS, _role_reason(role))
+
+
+def _liability(account: str, role: Role) -> Classification:
+    if role.role != FINANCING:
+        return Classification(OTHER, _role_reason(role))
+    if not role.declared and CARD_NAMES.search(account):
+        return Classification(OTHER, "a credit card, by its name")
+    return Classification(DEBT, _role_reason(role))
+
+
+def _role_reason(role: Role) -> str:
+    if role.declared:
+        return f"{role.role}, declared on {role.declared_by}"
+    return f"{role.role}, by default"
 
 
 @dataclass
@@ -137,8 +139,8 @@ class YearSummary:
 
     year: int
     end: datetime.date
-    net_worth_start: Decimal = Decimal(0)
-    # Net worth at the end of the year, by role group: cash, investing, debt, other.
+    # Net worth by group, at the start and end of the year. Liabilities are negative.
+    holdings_start: dict[str, Decimal] = field(default_factory=dict)
     holdings: dict[str, Decimal] = field(default_factory=dict)
     income: Decimal = Decimal(0)
     expenses: Decimal = Decimal(0)
@@ -159,7 +161,12 @@ class YearSummary:
         return (self.end - self.start).days
 
     @property
+    def net_worth_start(self) -> Decimal:
+        return sum(self.holdings_start.values(), Decimal(0))
+
+    @property
     def net_worth(self) -> Decimal:
+        """Assets minus liabilities at the end of the year."""
         return sum(self.holdings.values(), Decimal(0))
 
     @property
@@ -167,7 +174,17 @@ class YearSummary:
         return self.net_worth - self.net_worth_start
 
     @property
+    def investable_start(self) -> Decimal:
+        return _investable(self.holdings_start)
+
+    @property
+    def investable(self) -> Decimal:
+        """Cash and investments at the end of the year."""
+        return _investable(self.holdings)
+
+    @property
     def savings(self) -> Decimal:
+        """Income minus expenses."""
         return self.income - self.expenses
 
     @property
@@ -182,21 +199,17 @@ class YearSummary:
 
     @property
     def spending_rate(self) -> Decimal | None:
-        """Annual expenses as a percentage of net worth at the start of the year.
-
-        Like a withdrawal rate in retirement: what share of your net worth a
-        year's spending would take.
-        """
-        if self.net_worth_start <= 0:
-            return None
-        return 100 * self.annual_expenses / self.net_worth_start
+        """Annual expenses as a percentage of net worth at the start of the year."""
+        return _percentage(self.annual_expenses, self.net_worth_start)
 
     @property
-    def years_of_spending(self) -> Decimal | None:
-        """Net worth at the end of the year, in years of annual expenses, if it's positive."""
-        if self.net_worth <= 0 or self.annual_expenses <= 0:
-            return None
-        return self.net_worth / self.annual_expenses
+    def withdrawal_rate(self) -> Decimal | None:
+        """Annual expenses as a percentage of investable assets at the start of the year.
+
+        Like a withdrawal rate in retirement: what share of the cash and
+        investments you could draw on a year's spending would take.
+        """
+        return _percentage(self.annual_expenses, self.investable_start)
 
     @property
     def months_of_cash(self) -> Decimal | None:
@@ -210,9 +223,13 @@ class YearSummary:
         return sorted(self.expenses_by_category.items(), key=lambda item: -item[1])
 
 
-# Net worth groups, by role, and for liabilities, by debt (financing) or other.
-DEBT, OTHER = "debt", "other"
-GROUPS = (CASH, INVESTING, DEBT, OTHER)
+def _investable(holdings: Mapping[str, Decimal]) -> Decimal:
+    return holdings.get(CASH, Decimal(0)) + holdings.get(INVESTMENTS, Decimal(0))
+
+
+def _percentage(part: Decimal, whole: Decimal) -> Decimal | None:
+    """``part`` as a percentage of a positive ``whole``."""
+    return 100 * part / whole if whole > 0 else None
 
 
 @dataclass(frozen=True)
@@ -224,21 +241,25 @@ class YearEnd:
     unconverted: set[str]
 
 
-def years_ending(end_year: int, first_year: int, count: int = MAX_YEARS) -> list[int]:
-    """Up to ``count`` years ending with ``end_year``, none before ``first_year``."""
-    return list(range(max(end_year - count + 1, first_year), end_year + 1))
+def years_shown(first_year: int, start_year: int | None, end_year: int) -> list[int]:
+    """The years to show: from ``start_year`` (or up to `MAX_YEARS` back) to ``end_year``.
+
+    At most `MAX_YEARS`, the latest, and none before ``first_year``.
+    """
+    start = start_year if start_year is not None else end_year - MAX_YEARS + 1
+    return list(range(max(start, end_year - MAX_YEARS + 1, first_year), end_year + 1))
 
 
 def year_end(
     entries: list[Directive],
-    roles: Mapping[str, Role],
+    price_map: prices.PriceMap,
+    classes: Mapping[str, Classification],
     account_types: AccountTypes,
     currency: str,
     years: list[int],
     today: datetime.date,
 ) -> YearEnd:
     """Summaries of the given (consecutive) years, valued in ``currency``."""
-    price_map = prices.build_price_map(entries)
     unconverted: set[str] = set()
     summaries = [
         YearSummary(year, min(datetime.date(year + 1, 1, 1), today + ONE_DAY)) for year in years
@@ -273,18 +294,27 @@ def year_end(
 
     for summary in summaries:
         start, end = snapshots[summary.start], snapshots[summary.end]
-        summary.net_worth_start = sum(
-            _values(start, currency, price_map, summary.start - ONE_DAY, unconverted).values(),
-            Decimal(0),
-        )
-        values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
-        summary.holdings = {group: Decimal(0) for group in GROUPS}
-        for account, value in values.items():
-            summary.holdings[_group(account, roles, account_types)] += value
+        start_values = _values(start, currency, price_map, summary.start - ONE_DAY, unconverted)
+        end_values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
+        summary.holdings_start = _by_group(start_values, classes)
+        summary.holdings = _by_group(end_values, classes)
         summary.debts = _debts(
-            entries, summary, roles, account_types, currency, price_map, start, end, unconverted
+            entries, summary, classes, currency, price_map, start_values, end_values, unconverted
         )
     return YearEnd(summaries, currency, unconverted)
+
+
+def _group(account: str, classes: Mapping[str, Classification]) -> str:
+    return classes[account].group if account in classes else OTHER
+
+
+def _by_group(
+    values: Mapping[str, Decimal], classes: Mapping[str, Classification]
+) -> dict[str, Decimal]:
+    totals = {group: Decimal(0) for group in GROUPS}
+    for account, value in values.items():
+        totals[_group(account, classes)] += value
+    return totals
 
 
 def _snapshot(
@@ -300,13 +330,6 @@ def _snapshot(
     """
     while boundaries and boundaries[0] <= date:
         snapshots[boundaries.pop(0)] = {account: Inventory(i) for account, i in balances.items()}
-
-
-def _group(account: str, roles: Mapping[str, Role], account_types: AccountTypes) -> str:
-    role = roles[account].role if account in roles else _default_role(account, account_types)
-    if get_account_type(account) == account_types.liabilities:
-        return DEBT if role == FINANCING else OTHER
-    return role if role in (CASH, INVESTING) else OTHER
 
 
 def _flow_value(
@@ -350,20 +373,17 @@ def _values(
 def _debts(
     entries: list[Directive],
     summary: YearSummary,
-    roles: Mapping[str, Role],
-    account_types: AccountTypes,
+    classes: Mapping[str, Classification],
     currency: str,
     price_map: prices.PriceMap,
-    start: Mapping[str, Inventory],
-    end: Mapping[str, Inventory],
+    start_values: Mapping[str, Decimal],
+    end_values: Mapping[str, Decimal],
     unconverted: set[str],
 ) -> list[Debt]:
-    """The year's debts (financing liabilities) with a balance or activity."""
+    """The year's loans with a balance or activity."""
     debts: dict[str, Debt] = {}
-    start_values = _values(start, currency, price_map, summary.start - ONE_DAY, unconverted)
-    end_values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
     for account in start_values.keys() | end_values.keys():
-        if _group(account, roles, account_types) == DEBT and (
+        if _group(account, classes) == DEBT and (
             start_values.get(account) or end_values.get(account)
         ):
             # Owed amounts are positive.
@@ -376,7 +396,7 @@ def _debts(
         if not isinstance(txn, Transaction) or not summary.start <= txn.date < summary.end:
             continue
         for posting in txn.postings:
-            if _group(posting.account, roles, account_types) != DEBT:
+            if _group(posting.account, classes) != DEBT:
                 continue
             debt = debts.setdefault(posting.account, Debt(posting.account))
             value = _flow_value(posting, currency, price_map, txn.date, unconverted)

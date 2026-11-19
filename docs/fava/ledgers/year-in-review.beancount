@@ -17,16 +17,16 @@ option "operating_currency" "USD"
 2022-12-01 open Assets:Bank:Savings USD
 2022-12-01 open Assets:Brokerage
   cash-flow-role: "investing"
-2022-12-01 open Liabilities:Mortgage USD
+2022-12-01 open Liabilities:Home:Mortgage USD
 2022-12-01 open Expenses:Home:MortgageInterest USD
 2022-12-01 open Expenses:Home:Utilities USD
 2022-12-01 open Expenses:Insurance USD
 
 2022-12-31 * "Opening balances"
   Assets:Home  400000.00 USD
-  Liabilities:Mortgage  -305000.00 USD
+  Liabilities:Home:Mortgage  -305000.00 USD
   Assets:Bank:Savings  15000.00 USD
-  Assets:Brokerage  80 VTI {180.00 USD}
+  Assets:Brokerage  2000 VTI {180.00 USD}
   Equity:Opening-Balances
 
 2023-01-01 * "Employer" "Payroll"
@@ -34,7 +34,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-01-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1050.00 USD
+  Liabilities:Home:Mortgage  1050.00 USD
   Expenses:Home:MortgageInterest  1300.00 USD
   Assets:Bank:Savings
 
@@ -51,7 +51,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-02-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1055.00 USD
+  Liabilities:Home:Mortgage  1055.00 USD
   Expenses:Home:MortgageInterest  1295.00 USD
   Assets:Bank:Savings
 
@@ -68,7 +68,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-03-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1060.00 USD
+  Liabilities:Home:Mortgage  1060.00 USD
   Expenses:Home:MortgageInterest  1290.00 USD
   Assets:Bank:Savings
 
@@ -91,7 +91,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-04-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1065.00 USD
+  Liabilities:Home:Mortgage  1065.00 USD
   Expenses:Home:MortgageInterest  1285.00 USD
   Assets:Bank:Savings
 
@@ -108,7 +108,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-05-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1070.00 USD
+  Liabilities:Home:Mortgage  1070.00 USD
   Expenses:Home:MortgageInterest  1280.00 USD
   Assets:Bank:Savings
 
@@ -125,7 +125,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-06-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1075.00 USD
+  Liabilities:Home:Mortgage  1075.00 USD
   Expenses:Home:MortgageInterest  1275.00 USD
   Assets:Bank:Savings
 
@@ -152,7 +152,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-07-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1080.00 USD
+  Liabilities:Home:Mortgage  1080.00 USD
   Expenses:Home:MortgageInterest  1270.00 USD
   Assets:Bank:Savings
 
@@ -169,7 +169,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-08-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1085.00 USD
+  Liabilities:Home:Mortgage  1085.00 USD
   Expenses:Home:MortgageInterest  1265.00 USD
   Assets:Bank:Savings
 
@@ -186,7 +186,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-09-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1090.00 USD
+  Liabilities:Home:Mortgage  1090.00 USD
   Expenses:Home:MortgageInterest  1260.00 USD
   Assets:Bank:Savings
 
@@ -209,7 +209,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-10-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1095.00 USD
+  Liabilities:Home:Mortgage  1095.00 USD
   Expenses:Home:MortgageInterest  1255.00 USD
   Assets:Bank:Savings
 
@@ -226,7 +226,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-11-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1100.00 USD
+  Liabilities:Home:Mortgage  1100.00 USD
   Expenses:Home:MortgageInterest  1250.00 USD
   Assets:Bank:Savings
 
@@ -243,7 +243,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2023-12-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1105.00 USD
+  Liabilities:Home:Mortgage  1105.00 USD
   Expenses:Home:MortgageInterest  1245.00 USD
   Assets:Bank:Savings
 
@@ -266,7 +266,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-01-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1110.00 USD
+  Liabilities:Home:Mortgage  1110.00 USD
   Expenses:Home:MortgageInterest  1240.00 USD
   Assets:Bank:Savings
 
@@ -283,7 +283,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-02-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1115.00 USD
+  Liabilities:Home:Mortgage  1115.00 USD
   Expenses:Home:MortgageInterest  1235.00 USD
   Assets:Bank:Savings
 
@@ -300,7 +300,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-03-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1120.00 USD
+  Liabilities:Home:Mortgage  1120.00 USD
   Expenses:Home:MortgageInterest  1230.00 USD
   Assets:Bank:Savings
 
@@ -323,7 +323,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-04-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1125.00 USD
+  Liabilities:Home:Mortgage  1125.00 USD
   Expenses:Home:MortgageInterest  1225.00 USD
   Assets:Bank:Savings
 
@@ -340,7 +340,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-05-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1130.00 USD
+  Liabilities:Home:Mortgage  1130.00 USD
   Expenses:Home:MortgageInterest  1220.00 USD
   Assets:Bank:Savings
 
@@ -357,7 +357,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-06-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1135.00 USD
+  Liabilities:Home:Mortgage  1135.00 USD
   Expenses:Home:MortgageInterest  1215.00 USD
   Assets:Bank:Savings
 
@@ -384,7 +384,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-07-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1140.00 USD
+  Liabilities:Home:Mortgage  1140.00 USD
   Expenses:Home:MortgageInterest  1210.00 USD
   Assets:Bank:Savings
 
@@ -401,7 +401,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-08-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1145.00 USD
+  Liabilities:Home:Mortgage  1145.00 USD
   Expenses:Home:MortgageInterest  1205.00 USD
   Assets:Bank:Savings
 
@@ -418,7 +418,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-09-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1150.00 USD
+  Liabilities:Home:Mortgage  1150.00 USD
   Expenses:Home:MortgageInterest  1200.00 USD
   Assets:Bank:Savings
 
@@ -441,7 +441,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-10-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1155.00 USD
+  Liabilities:Home:Mortgage  1155.00 USD
   Expenses:Home:MortgageInterest  1195.00 USD
   Assets:Bank:Savings
 
@@ -458,7 +458,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-11-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1160.00 USD
+  Liabilities:Home:Mortgage  1160.00 USD
   Expenses:Home:MortgageInterest  1190.00 USD
   Assets:Bank:Savings
 
@@ -475,7 +475,7 @@ option "operating_currency" "USD"
   Income:Salary
 
 2024-12-02 * "Lender" "Mortgage payment"
-  Liabilities:Mortgage  1165.00 USD
+  Liabilities:Home:Mortgage  1165.00 USD
   Expenses:Home:MortgageInterest  1185.00 USD
   Assets:Bank:Savings
 

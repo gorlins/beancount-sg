@@ -1,24 +1,25 @@
-"""Tests for yearly financial metrics, without Fava (see tests/ext for the report)."""
+"""Tests for the Year in Review's calculations (see test_year_end.py for the page)."""
 
 import datetime
 from decimal import Decimal
 
 import pytest
+from beancount.core import prices
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
+from beancount.core.data import Open
 
-from beancount_sg.testing import load
-from beancount_sg.year_end import (
-    CASH,
+from beancount_sg.cash_flow_roles import CASH, account_roles
+from beancount_sg.ext.year_end.metrics import (
     DEBT,
-    FINANCING,
-    INVESTING,
-    OPERATING,
+    INVESTMENTS,
     OTHER,
+    PROPERTY,
     Debt,
-    account_roles,
+    classify,
     year_end,
-    years_ending,
+    years_shown,
 )
+from beancount_sg.testing import load
 
 LEDGER = """
 option "operating_currency" "USD"
@@ -27,7 +28,7 @@ option "operating_currency" "USD"
 2020-01-01 open Assets:Brokerage
 2020-01-01 open Assets:Home USD
 2020-01-01 open Liabilities:CreditCard USD
-2020-01-01 open Liabilities:Mortgage USD
+2020-01-01 open Liabilities:Home:Mortgage USD
 2020-01-01 open Equity:Opening
 2020-01-01 open Income:Salary USD
 2020-01-01 open Expenses:Food:Groceries USD
@@ -36,7 +37,7 @@ option "operating_currency" "USD"
 2023-01-01 * "Opening balances"
   Assets:Bank:Checking  10000 USD
   Assets:Home  300000 USD
-  Liabilities:Mortgage  -200000 USD
+  Liabilities:Home:Mortgage  -200000 USD
   Equity:Opening
 
 2024-01-31 * "Salary"
@@ -52,7 +53,7 @@ option "operating_currency" "USD"
   Liabilities:CreditCard
 
 2024-03-01 * "Mortgage payment"
-  Liabilities:Mortgage  10000 USD
+  Liabilities:Home:Mortgage  10000 USD
   Expenses:Housing:Interest  2000 USD
   Assets:Bank:Checking
 
@@ -64,11 +65,52 @@ option "operating_currency" "USD"
 """
 
 
-def summaries(ledger=LEDGER, years=(2024,), today=datetime.date(2030, 1, 1)):
+def classes(ledger=LEDGER):
     entries, _ = load(ledger)
     roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    result = year_end(entries, roles, DEFAULT_ACCOUNT_TYPES, "USD", list(years), today)
+    opens = [entry for entry in entries if isinstance(entry, Open)]
+    return entries, classify(opens, roles, DEFAULT_ACCOUNT_TYPES)
+
+
+def summaries(ledger=LEDGER, years=(2024,), today=datetime.date(2030, 1, 1)):
+    entries, found = classes(ledger)
+    price_map = prices.build_price_map(entries)
+    result = year_end(entries, price_map, found, DEFAULT_ACCOUNT_TYPES, "USD", list(years), today)
     return {summary.year: summary for summary in result.years}, result
+
+
+def test_classification():
+    _, found = classes()
+    assert {account: c.group for account, c in found.items()} == {
+        "Assets:Bank:Checking": CASH,
+        "Assets:Brokerage": INVESTMENTS,
+        "Assets:Home": PROPERTY,  # it secures Liabilities:Home:Mortgage
+        "Liabilities:CreditCard": OTHER,  # a card, by its name
+        "Liabilities:Home:Mortgage": DEBT,
+    }
+    assert found["Assets:Home"].reason == "secures Liabilities:Home:Mortgage"
+    assert found["Liabilities:CreditCard"].reason == "a credit card, by its name"
+
+
+def test_investable_metadata_overrides_the_inference():
+    ledger = LEDGER.replace(
+        "2020-01-01 open Assets:Home USD", "2020-01-01 open Assets:Home USD\n  investable: TRUE"
+    ).replace(
+        "2020-01-01 open Assets:Brokerage", "2020-01-01 open Assets:Brokerage\n  investable: FALSE"
+    )
+    _, found = classes(ledger)
+    assert found["Assets:Home"].group == INVESTMENTS
+    assert found["Assets:Brokerage"].group == PROPERTY
+    assert found["Assets:Brokerage"].reason == "investable: False on Assets:Brokerage"
+
+
+def test_a_declared_financing_card_is_debt():
+    ledger = LEDGER.replace(
+        "2020-01-01 open Liabilities:CreditCard USD",
+        '2020-01-01 open Liabilities:CreditCard USD\n  cash-flow-role: "financing"',
+    )
+    _, found = classes(ledger)
+    assert found["Liabilities:CreditCard"].group == DEBT
 
 
 def test_net_worth_by_group_at_market_value():
@@ -76,12 +118,14 @@ def test_net_worth_by_group_at_market_value():
     assert summary.net_worth_start == 110000
     assert summary.holdings == {
         CASH: 91000,
-        INVESTING: 302500,  # the home, and VTI at 250
+        INVESTMENTS: 2500,  # VTI at 250
+        PROPERTY: 300000,
         DEBT: -190000,
         OTHER: -1000,  # the credit card
     }
     assert summary.net_worth == 202500
     assert summary.net_worth_change == 92500
+    assert (summary.investable_start, summary.investable) == (10000, 93500)
 
 
 def test_income_spending_and_savings():
@@ -93,16 +137,16 @@ def test_income_spending_and_savings():
 
 def test_spending_ratios():
     [summary] = summaries()[0].values()
-    # A year's spending against net worth at the start of the year.
+    # A year's spending against net worth, and investable assets, at its start.
     assert summary.spending_rate == Decimal(100 * 8000) / 110000
-    assert summary.years_of_spending == Decimal(202500) / 8000
+    assert summary.withdrawal_rate == Decimal(100 * 8000) / 10000
     assert summary.months_of_cash == Decimal(12 * 91000) / 8000
 
 
 def test_debt_paydown_excludes_credit_cards():
     [summary] = summaries()[0].values()
     assert summary.debts == [
-        Debt("Liabilities:Mortgage", start=200000, borrowed=0, paid=10000, end=190000)
+        Debt("Liabilities:Home:Mortgage", start=200000, borrowed=0, paid=10000, end=190000)
     ]
 
 
@@ -110,10 +154,10 @@ def test_new_borrowing():
     ledger = (
         LEDGER
         + """
+2020-01-01 open Liabilities:CarLoan USD
 2024-06-01 * "Car loan"
   Assets:Bank:Checking  20000 USD
   Liabilities:CarLoan
-2020-01-01 open Liabilities:CarLoan USD
 """
     )
     [summary] = summaries(ledger)[0].values()
@@ -124,8 +168,8 @@ def test_consecutive_years_chain():
     found, _ = summaries(years=(2023, 2024))
     assert found[2023].net_worth_start == 0
     assert found[2023].net_worth == 110000 == found[2024].net_worth_start
-    assert found[2023].income == 0
     assert found[2023].spending_rate is None  # no net worth at its start
+    assert found[2023].withdrawal_rate is None
     assert found[2023].savings_rate is None  # no income
 
 
@@ -135,10 +179,9 @@ def test_year_to_date_is_annualized():
     assert not summary.complete
     assert summary.end == datetime.date(2024, 7, 2)
     assert summary.days == 183
-    assert summary.expenses == 8000
     assert summary.annual_expenses == Decimal(8000) * 365 / 183
     # VTI's only price, on 2024-12-31, is after today, so it's valued at cost.
-    assert summary.holdings[INVESTING] == 302000
+    assert summary.holdings[INVESTMENTS] == 2000
 
 
 def test_unconverted_currencies_are_reported():
@@ -152,58 +195,17 @@ def test_unconverted_currencies_are_reported():
     )
     found, result = summaries(ledger)
     assert result.unconverted == {"EUR"}
-    assert found[2024].holdings[INVESTING] == 302500
+    assert found[2024].holdings[INVESTMENTS] == 2500
 
 
 @pytest.mark.parametrize(
-    ("end_year", "first_year", "expected"),
+    ("first", "start", "end", "expected"),
     [
-        (2025, 2018, [2021, 2022, 2023, 2024, 2025]),  # at most 5
-        (2025, 2024, [2024, 2025]),  # none before the ledger starts
-        (2025, 2025, [2025]),
+        (2018, None, 2025, [2021, 2022, 2023, 2024, 2025]),  # a year: it and four before
+        (2024, None, 2025, [2024, 2025]),  # none before the first year
+        (2018, 2023, 2024, [2023, 2024]),  # a range of years
+        (2010, 2015, 2025, [2021, 2022, 2023, 2024, 2025]),  # at most five, the latest
     ],
 )
-def test_years_ending(end_year, first_year, expected):
-    assert years_ending(end_year, first_year) == expected
-
-
-ROLES = """
-2020-01-01 open Assets:Bank:Checking
-2020-01-01 open Assets:Bank:CD
-  cash-flow-role: "investing"
-2020-01-01 open Assets:MoneyMarket
-  cash-flow-role: "cash"
-2020-01-01 open Assets:Brokerage
-2020-01-01 open Assets:Retirement
-  cash-flow-role: "investing"
-2020-01-01 open Assets:Retirement:Cash
-2020-01-01 open Liabilities:CreditCard:Visa
-2020-01-01 open Liabilities:Mortgage
-2020-01-01 open Liabilities:CarLoan
-  cash-flow-role: "invsting"
-2020-01-01 open Equity:Opening
-2020-01-01 open Expenses:Food
-"""
-
-
-def test_account_roles():
-    entries, _ = load(ROLES)
-    roles, errors = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    assert {account: (role.role, role.declared_by) for account, role in roles.items()} == {
-        "Assets:Bank:Checking": (CASH, None),  # by name
-        "Assets:Bank:CD": (INVESTING, "Assets:Bank:CD"),  # declared, over its name
-        "Assets:MoneyMarket": (CASH, "Assets:MoneyMarket"),
-        "Assets:Brokerage": (INVESTING, None),
-        "Assets:Retirement": (INVESTING, "Assets:Retirement"),
-        # Inherited, over its name.
-        "Assets:Retirement:Cash": (INVESTING, "Assets:Retirement"),
-        "Liabilities:CreditCard:Visa": (OPERATING, None),  # a card
-        "Liabilities:Mortgage": (FINANCING, None),
-        "Liabilities:CarLoan": (FINANCING, None),  # the default, for an unknown role
-        "Equity:Opening": (FINANCING, None),
-        "Expenses:Food": (OPERATING, None),
-    }
-    [error] = errors
-    assert (
-        error.message == "Liabilities:CarLoan: unknown cash-flow-role 'invsting', using the default"
-    )
+def test_years_shown(first, start, end, expected):
+    assert years_shown(first, start, end) == expected

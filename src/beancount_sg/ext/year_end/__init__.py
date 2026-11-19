@@ -4,26 +4,34 @@ Enable it in the ledger:
 
     2020-01-01 custom "fava-extension" "beancount_sg.ext.year_end"
 
-The "Year in Review" report shows up to five years, ending with the last year
-of Fava's time filter, or the current year without one (which is year-to-date).
-Only the time filter's last year is used: the figures always cover whole years
-of the whole ledger, since a filter on accounts or tags would make net worth
-meaningless. It has:
+The "Year in Review" report shows whole years, ending with the last year of
+Fava's time filter, or the current year without one (which is year-to-date). A
+time filter over a range of years, e.g. ``2022 - 2024``, shows those years; a
+single year shows it and the four before. It shows at most five years.
 
-- Key metrics per year: net worth (by cash, investments, debt and other), its
-  change, income, expenses, savings and savings rate; spending as a percentage
-  of net worth at the start of the year (a withdrawal rate, as a preview of
-  retirement), net worth in years of spending, and cash in months of spending.
-  For the current year, spending-based ratios use spending annualized from the
-  year so far.
-- Charts of net worth by year, and expenses by top-level category.
-- Expenses by top-level category (e.g. ``Expenses:Food``) per year.
-- Debt paydown in the last year: each loan's balance, new borrowing and
-  payments.
+Fava's account and advanced filters apply as on Fava's own reports, but the time
+filter only picks the years: balances always include everything before them.
+
+The dashboard has:
+
+- Cards with the final year's headline metrics and their change from the
+  previous year: net worth, investable assets, savings rate, income, expenses,
+  withdrawal rate, emergency fund and debt paid down.
+- Net worth (assets minus liabilities) by group, with a chart of assets,
+  liabilities and net worth per year.
+- Income, expenses, savings and ratios per year: savings rate, spending as a
+  share of net worth, and the withdrawal rate (spending as a share of investable
+  assets: cash and investments). For the current year, the spending ratios use
+  spending annualized from the year so far.
+- Expenses by top-level category (e.g. ``Expenses:Food``) per year, with a chart.
+- Debt paydown in the final year: each loan's balance, new borrowing and
+  principal paid.
 - How each asset and liability account is classified.
 
-Accounts are classified with ``cash-flow-role`` metadata, or by their names; see
-`beancount_sg.year_end`.
+Changes from the previous year are green when they're good and red when they're
+bad. Accounts are classified by their ``cash-flow-role`` (see
+`beancount_sg.cash_flow_roles`) and ``investable`` metadata, or their names; see
+`beancount_sg.ext.year_end.metrics`.
 """
 
 from __future__ import annotations
@@ -33,26 +41,31 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
+from beancount.core import prices
 from beancount.core.account_types import get_account_type
 from beancount.core.data import Transaction
 from beancount.parser.options import get_account_types
 from fava.context import g
+from fava.core import FilteredLedger
 from fava.core.charts import DateAndBalanceWithBudget
 from fava.core.inventory import SimpleCounterInventory
 from fava.ext import FavaExtensionBase
 from fava.internal_api import BarChart
 from fava.util.date import local_today
-from flask import url_for
+from flask import request, url_for
 
-from beancount_sg.year_end import (
+from beancount_sg.cash_flow_roles import Role, account_roles
+
+from .metrics import (
     ONE_DAY,
+    PROPERTY,
+    Classification,
     Debt,
-    Role,
     YearEnd,
     YearSummary,
-    account_roles,
+    classify,
     year_end,
-    years_ending,
+    years_shown,
 )
 
 
@@ -151,10 +164,16 @@ class YearInReview(FavaExtensionBase):
         """How much of a loan's starting balance was paid down, as a percentage."""
         return min(Decimal(100), 100 * debt.paid / debt.start) if debt.start > 0 else Decimal(0)
 
-    def end_year(self) -> int:
-        """The last year of Fava's time filter, or the current year."""
+    def years_filtered(self) -> tuple[int | None, int]:
+        """The first and last years of Fava's time filter, or no first year and this year.
+
+        The first year is None unless the filter spans more than one year.
+        """
         date_range = g.filtered.date_range
-        return (date_range.end - ONE_DAY).year if date_range else local_today().year
+        if not date_range:
+            return None, local_today().year
+        start, end = date_range.begin.year, (date_range.end - ONE_DAY).year
+        return (start if start < end else None), end
 
     def currency(self) -> str | None:
         """The ledger's first operating currency, which values are shown in."""
@@ -168,12 +187,22 @@ class YearInReview(FavaExtensionBase):
         )
         return roles, [error.message for error in errors]
 
+    def _classes(self) -> dict[str, Classification]:
+        roles, _ = self.roles()
+        return classify(
+            self.ledger.all_entries_by_type.Open, roles, get_account_types(self.ledger.options)
+        )
+
     def review(self) -> YearEnd | None:
         """The summaries of the years shown, or None without an operating currency."""
         currency = self.currency()
         if not currency:
             return None
-        entries = self.ledger.all_entries
+        # Fava's account and advanced filters, but not its time filter: balances
+        # need everything before the years shown.
+        entries = FilteredLedger(
+            self.ledger, account=request.args.get("account"), filter=request.args.get("filter")
+        ).entries
         account_types = get_account_types(self.ledger.options)
         # Years start with the first with income or expenses: before that, there are
         # at most opening balances, which the next year starts from anyway.
@@ -187,20 +216,22 @@ class YearInReview(FavaExtensionBase):
             ),
             None,
         )
-        years = years_ending(self.end_year(), first) if first else []
-        roles, _ = self.roles()
-        return year_end(entries, roles, account_types, currency, years, local_today())
+        start, end = self.years_filtered()
+        years = years_shown(first, start, end) if first else []
+        # Prices from the whole ledger, which the filters could leave out.
+        price_map = prices.build_price_map(self.ledger.all_entries)
+        return year_end(
+            entries, price_map, self._classes(), account_types, currency, years, local_today()
+        )
 
-    def classified(self) -> list[tuple[str, Role]]:
-        """The open asset and liability accounts, and their roles."""
+    def classified(self) -> list[tuple[str, Role, Classification]]:
+        """The open asset and liability accounts, their roles and net worth groups."""
         roles, _ = self.roles()
-        account_types = get_account_types(self.ledger.options)
-        held = (account_types.assets, account_types.liabilities)
         closed = {entry.account for entry in self.ledger.all_entries_by_type.Close}
         return [
-            (account, role)
-            for account, role in sorted(roles.items())
-            if get_account_type(account) in held and account not in closed
+            (account, roles[account], classification)
+            for account, classification in sorted(self._classes().items())
+            if account not in closed
         ]
 
     @staticmethod
@@ -220,19 +251,35 @@ class YearInReview(FavaExtensionBase):
         """An account's page for a year."""
         return url_for("account", name=account, time=str(year))
 
-    @staticmethod
-    def charts(result: YearEnd) -> list[BarChart]:
-        """Net worth at each year's end, and expenses by category per year."""
+    def net_worth_chart(self, result: YearEnd) -> BarChart:
+        """Assets and liabilities at each year's end, stacked; as single bars, net worth.
+
+        Clicking a bar's date sets Fava's time filter to that year: this review,
+        ending there. Clicking assets or liabilities opens their account page.
+        """
+        account_types = get_account_types(self.ledger.options)
         currency = result.currency
-        # Bars rather than a line, as there's one value per year. Clicking a bar's
-        # date sets Fava's time filter to that year: this review, ending there.
-        net_worth = [
+        bars = [
             DateAndBalanceWithBudget(
-                _last_day(year), SimpleCounterInventory({currency: year.net_worth}), {}, {}
+                _last_day(year),
+                SimpleCounterInventory({currency: year.net_worth}),
+                {
+                    account_types.assets: SimpleCounterInventory({currency: _assets(year)}),
+                    account_types.liabilities: SimpleCounterInventory(
+                        {currency: year.net_worth - _assets(year)}
+                    ),
+                },
+                {},
             )
             for year in result.years
         ]
-        expenses = [
+        return BarChart("Assets, liabilities and net worth", bars)
+
+    @staticmethod
+    def expenses_chart(result: YearEnd) -> BarChart:
+        """Expenses by category per year, stacked."""
+        currency = result.currency
+        bars = [
             DateAndBalanceWithBudget(
                 _last_day(year),
                 SimpleCounterInventory({currency: year.expenses}),
@@ -244,10 +291,12 @@ class YearInReview(FavaExtensionBase):
             )
             for year in result.years
         ]
-        return [
-            BarChart("Net worth", net_worth),
-            BarChart("Expenses by category", expenses),
-        ]
+        return BarChart("Expenses by category", bars)
+
+
+def _assets(year: YearSummary) -> Decimal:
+    """Assets at the year's end: cash, investments and property."""
+    return year.investable + year.holdings[PROPERTY]
 
 
 def _last_day(year: YearSummary) -> datetime.date:
