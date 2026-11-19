@@ -103,5 +103,5 @@ on the account's `open` directive:
 
 The roles are `cash`, `investing`, `financing` and `operating`; a declared role also applies to the
 account's subaccounts. Without one, assets named with Cash, Checking, Savings or Bank are `cash`,
-other assets `investing`, and liabilities `financing`. An unknown role is reported, and the default
-used. The page's "How accounts are classified" section lists each account's group and why.
+other assets `investing`, and liabilities `financing`. A declared value that isn't a role (e.g. a
+typo) is reported as an error and ignored. The page's "How accounts are classified" section lists each account's group and why.

@@ -253,7 +253,10 @@ def test_classification_is_shown(tmp_path):
 
 def test_unknown_role_is_reported(tmp_path):
     body = text(page(tmp_path, LEDGER.replace('"investing"', '"invsting"')))
-    assert "Assets:Brokerage: unknown cash-flow-role 'invsting', using the default" in body
+    assert (
+        "Assets:Brokerage: cash-flow-role 'invsting' isn't one of"
+        " cash, operating, investing, financing; it's ignored" in body
+    )
 
 
 def test_without_an_operating_currency(tmp_path):

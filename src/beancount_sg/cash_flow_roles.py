@@ -16,7 +16,8 @@ addition to that convention), or else the convention's default:
 - Liabilities and Equity: ``financing``.
 - Income and Expenses: ``operating``.
 
-An unknown role is reported as an error, and the default used.
+A declaration that isn't one of these roles (e.g. a typo) is reported as an
+error and ignored, so the account resolves as if it weren't there.
 """
 
 from __future__ import annotations
@@ -82,7 +83,10 @@ def _declarations(opens: list[Open]) -> tuple[dict[str, str], list[RoleError]]:
         if value in ROLES:
             declared[entry.account] = value
         else:
-            message = f"{entry.account}: unknown {ROLE_KEY} {value!r}, using the default"
+            message = (
+                f"{entry.account}: {ROLE_KEY} {value!r} isn't one of {', '.join(ROLES)};"
+                " it's ignored"
+            )
             errors.append(RoleError(entry.meta, message, entry))
     return declared, errors
 
