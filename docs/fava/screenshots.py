@@ -111,6 +111,9 @@ def main() -> None:
             page.wait_for_load_state("networkidle")
             save(page, "travel-over-time", "svelte-component", margin=0)
 
+            page.goto(f"{base}/PayeeReview/", wait_until="networkidle")
+            save(page, "payees")
+
             browser.close()
     finally:
         fava.terminate()

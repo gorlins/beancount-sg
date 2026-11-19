@@ -20,7 +20,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-fava = ["fava>=1.30"]
+fava = [
+    "fava>=1.30",
+    "rapidfuzz>=3.14.6",
+]
 
 [project.urls]
 Repository = "https://github.com/gorlins/beancount-sg"
@@ -29,6 +32,7 @@ Repository = "https://github.com/gorlins/beancount-sg"
 dev = [
     "fava>=1.30",
     "pytest>=8",
+    "rapidfuzz>=3.14.6",
     "ruff>=0.6",
 ]
 

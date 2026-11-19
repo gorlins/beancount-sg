@@ -1,0 +1,95 @@
+{# A category's count and total, linked to the account filtered to the payees. #}
+{% macro usage(usage, names) -%}
+<a href="{{ extension.account_url(usage.account, names) }}">{{ usage.account }}</a>:
+{{ usage.transactions }} &times;
+{% for amount in usage.total %}{{ amount.number|format_currency(amount.currency) }} {{ amount.currency }}{% if not loop.last %}, {% endif %}{% endfor %}
+{%- endmacro %}
+
+<h2>Payee Review</h2>
+
+{% set mixed, groups, count = extension.review() %}
+<p>{{ count }} payees in the current filter: <strong>{{ mixed|length }}</strong> in more than one
+  category, and <strong>{{ groups|length }}</strong> group{{ '' if groups|length == 1 else 's' }} of
+  similar names.</p>
+
+<h3>Payees in more than one category</h3>
+{% if mixed %}
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Payee</th>
+      <th data-sort="num">Transactions</th>
+      <th data-sort="num">Main share</th>
+      <th>Main category</th>
+      <th>Other categories</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for payee in mixed %}
+    {% set names = [payee.name] %}
+    <tr>
+      <td><a href="{{ extension.payee_url(names) }}">{{ payee.name }}</a></td>
+      <td class="num">{{ payee.transactions }}</td>
+      <td class="num" data-sort-value="{{ payee.main_share }}">{{ '%.0f'|format(payee.main_share) }}%</td>
+      <td>{{ usage(payee.main, names) }}</td>
+      <td>{% for other in payee.others %}{{ usage(other, names) }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+      {% set fix = extension.batch_edit_url(names, new_category=payee.main.account) %}
+      <td>{% if fix %}<a href="{{ fix }}" title="Preview moving all of {{ payee.name }}'s transactions to {{ payee.main.account }} in Batch Edit">Recategorize</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
+{% else %}
+<p>None: every payee is in a single category.</p>
+{% endif %}
+
+<h3>Similar payee names</h3>
+{% if groups %}
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Most common</th>
+      <th data-sort="num">Transactions</th>
+      <th>Payees</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for group in groups %}
+    <tr>
+      <td><a href="{{ extension.payee_url(group.names) }}">{{ group.most_common }}</a></td>
+      <td class="num">{{ group.transactions }}</td>
+      <td>{% for payee in group.payees %}<a href="{{ extension.payee_url([payee.name]) }}">{{ payee.name }}</a> ({{ payee.transactions }}){% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+      {% set fix = extension.batch_edit_url(group.names, new_payee=group.most_common) %}
+      <td>{% if fix %}<a href="{{ fix }}" title="Preview renaming these payees to {{ group.most_common }} in Batch Edit">Rename</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</sortable-table>
+{% else %}
+<p>None found.</p>
+{% endif %}
+
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>A payee's <em>categories</em> are the income and expense accounts its transactions (in the
+      current Fava filter) post to; a split transaction counts in each. A payee is listed below only
+      if its transactions don't all have the same categories, so one that always splits the same
+      way isn't. Transactions without a payee are left out.</li>
+    <li><em>Payees in more than one category</em> lists each payee's main category (the one with the
+      most transactions) and its others. Payees almost always in one category, with the highest
+      <em>main share</em>, come first: their other categories are the likeliest mistakes.</li>
+    <li><em>Similar payee names</em> groups payees whose names are alike, ignoring case,
+      punctuation and word order (e.g. <code>SQ *CORNER COFFEE 0412</code> and <code>Corner
+      Coffee</code>). Some groups will be different payees with similar names.</li>
+    <li>Click a payee or a category to open its transactions. With the Batch Edit extension enabled,
+      <em>Recategorize</em> and <em>Rename</em> open it with the fix filled in, to preview before
+      applying.</li>
+  </ul>
+</details>
