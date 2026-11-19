@@ -30,6 +30,8 @@
     gap: 1rem;
     margin-bottom: 1rem;
   }
+  /* Five years of figures need room: side by side only on wide screens. */
+  .ye-tables { grid-template-columns: repeat(auto-fit, minmax(640px, 1fr)); }
   .ye-panel {
     border: 1px solid var(--border);
     border-radius: var(--ye-radius);
@@ -140,8 +142,14 @@
 
 <div class="ye-columns">
   <section class="ye-panel">
-    <svelte-component type="charts"><script type="application/json">{{ [extension.net_worth_chart(result)]|tojson }}</script></svelte-component>
+    <svelte-component type="charts"><script type="application/json">{{ extension.net_worth_charts(result)|tojson }}</script></svelte-component>
   </section>
+  <section class="ye-panel">
+    <svelte-component type="charts"><script type="application/json">{{ [extension.expenses_chart(result)]|tojson }}</script></svelte-component>
+  </section>
+</div>
+
+<div class="ye-columns ye-tables">
   <section class="ye-panel">
     <h3>Net worth</h3>
     <table>
@@ -157,9 +165,6 @@
       </tbody>
     </table>
   </section>
-</div>
-
-<div class="ye-columns">
   <section class="ye-panel">
     <h3>Income &amp; savings</h3>
     <table>
@@ -176,12 +181,9 @@
       </tbody>
     </table>
   </section>
-  <section class="ye-panel">
-    <svelte-component type="charts"><script type="application/json">{{ [extension.expenses_chart(result)]|tojson }}</script></svelte-component>
-  </section>
 </div>
 
-<div class="ye-columns">
+<div class="ye-columns ye-tables">
   <section class="ye-panel">
     <h3>Expenses by category</h3>
     {% set categories = extension.categories(result) %}
@@ -291,8 +293,8 @@
       investments) at its start, like a withdrawal rate in retirement; <em>spending / net
       worth</em> also counts property and debt.</li>
     <li>Click a year for its income statement, a category or loan for its account page, or a bar's
-      date in a chart to make that the final year. In the net worth chart, <em>Single Bars</em>
-      shows net worth.</li>
+      date in a chart to make that the final year. Below the net worth chart, switch between net
+      worth and assets &amp; liabilities.</li>
   </ul>
 </details>
 </div>

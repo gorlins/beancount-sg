@@ -17,8 +17,9 @@ The dashboard has:
 - Cards with the final year's headline metrics and their change from the
   previous year: net worth, investable assets, savings rate, income, expenses,
   withdrawal rate, emergency fund and debt paid down.
-- Net worth (assets minus liabilities) by group, with a chart of assets,
-  liabilities and net worth per year.
+- Charts of net worth per year (or assets and liabilities, stacked), and of
+  expenses by category.
+- Net worth (assets minus liabilities) by group.
 - Income, expenses, savings and ratios per year: savings rate, spending as a
   share of net worth, and the withdrawal rate (spending as a share of investable
   assets: cash and investments). For the current year, the spending ratios use
@@ -251,15 +252,22 @@ class YearInReview(FavaExtensionBase):
         """An account's page for a year."""
         return url_for("account", name=account, time=str(year))
 
-    def net_worth_chart(self, result: YearEnd) -> BarChart:
-        """Assets and liabilities at each year's end, stacked; as single bars, net worth.
+    def net_worth_charts(self, result: YearEnd) -> list[BarChart]:
+        """Net worth at each year's end, and assets and liabilities, stacked.
 
-        Clicking a bar's date sets Fava's time filter to that year: this review,
-        ending there. Clicking assets or liabilities opens their account page.
+        Fava can't draw a line over bars, so these are two charts, switched between
+        below them. Clicking a bar's date sets Fava's time filter to that year: this
+        review, ending there. Clicking assets or liabilities opens their account page.
         """
         account_types = get_account_types(self.ledger.options)
         currency = result.currency
-        bars = [
+        net_worth = [
+            DateAndBalanceWithBudget(
+                _last_day(year), SimpleCounterInventory({currency: year.net_worth}), {}, {}
+            )
+            for year in result.years
+        ]
+        assets_and_liabilities = [
             DateAndBalanceWithBudget(
                 _last_day(year),
                 SimpleCounterInventory({currency: year.net_worth}),
@@ -273,7 +281,10 @@ class YearInReview(FavaExtensionBase):
             )
             for year in result.years
         ]
-        return BarChart("Assets, liabilities and net worth", bars)
+        return [
+            BarChart("Net worth", net_worth),
+            BarChart("Assets & liabilities", assets_and_liabilities),
+        ]
 
     @staticmethod
     def expenses_chart(result: YearEnd) -> BarChart:

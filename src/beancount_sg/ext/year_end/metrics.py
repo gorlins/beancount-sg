@@ -37,7 +37,7 @@ from beancount.core.account_types import AccountTypes, get_account_type
 from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
-from beancount_sg.cash_flow_roles import CASH, FINANCING, Role, self_and_parents
+from beancount_sg.cash_flow_roles import CASH, FINANCING, Role
 
 INVESTABLE_KEY = "investable"
 # Names of liabilities that are credit cards, rather than loans, by default.
@@ -86,21 +86,16 @@ def _asset(
 ) -> Classification:
     if role.role == CASH:
         return Classification(CASH, _role_reason(role))
-    declarer = next((parent for parent in self_and_parents(account) if parent in investable), None)
-    if declarer:
-        group = INVESTMENTS if investable[declarer] else PROPERTY
-        return Classification(group, f"{INVESTABLE_KEY}: {investable[declarer]} on {declarer}")
+    # Its own investable metadata, or its nearest parent's.
+    for name in account_lib.parents(account):
+        if name in investable:
+            group = INVESTMENTS if investable[name] else PROPERTY
+            return Classification(group, f"{INVESTABLE_KEY}: {investable[name]} on {name}")
+    # A liability under the matching path, e.g. Liabilities:Home:Mortgage for Assets:Home.
     path = account_lib.split(account)[1:]
-    secured_by = next(
-        (
-            liability
-            for liability in liabilities
-            if path and account_lib.split(liability)[1 : len(path) + 1] == path
-        ),
-        None,
-    )
-    if secured_by:
-        return Classification(PROPERTY, f"secures {secured_by}")
+    for liability in liabilities:
+        if path and account_lib.split(liability)[1 : len(path) + 1] == path:
+            return Classification(PROPERTY, f"secures {liability}")
     return Classification(INVESTMENTS, _role_reason(role))
 
 

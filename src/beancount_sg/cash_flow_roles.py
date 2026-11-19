@@ -60,36 +60,39 @@ class Role:
 def account_roles(
     entries: Iterable[Directive], account_types: AccountTypes
 ) -> tuple[dict[str, Role], list[RoleError]]:
-    """Every opened account's role: declared, inherited from a parent, or the default."""
-    opens = {entry.account: entry for entry in entries if isinstance(entry, Open)}
+    """Every opened account's role: declared, inherited from a parent, or the default.
+
+    All declarations are read before any role is resolved, so an account inherits
+    its parent's declaration whatever order they're opened in.
+    """
+    opens = [entry for entry in entries if isinstance(entry, Open)]
+    declared, errors = _declarations(opens)
+    roles = {entry.account: _role(entry.account, declared, account_types) for entry in opens}
+    return roles, errors
+
+
+def _declarations(opens: list[Open]) -> tuple[dict[str, str], list[RoleError]]:
+    """The roles declared on ``open`` directives, by account, and unknown roles."""
     declared: dict[str, str] = {}
     errors: list[RoleError] = []
-    for account, entry in opens.items():
+    for entry in opens:
         value = entry.meta.get(ROLE_KEY)
         if value is None:
             continue
         if value in ROLES:
-            declared[account] = value
+            declared[entry.account] = value
         else:
-            message = f"{account}: unknown {ROLE_KEY} {value!r}, using the default"
+            message = f"{entry.account}: unknown {ROLE_KEY} {value!r}, using the default"
             errors.append(RoleError(entry.meta, message, entry))
-    roles = {}
-    for account in opens:
-        declarer = next(
-            (parent for parent in self_and_parents(account) if parent in declared), None
-        )
-        if declarer:
-            roles[account] = Role(declared[declarer], declarer)
-        else:
-            roles[account] = Role(default_role(account, account_types))
-    return roles, errors
+    return declared, errors
 
 
-def self_and_parents(account: str) -> Iterable[str]:
-    """The account, then each of its parents, nearest first."""
-    while account:
-        yield account
-        account = account_lib.parent(account)
+def _role(account: str, declared: dict[str, str], account_types: AccountTypes) -> Role:
+    """The account's own declared role, or its nearest parent's, or else the default."""
+    for name in account_lib.parents(account):
+        if name in declared:
+            return Role(declared[name], declared_by=name)
+    return Role(default_role(account, account_types))
 
 
 def default_role(account: str, account_types: AccountTypes) -> str:
