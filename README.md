@@ -178,6 +178,17 @@ A "Travel" report of `#travel` spending by trip (tags used only on travel transa
 stacked by trip) and a table of trips, calling out travel spending without a trip. Every link opens Fava filtered by the trip's tag.
 [Docs](docs/fava/travel.md)
 
+### `beancount_sg.ext.payees`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.payees"
+```
+
+A "Payee Review" report of payees likely miscategorized (transactions in different income or expense
+categories, mostly-one-category payees first) or duplicated (similar names, by
+[rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)), with links to their transactions and, with
+Batch Edit enabled, to the fix. [Docs](docs/fava/payees.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`
