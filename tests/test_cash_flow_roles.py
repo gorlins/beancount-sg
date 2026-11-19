@@ -36,7 +36,7 @@ def test_roles_are_declared_inherited_or_the_default():
         "Assets:Retirement:Cash": (INVESTING, "Assets:Retirement"),
         "Liabilities:CreditCard:Visa": (FINANCING, None),
         "Liabilities:Mortgage": (FINANCING, None),
-        "Liabilities:CarLoan": (FINANCING, None),  # the default, for an unknown role
+        "Liabilities:CarLoan": (FINANCING, None),  # the default: its invalid role is ignored
         "Equity:Opening": (FINANCING, None),
         "Income:Salary": (OPERATING, None),
         "Expenses:Food": (OPERATING, None),
@@ -49,8 +49,9 @@ def test_unknown_roles_are_errors():
     entries, _ = load(LEDGER)
     _, errors = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
     [error] = errors
-    assert (
-        error.message == "Liabilities:CarLoan: unknown cash-flow-role 'invsting', using the default"
+    assert error.message == (
+        "Liabilities:CarLoan: cash-flow-role 'invsting' isn't one of"
+        " cash, operating, investing, financing; it's ignored"
     )
     assert error.entry.account == "Liabilities:CarLoan"
 
