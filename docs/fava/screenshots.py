@@ -114,6 +114,9 @@ def main() -> None:
             page.goto(f"{base}/PayeeReview/", wait_until="networkidle")
             save(page, "payees")
 
+            page.goto(f"{base}/YearInReview/?time=2024", wait_until="networkidle")
+            save(page, "year-in-review")
+
             browser.close()
     finally:
         fava.terminate()

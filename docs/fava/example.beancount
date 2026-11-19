@@ -8,6 +8,7 @@ option "operating_currency" "USD"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.update_status"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.travel"
 2024-01-01 custom "fava-extension" "beancount_sg.ext.payees"
+2024-01-01 custom "fava-extension" "beancount_sg.ext.year_end"
 
 2024-01-01 open Assets:Bank:Checking USD
   fava-uptodate-indication: TRUE
@@ -160,3 +161,30 @@ option "operating_currency" "USD"
 2024-03-13 * "Corner Coffee" "Coffee"
   Expenses:Food:Restaurants  4.00 USD
   Assets:Cash
+
+; For the Year in Review: a home with a mortgage, savings, and investments
+2023-12-01 open Assets:Home USD
+2023-12-01 open Assets:Bank:Savings USD
+2023-12-01 open Assets:Brokerage
+  cash-flow-role: "investing"
+2023-12-01 open Liabilities:Mortgage USD
+2023-12-01 open Expenses:Home:MortgageInterest USD
+
+2023-12-31 * "Opening balances"
+  Assets:Home  400000.00 USD
+  Liabilities:Mortgage  -300000.00 USD
+  Assets:Bank:Savings  20000.00 USD
+  Assets:Brokerage  100 VTI {200.00 USD}
+  Equity:Opening-Balances
+
+2024-02-01 * "Lender" "Mortgage payment"
+  Liabilities:Mortgage  1100.00 USD
+  Expenses:Home:MortgageInterest  1250.00 USD
+  Assets:Bank:Savings
+
+2024-03-01 * "Lender" "Mortgage payment"
+  Liabilities:Mortgage  1105.00 USD
+  Expenses:Home:MortgageInterest  1245.00 USD
+  Assets:Bank:Savings
+
+2024-03-31 price VTI  230.00 USD

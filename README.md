@@ -189,6 +189,17 @@ categories, mostly-one-category payees first) or duplicated (similar names, by
 [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz)), with links to their transactions and, with
 Batch Edit enabled, to the fix. [Docs](docs/fava/payees.md)
 
+### `beancount_sg.ext.year_end`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.year_end"
+```
+
+A "Year in Review" dashboard of up to five years, ending with the time filter's last year: net
+worth (cash, investments, debt), income, expenses and savings rate, spending as a share of net
+worth, expenses by top-level category, and debt paydown. Accounts are classified by
+`cash-flow-role` metadata or their names. [Docs](docs/fava/year-in-review.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`
@@ -200,6 +211,11 @@ assertions in importers, plugins and tests.
 
 `map_transactions` and `flat_map_transactions` run a per-transaction function over a ledger, for
 writing plugins that rewrite transactions or add directives next to them.
+
+### `beancount_sg.year_end`
+
+The calculations behind the Year in Review report, independent of Fava: account roles and yearly
+summaries.
 
 ### `beancount_sg.batch_edit`
 

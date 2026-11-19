@@ -1,0 +1,168 @@
+{# Formatting: money in the review's currency, and percentages and ratios. #}
+{% macro money(value) -%}{{ value|format_currency(currency) }}{%- endmacro %}
+{% macro ratio(value, suffix, digits=1) -%}
+{%- if value is none %}&mdash;{% else %}{{ ('%.' ~ digits ~ 'f')|format(value) }}{{ suffix }}{% endif -%}
+{%- endmacro %}
+{% macro money_row(label, attribute, title="") -%}
+<tr><td title="{{ title }}">{{ label }}</td>{% for year in years %}<td class="num">{{ money(year[attribute]) }}</td>{% endfor %}</tr>
+{%- endmacro %}
+{% macro holding_row(label, group, title="") -%}
+<tr><td title="{{ title }}">&nbsp;&nbsp;{{ label }}</td>{% for year in years %}<td class="num">{{ money(year.holdings[group]) }}</td>{% endfor %}</tr>
+{%- endmacro %}
+
+<h2>Year in Review</h2>
+
+{% set role_errors = extension.roles()[1] %}
+{% set result = extension.review() %}
+{% if result is none %}
+<ul class="error"><li>Set an <code>operating_currency</code> option: the review shows values in the ledger's first operating currency.</li></ul>
+{% elif not result.years %}
+<p>No transactions up to {{ extension.end_year() }}.</p>
+{% else %}
+{% set years = result.years %}
+{% set currency = result.currency %}
+{% set last = years[-1] %}
+<p>
+  {{ years[0].year }}{% if years|length > 1 %}&ndash;{{ last.year }}{% endif %}, in {{ currency }}.
+  {% if not last.complete %}{{ last.year }} is year-to-date, through {{ last.end - extension.one_day }}; its
+  spending ratios use its spending so far, annualized.{% endif %}
+  Pick another final year with Fava's time filter.
+</p>
+{% if role_errors or result.unconverted %}
+<ul class="error">
+  {% for error in role_errors %}<li>{{ error }}</li>{% endfor %}
+  {% if result.unconverted %}<li>Left out, for lack of prices in {{ currency }}: {{ result.unconverted|sort|join(', ') }}.</li>{% endif %}
+</ul>
+{% endif %}
+
+<h3>Key metrics</h3>
+<table>
+  <thead>
+    <tr><th></th>{% for year in years %}<th class="num"><a href="{{ extension.year_url(year.year) }}">{{ year.year }}{% if not year.complete %} (YTD){% endif %}</a></th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Net worth</strong></td>{% for year in years %}<td class="num"><strong>{{ money(year.net_worth) }}</strong></td>{% endfor %}</tr>
+    {{ holding_row("Cash", "cash", "Accounts with the cash role") }}
+    {{ holding_row("Investments", "investing", "Assets with the investing role, at market value") }}
+    {{ holding_row("Debt", "debt", "Loans: liabilities with the financing role") }}
+    {{ holding_row("Other", "other", "E.g. credit card balances") }}
+    {{ money_row("Change", "net_worth_change") }}
+    <tr><td colspan="{{ years|length + 1 }}"></td></tr>
+    {{ money_row("Income", "income") }}
+    {{ money_row("Expenses", "expenses") }}
+    {{ money_row("Savings", "savings", "Income minus expenses") }}
+    <tr><td>Savings rate</td>{% for year in years %}<td class="num">{{ ratio(year.savings_rate, '%') }}</td>{% endfor %}</tr>
+    <tr><td colspan="{{ years|length + 1 }}"></td></tr>
+    <tr><td title="A year's spending as a share of net worth at its start, like a withdrawal rate in retirement">Spending / net worth</td>{% for year in years %}<td class="num">{{ ratio(year.spending_rate, '%', 2) }}</td>{% endfor %}</tr>
+    <tr><td title="Net worth at the year's end, divided by a year's spending">Net worth in years of spending</td>{% for year in years %}<td class="num">{{ ratio(year.years_of_spending, '') }}</td>{% endfor %}</tr>
+    <tr><td title="Cash at the year's end, divided by a month's spending">Cash in months of spending</td>{% for year in years %}<td class="num">{{ ratio(year.months_of_cash, '') }}</td>{% endfor %}</tr>
+  </tbody>
+</table>
+
+<svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
+
+<h3>Expenses by category</h3>
+{% set categories = extension.categories(result) %}
+{% if categories %}
+<sortable-table>
+<table>
+  <thead>
+    <tr>
+      <th data-sort="string">Category</th>
+      {% for year in years %}<th data-sort="num" class="num">{{ year.year }}</th>{% endfor %}
+      <th data-sort="num" class="num">Share of {{ last.year }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for category in categories %}
+    <tr>
+      <td><a href="{{ extension.account_url(category, last.year) }}">{{ category }}</a></td>
+      {% for year in years %}
+      {% set value = year.expenses_by_category.get(category, 0) %}
+      <td class="num" data-sort-value="{{ value }}"><a href="{{ extension.account_url(category, year.year) }}">{{ money(value) }}</a></td>
+      {% endfor %}
+      {% set share = (100 * last.expenses_by_category.get(category, 0) / last.expenses) if last.expenses else none %}
+      <td class="num" data-sort-value="{{ share or 0 }}">{{ ratio(share, '%') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><th>Total</th>{% for year in years %}<th class="num">{{ money(year.expenses) }}</th>{% endfor %}<th></th></tr>
+  </tfoot>
+</table>
+</sortable-table>
+{% else %}
+<p>No expenses.</p>
+{% endif %}
+
+<h3>Debt paydown in {{ last.year }}</h3>
+{% if last.debts %}
+<table>
+  <thead>
+    <tr><th>Loan</th><th class="num">Owed at start</th><th class="num">Borrowed</th><th class="num">Paid down</th><th class="num">Owed at end</th></tr>
+  </thead>
+  <tbody>
+    {% for debt in last.debts %}
+    <tr>
+      <td><a href="{{ extension.account_url(debt.account, last.year) }}">{{ debt.account }}</a></td>
+      <td class="num">{{ money(debt.start) }}</td>
+      <td class="num">{{ money(debt.borrowed) }}</td>
+      <td class="num">{{ money(debt.paid) }}</td>
+      <td class="num">{{ money(debt.end) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th>Total</th>
+      <th class="num">{{ money(last.debts|sum(attribute='start')) }}</th>
+      <th class="num">{{ money(last.debts|sum(attribute='borrowed')) }}</th>
+      <th class="num">{{ money(last.debts|sum(attribute='paid')) }}</th>
+      <th class="num">{{ money(last.debts|sum(attribute='end')) }}</th>
+    </tr>
+  </tfoot>
+</table>
+<p>Paid down is principal: payments to the loan accounts. Interest is in expenses.</p>
+{% else %}
+<p>No loans (liabilities with the <code>financing</code> role) with a balance or activity.</p>
+{% endif %}
+{% endif %}
+
+<details>
+  <summary>How accounts are classified</summary>
+  <p>Each asset and liability account's <code>cash-flow-role</code>, as used above. Declare one on
+    the account's <code>open</code> directive, where it also applies to subaccounts:</p>
+  <pre>2020-01-01 open Assets:Bank:CD
+  cash-flow-role: "investing"</pre>
+  <p>Without one, assets are <code>cash</code> if their name contains Cash, Checking, Savings or
+    Bank, else <code>investing</code>; liabilities are <code>operating</code> (e.g. credit cards,
+    not debt) if their name contains Card, else <code>financing</code> (loans).</p>
+  <table>
+    <thead><tr><th>Account</th><th>Role</th><th>From</th></tr></thead>
+    <tbody>
+      {% for account, role in extension.classified() %}
+      <tr>
+        <td>{{ account }}</td>
+        <td>{{ role.role }}</td>
+        <td>{% if role.declared_by == account %}declared{% elif role.declared_by %}{{ role.declared_by }}{% else %}name and type{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>The review shows up to five years, ending with the last year of Fava's time filter, or this
+      year without one. Other filters don't apply: it always covers whole years of the whole
+      ledger.</li>
+    <li>Values are in the first operating currency: holdings at market value at each year's end
+      (or at cost without a price), income and expenses at their value on each transaction's
+      date.</li>
+    <li><em>Spending / net worth</em> is a year's expenses as a share of net worth at its start,
+      like a withdrawal rate in retirement. <em>Net worth in years of spending</em> is its inverse,
+      at the year's end (25 years is a 4% rate).</li>
+    <li>Click a year for its income statement, or a category or loan for its account page.</li>
+  </ul>
+</details>

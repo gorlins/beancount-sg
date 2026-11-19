@@ -9,7 +9,8 @@ extension with a `custom` directive in your ledger:
 ```
 
 Each report then appears in Fava's sidebar. Most cover the transactions in Fava's current time,
-account and filter selection; Update Status covers the whole ledger.
+account and filter selection; Update Status covers the whole ledger, and Year in Review takes only
+the time filter's last year.
 
 | Extension | Report | |
 | --- | --- | --- |
@@ -19,6 +20,7 @@ account and filter selection; Update Status covers the whole ledger.
 | [`beancount_sg.ext.update_status`](update-status.md) | Update Status | When each account was last balanced |
 | [`beancount_sg.ext.travel`](travel.md) | Travel | Travel spending by trip and category |
 | [`beancount_sg.ext.payees`](payees.md) | Payee Review | Payees likely miscategorized or duplicated |
+| [`beancount_sg.ext.year_end`](year-in-review.md) | Year in Review | Year-end dashboard of key metrics |
 
 ## Screenshots
 
