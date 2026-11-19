@@ -21,6 +21,20 @@ end, or at cost if they have no price yet. Income and expenses are at their valu
 transaction's date. Amounts that can't be converted, for lack of prices, are left out and their
 currencies listed.
 
+## The dashboard
+
+- **Cards** across the top show the final year's headline metrics, each with its change from the
+  previous year.
+- **Net worth** and **Income & savings** panels show each metric per year.
+- **Charts** of net worth and expenses by category per year: click a year's bar to make it the
+  final year.
+- **Expenses by category** and **Debt paydown** panels, below.
+
+Every change from the previous year has an arrow and a sign, in **green when it's good** and **red
+when it's bad**: more net worth, income or savings is good, and so is less spending or debt. A
+year-to-date year's income and spending aren't compared with whole years. Amounts are rounded to
+whole units.
+
 ## Key metrics
 
 | Metric | |
@@ -35,9 +49,6 @@ currencies listed.
 
 For the current year, the spending-based ratios use its spending so far, annualized. Ratios to a
 net worth that isn't positive aren't shown.
-
-The charts show net worth and expenses by category per year. Click a year's bar to make it the
-final year.
 
 ## Expenses by category
 

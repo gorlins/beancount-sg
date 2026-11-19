@@ -2,11 +2,14 @@ import datetime
 import html
 import json
 import re
+from decimal import Decimal
 
 import pytest
 from fava.application import create_app
 
 import beancount_sg.ext.year_end as year_end_ext
+from beancount_sg.ext.year_end import change, changes
+from beancount_sg.year_end import YearSummary
 
 ENABLE = 'custom "fava-extension" "beancount_sg.ext.year_end"'
 
@@ -70,20 +73,30 @@ def text(body):
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body)))
 
 
-def metrics_header(body):
-    table = body[body.index("<h3>Key metrics</h3>") :]
-    return text(table[table.index("<thead>") : table.index("</thead>")]).split()
+def panel(body, title):
+    """The text of the dashboard panel with this title."""
+    start = body.index(f"<h3>{title}")
+    return text(body[start : body.index("</section>", start)])
+
+
+def cards(body):
+    return text(body[body.index('<div class="ye-cards">') : body.index('<div class="ye-columns">')])
+
+
+def year_headers(body):
+    start = body.index("<h3>Net worth")
+    return text(body[body.index("<thead>", start) : body.index("</thead>", start)]).split()
 
 
 def test_defaults_to_five_years_ending_this_year(tmp_path):
     body = page(tmp_path)
-    assert metrics_header(body) == ["2021", "2022", "2023", "2024", "2025", "(YTD)"]
+    assert year_headers(body) == ["2021", "2022", "2023", "2024", "2025", "YTD"]
     assert "2025 is year-to-date, through 2025-07-01" in text(body)
 
 
 def test_ends_with_the_time_filters_last_year(tmp_path):
-    assert metrics_header(page(tmp_path, query="?time=2019")) == ["2018", "2019"]
-    assert metrics_header(page(tmp_path, query="?time=2020-2023")) == [
+    assert year_headers(page(tmp_path, query="?time=2019")) == ["2018", "2019"]
+    assert year_headers(page(tmp_path, query="?time=2020-2023")) == [
         "2019",
         "2020",
         "2021",
@@ -92,26 +105,67 @@ def test_ends_with_the_time_filters_last_year(tmp_path):
     ]
 
 
-def test_key_metrics(tmp_path):
-    body = text(page(tmp_path, query="?time=2019"))
-    # 2018: checking 10000 + 50000 - 6000 (mortgage and interest), mortgage 95000, card 6000.
-    assert "Net worth -47000 -4100 Cash 54000 98000 Investments 0 0" in body
-    assert "Debt -95000 -90000 Other -6000 -12100 Change -47000 42900" in body
-    assert "Income 50000 50000 Expenses 7000 7100 Savings 43000 42900" in body
-    assert "Savings rate 86.0% 85.8%" in body
+def test_years_start_with_the_first_income_or_expenses(tmp_path):
+    # Opening balances alone don't make a year.
+    ledger = LEDGER.replace('2018-01-01 * "Opening balances"', '2017-12-31 * "Opening balances"')
+    ledger = ledger.replace("2018-01-01 open", "2017-01-01 open")
+    assert year_headers(page(tmp_path, ledger, query="?time=2019")) == ["2018", "2019"]
+
+
+def test_cards_show_the_last_year_and_its_change(tmp_path):
+    found = cards(page(tmp_path, query="?time=2019"))
+    # 2019 ends at checking 98000 - mortgage 90000 - card 12100.
+    assert "Net worth -4,100 ▲ +42,900 (+91.3%) vs 2018" in found
+    assert "Savings rate 85.8% ▼ −0.2 pts vs 2018 42,900 saved" in found
+    assert "Income 50,000 ■ no change vs 2018" in found
+    assert "Expenses 7,100 ▲ +100 (+1.4%) vs 2018" in found
+    assert "Emergency fund 165.6 mo ▲ +73.1 vs 2018 98,000 in cash" in found
+    assert "Debt paid down 5,000 90,000 still owed" in found
+
+
+def tone(body, label):
+    """The CSS class of the change shown with this label (on a card and in a table)."""
+    [found] = set(re.findall(rf'class="ye-delta ye-(\w+)">[^<]*{re.escape(label)}', body))
+    return found
+
+
+def test_changes_are_green_when_good_and_red_when_bad(tmp_path):
+    body = page(tmp_path, query="?time=2019")
+    assert tone(body, "+42,900 (+91.3%)") == "good"  # net worth up
+    assert tone(body, "+5,000 (+5.3%)") == "good"  # debt down
+    assert tone(body, "+100 (+1.4%) vs 2018") == "bad"  # expenses up
+    assert tone(body, "−0.2 pts vs 2018") == "bad"  # savings rate down
+    assert tone(body, "no change vs 2018") == "flat"
+
+
+def test_net_worth_and_income_panels(tmp_path):
+    body = page(tmp_path, query="?time=2019")
+    net_worth = panel(body, "Net worth")
+    assert "Cash 54,000 98,000 ▲ +44,000 (+81.5%)" in net_worth
+    assert "Debt -95,000 -90,000 ▲ +5,000 (+5.3%)" in net_worth
+    assert "Other -6,000 -12,100 ▼ −6,100 (−101.7%)" in net_worth
+    assert "Net worth -47,000 -4,100 ▲ +42,900 (+91.3%)" in net_worth
+    income = panel(body, "Income &amp; savings")
+    assert "Income 50,000 50,000 ■ no change" in income
+    assert "Savings 43,000 42,900 ▼ −100 (−0.2%)" in income
+    assert "Savings rate 86.0% 85.8% ▼ −0.2 pts" in income
     # Without a positive net worth, the ratios to it aren't meaningful.
-    assert "Spending / net worth — —" in body
-    assert "Net worth in years of spending — —" in body
-    assert "Cash in months of spending 92.6 165.6" in body
+    assert "Spending / net worth — — Years of spending — —" in income
+
+
+def test_a_year_to_dates_flows_are_not_compared(tmp_path):
+    found = cards(page(tmp_path))
+    assert "Income 50,000 year to date" in found
+    assert "Expenses 7,700 year to date" in found
 
 
 def test_spending_ratios_with_a_positive_net_worth(tmp_path):
     ledger = LEDGER.replace("Liabilities:Mortgage  -100000 USD", "Liabilities:Mortgage  -20000 USD")
-    body = text(page(tmp_path, ledger, query="?time=2019"))
+    income = panel(page(tmp_path, ledger, query="?time=2019"), "Income &amp; savings")
     # 2018 ends at 54000 (checking) - 15000 (mortgage) - 6000 (card) = 33000: 2019's start.
-    assert "Spending / net worth — 21.52%" in body  # 7100 / 33000
-    # 2019 ends at 98000 - 10000 - 12100 = 75900: 10.7 years of 7100.
-    assert "Net worth in years of spending 4.7 10.7" in body
+    assert "Spending / net worth — 21.5%" in income  # 7100 / 33000
+    # 2018 ends at 33000, 4.7 years of 7000; 2019 at 98000 - 10000 - 12100 = 75900, 10.7 of 7100.
+    assert "Years of spending 4.7 10.7 ▲ +6.0" in income
 
 
 def test_charts(tmp_path):
@@ -134,16 +188,16 @@ def test_charts(tmp_path):
 
 
 def test_expenses_by_category(tmp_path):
-    body = text(page(tmp_path, query="?time=2019"))
-    assert "Expenses:Food 6000 6100 85.9%" in body
-    assert "Total 7000 7100" in body
+    found = panel(page(tmp_path, query="?time=2019"), "Expenses by category")
+    assert "Expenses:Food 6,000 6,100 ▲ +100 (+1.7%)" in found
+    assert "Expenses:Housing 1,000 1,000 ■ no change" in found
+    assert "Total 7,000 7,100 ▲ +100 (+1.4%)" in found
 
 
 def test_debt_paydown_in_the_last_year(tmp_path):
-    body = page(tmp_path, query="?time=2019")
-    section = text(body[body.index("<h3>Debt paydown in 2019</h3>") :])
-    assert "Liabilities:Mortgage 95000 0 5000 90000" in section
-    assert "Liabilities:CreditCard" not in section[: section.index("Paid down is principal")]
+    found = panel(page(tmp_path, query="?time=2019"), "Debt paydown in 2019")
+    assert "Liabilities:Mortgage 95,000 0 5,000 90,000" in found
+    assert "Liabilities:CreditCard" not in found
 
 
 def test_classification_is_shown(tmp_path):
@@ -167,3 +221,34 @@ def test_without_an_operating_currency(tmp_path):
 def test_before_the_ledger_starts(tmp_path):
     body = text(page(tmp_path, query="?time=2015"))
     assert "No transactions up to 2015." in body
+
+
+@pytest.mark.parametrize(
+    ("current", "previous", "higher_is_better", "tone", "label"),
+    [
+        (Decimal(110), Decimal(100), True, "good", "+10 (+10.0%)"),
+        (Decimal(90), Decimal(100), True, "bad", "−10 (−10.0%)"),
+        (Decimal(90), Decimal(100), False, "good", "−10 (−10.0%)"),
+        (Decimal(1500), Decimal(0), True, "good", "+1,500"),  # no percentage of zero
+        (Decimal(100), Decimal(100), True, "flat", "no change"),
+    ],
+)
+def test_change(current, previous, higher_is_better, tone, label):
+    found = change(current, previous, higher_is_better=higher_is_better)
+    assert (found.tone, found.label()) == (tone, label)
+
+
+def test_change_labels_and_unknowns():
+    assert change(Decimal("45.5"), Decimal("40"), higher_is_better=True).label("points") == (
+        "+5.5 pts"
+    )
+    assert change(Decimal("6.1"), Decimal("5.4")).label("number") == "+0.7"
+    assert change(None, Decimal(1)) is None
+
+
+def test_changes_skip_a_year_to_dates_flows():
+    complete = YearSummary(2024, datetime.date(2025, 1, 1))
+    partial = YearSummary(2025, datetime.date(2025, 7, 2))
+    values = [Decimal(100), Decimal(50)]
+    assert changes(values, [complete, partial], flow=True) == [None, None]
+    assert changes(values, [complete, partial])[1].label() == "−50 (−50.0%)"

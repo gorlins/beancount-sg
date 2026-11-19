@@ -24,12 +24,16 @@ the time filter's last year.
 
 ## Screenshots
 
-The screenshots in [`images/`](images) are of [`example.beancount`](example.beancount). After
-changing a report's page, regenerate them from the repository root:
+The screenshots in [`images/`](images) are of [`example.beancount`](example.beancount), or for
+the Year in Review, which needs years of history, [`year-in-review.beancount`](year-in-review.beancount).
+After changing a report's page, regenerate its screenshots from the repository root, by name, so
+the other reports' screenshots don't change:
 
 ```bash
-uv run --with playwright python docs/fava/screenshots.py
+uv run --with playwright python docs/fava/screenshots.py year-in-review
 ```
+
+Without names, it regenerates them all.
 
 If Playwright has no browser installed yet, first run
 `uv run --with playwright playwright install chromium`.

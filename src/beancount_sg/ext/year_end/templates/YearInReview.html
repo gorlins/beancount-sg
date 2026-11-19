@@ -1,15 +1,87 @@
-{# Formatting: money in the review's currency, and percentages and ratios. #}
-{% macro money(value) -%}{{ value|format_currency(currency) }}{%- endmacro %}
-{% macro ratio(value, suffix, digits=1) -%}
+<style>
+  .ye { --ye-radius: 8px; }
+  .ye-subtitle { color: var(--text-color-lightest); margin-top: -0.5rem; }
+  .ye-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 1.25rem;
+  }
+  @media (max-width: 900px) {
+    .ye-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .ye-card {
+    background: var(--background-darker);
+    border: 1px solid var(--border);
+    border-radius: var(--ye-radius);
+    padding: 0.75rem 1rem;
+  }
+  .ye-card-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-color-lightest);
+  }
+  .ye-card-value { font-size: 1.7rem; font-weight: 600; line-height: 1.3; }
+  .ye-card-note { font-size: 0.8rem; color: var(--text-color-lightest); }
+  .ye-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .ye-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--ye-radius);
+    padding: 0.75rem 1rem 1rem;
+    overflow-x: auto;
+  }
+  .ye-panel h3 { margin: 0 0 0.5rem; }
+  .ye-panel table { width: 100%; }
+  .ye-panel td, .ye-panel th { vertical-align: top; }
+  .ye-total td { font-weight: 600; border-top: 2px solid var(--border-darker); }
+  .ye-delta { display: block; font-size: 0.75rem; white-space: nowrap; }
+  .ye-good { color: var(--green); }
+  .ye-bad { color: var(--red); }
+  .ye-flat { color: var(--text-color-lightest); }
+  .ye-bar {
+    height: 6px;
+    margin-top: 4px;
+    border-radius: 3px;
+    background: var(--background-darkest);
+  }
+  .ye-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--green); }
+  .ye-share > span { background: var(--link-color); }
+  .ye details { margin-top: 1rem; }
+</style>
+
+{# A change from the previous year: ▲/▼, signed, green when good and red when bad. #}
+{% macro delta(change, unit="money", vs=none) -%}
+{%- if change -%}
+<span class="ye-delta ye-{{ change.tone }}">{{ change.arrow }} {{ change.label(unit) }}{% if vs %} vs {{ vs }}{% endif %}</span>
+{%- endif -%}
+{%- endmacro %}
+{% macro ratio(value, suffix="", digits=1) -%}
 {%- if value is none %}&mdash;{% else %}{{ ('%.' ~ digits ~ 'f')|format(value) }}{{ suffix }}{% endif -%}
 {%- endmacro %}
-{% macro money_row(label, attribute, title="") -%}
-<tr><td title="{{ title }}">{{ label }}</td>{% for year in years %}<td class="num">{{ money(year[attribute]) }}</td>{% endfor %}</tr>
+{# A row of yearly values, each with its change from the previous year. #}
+{% macro yearly_row(label, values, unit="money", higher=true, flow=false, title="", total=false) -%}
+{% set found = extension.changes(values, years, higher_is_better=higher, flow=flow) %}
+<tr{% if total %} class="ye-total"{% endif %}>
+  <td title="{{ title }}">{{ label }}</td>
+  {% for value in values %}
+  <td class="num">
+    {%- if unit == "money" %}{{ extension.money(value) }}{% elif unit == "points" %}{{ ratio(value, '%') }}{% else %}{{ ratio(value) }}{% endif -%}
+    {{ delta(found[loop.index0], unit) }}
+  </td>
+  {% endfor %}
+</tr>
 {%- endmacro %}
-{% macro holding_row(label, group, title="") -%}
-<tr><td title="{{ title }}">&nbsp;&nbsp;{{ label }}</td>{% for year in years %}<td class="num">{{ money(year.holdings[group]) }}</td>{% endfor %}</tr>
+{% macro year_header(first="") -%}
+<thead><tr><th>{{ first }}</th>{% for year in years %}<th class="num"><a href="{{ extension.year_url(year.year) }}">{{ year.year }}{% if not year.complete %} YTD{% endif %}</a></th>{% endfor %}</tr></thead>
 {%- endmacro %}
 
+<div class="ye">
 <h2>Year in Review</h2>
 
 {% set role_errors = extension.roles()[1] %}
@@ -22,10 +94,12 @@
 {% set years = result.years %}
 {% set currency = result.currency %}
 {% set last = years[-1] %}
-<p>
+{% set previous = years[-2] if years|length > 1 else none %}
+{% set vs = previous.year if previous else none %}
+<p class="ye-subtitle">
   {{ years[0].year }}{% if years|length > 1 %}&ndash;{{ last.year }}{% endif %}, in {{ currency }}.
-  {% if not last.complete %}{{ last.year }} is year-to-date, through {{ last.end - extension.one_day }}; its
-  spending ratios use its spending so far, annualized.{% endif %}
+  {% if not last.complete %}{{ last.year }} is year-to-date, through {{ last.end - extension.one_day }}: its
+  spending ratios are annualized, and its income and spending aren't compared with whole years.{% endif %}
   Pick another final year with Fava's time filter.
 </p>
 {% if role_errors or result.unconverted %}
@@ -35,97 +109,130 @@
 </ul>
 {% endif %}
 
-<h3>Key metrics</h3>
-<table>
-  <thead>
-    <tr><th></th>{% for year in years %}<th class="num"><a href="{{ extension.year_url(year.year) }}">{{ year.year }}{% if not year.complete %} (YTD){% endif %}</a></th>{% endfor %}</tr>
-  </thead>
-  <tbody>
-    <tr><td><strong>Net worth</strong></td>{% for year in years %}<td class="num"><strong>{{ money(year.net_worth) }}</strong></td>{% endfor %}</tr>
-    {{ holding_row("Cash", "cash", "Accounts with the cash role") }}
-    {{ holding_row("Investments", "investing", "Assets with the investing role, at market value") }}
-    {{ holding_row("Debt", "debt", "Loans: liabilities with the financing role") }}
-    {{ holding_row("Other", "other", "E.g. credit card balances") }}
-    {{ money_row("Change", "net_worth_change") }}
-    <tr><td colspan="{{ years|length + 1 }}"></td></tr>
-    {{ money_row("Income", "income") }}
-    {{ money_row("Expenses", "expenses") }}
-    {{ money_row("Savings", "savings", "Income minus expenses") }}
-    <tr><td>Savings rate</td>{% for year in years %}<td class="num">{{ ratio(year.savings_rate, '%') }}</td>{% endfor %}</tr>
-    <tr><td colspan="{{ years|length + 1 }}"></td></tr>
-    <tr><td title="A year's spending as a share of net worth at its start, like a withdrawal rate in retirement">Spending / net worth</td>{% for year in years %}<td class="num">{{ ratio(year.spending_rate, '%', 2) }}</td>{% endfor %}</tr>
-    <tr><td title="Net worth at the year's end, divided by a year's spending">Net worth in years of spending</td>{% for year in years %}<td class="num">{{ ratio(year.years_of_spending, '') }}</td>{% endfor %}</tr>
-    <tr><td title="Cash at the year's end, divided by a month's spending">Cash in months of spending</td>{% for year in years %}<td class="num">{{ ratio(year.months_of_cash, '') }}</td>{% endfor %}</tr>
-  </tbody>
-</table>
+{# Headline metrics for the final year. #}
+{% macro card(label, value, change=none, unit="money", note="", title="") -%}
+<div class="ye-card" title="{{ title }}">
+  <div class="ye-card-label">{{ label }}</div>
+  <div class="ye-card-value">{{ value }}</div>
+  {{ delta(change, unit, vs) }}
+  {% if note %}<div class="ye-card-note">{{ note }}</div>{% endif %}
+</div>
+{%- endmacro %}
+<div class="ye-cards">
+  {{ card("Net worth", extension.money(last.net_worth), extension.changes([previous.net_worth, last.net_worth], [previous, last])[1] if previous else none) }}
+  {{ card("Savings rate", ratio(last.savings_rate, '%'), extension.changes([previous.savings_rate, last.savings_rate], [previous, last], flow=true)[1] if previous else none, "points",
+          extension.money(last.savings) ~ " saved") }}
+  {{ card("Income", extension.money(last.income), extension.changes([previous.income, last.income], [previous, last], flow=true)[1] if previous else none,
+          note=("year to date" if not last.complete else "")) }}
+  {{ card("Expenses", extension.money(last.expenses), extension.changes([previous.expenses, last.expenses], [previous, last], higher_is_better=false, flow=true)[1] if previous else none,
+          note=("year to date" if not last.complete else "")) }}
+  {{ card("Spending / net worth", ratio(last.spending_rate, '%', 2), extension.changes([previous.spending_rate, last.spending_rate], [previous, last], higher_is_better=false)[1] if previous else none, "points",
+          "of net worth at the year's start", "A year's spending as a share of net worth at its start, like a withdrawal rate in retirement") }}
+  {{ card("Years of spending", ratio(last.years_of_spending), extension.changes([previous.years_of_spending, last.years_of_spending], [previous, last])[1] if previous else none, "number",
+          "net worth ÷ a year's spending (25 = 4%)") }}
+  {{ card("Emergency fund", ratio(last.months_of_cash) ~ " mo", extension.changes([previous.months_of_cash, last.months_of_cash], [previous, last])[1] if previous else none, "number",
+          extension.money(last.holdings["cash"]) ~ " in cash") }}
+  {{ card("Debt paid down", extension.money(last.debts|sum(attribute='paid')), none, note=extension.money(last.debts|sum(attribute='end')) ~ " still owed") }}
+</div>
 
-<svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
+<div class="ye-columns">
+  <section class="ye-panel">
+    <h3>Net worth</h3>
+    <table>
+      {{ year_header() }}
+      <tbody>
+        {{ yearly_row("Cash", years|map(attribute="holdings.cash")|list, title="Accounts with the cash role") }}
+        {{ yearly_row("Investments", years|map(attribute="holdings.investing")|list, title="Assets with the investing role, at market value") }}
+        {{ yearly_row("Debt", years|map(attribute="holdings.debt")|list, title="Loans: liabilities with the financing role") }}
+        {{ yearly_row("Other", years|map(attribute="holdings.other")|list, title="E.g. credit card balances") }}
+        {{ yearly_row("Net worth", years|map(attribute="net_worth")|list, total=true) }}
+      </tbody>
+    </table>
+  </section>
+  <section class="ye-panel">
+    <h3>Income &amp; savings</h3>
+    <table>
+      {{ year_header() }}
+      <tbody>
+        {{ yearly_row("Income", years|map(attribute="income")|list, flow=true) }}
+        {{ yearly_row("Expenses", years|map(attribute="expenses")|list, higher=false, flow=true) }}
+        {{ yearly_row("Savings", years|map(attribute="savings")|list, flow=true, title="Income minus expenses") }}
+        {{ yearly_row("Savings rate", years|map(attribute="savings_rate")|list, "points", flow=true) }}
+        {{ yearly_row("Spending / net worth", years|map(attribute="spending_rate")|list, "points", higher=false,
+                      title="A year's spending as a share of net worth at its start, like a withdrawal rate in retirement") }}
+        {{ yearly_row("Years of spending", years|map(attribute="years_of_spending")|list, "number",
+                      title="Net worth at the year's end, divided by a year's spending") }}
+      </tbody>
+    </table>
+  </section>
+</div>
 
-<h3>Expenses by category</h3>
-{% set categories = extension.categories(result) %}
-{% if categories %}
-<sortable-table>
-<table>
-  <thead>
-    <tr>
-      <th data-sort="string">Category</th>
-      {% for year in years %}<th data-sort="num" class="num">{{ year.year }}</th>{% endfor %}
-      <th data-sort="num" class="num">Share of {{ last.year }}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for category in categories %}
-    <tr>
-      <td><a href="{{ extension.account_url(category, last.year) }}">{{ category }}</a></td>
-      {% for year in years %}
-      {% set value = year.expenses_by_category.get(category, 0) %}
-      <td class="num" data-sort-value="{{ value }}"><a href="{{ extension.account_url(category, year.year) }}">{{ money(value) }}</a></td>
-      {% endfor %}
-      {% set share = (100 * last.expenses_by_category.get(category, 0) / last.expenses) if last.expenses else none %}
-      <td class="num" data-sort-value="{{ share or 0 }}">{{ ratio(share, '%') }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-  <tfoot>
-    <tr><th>Total</th>{% for year in years %}<th class="num">{{ money(year.expenses) }}</th>{% endfor %}<th></th></tr>
-  </tfoot>
-</table>
-</sortable-table>
-{% else %}
-<p>No expenses.</p>
-{% endif %}
+<section class="ye-panel">
+  <svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
+</section>
 
-<h3>Debt paydown in {{ last.year }}</h3>
-{% if last.debts %}
-<table>
-  <thead>
-    <tr><th>Loan</th><th class="num">Owed at start</th><th class="num">Borrowed</th><th class="num">Paid down</th><th class="num">Owed at end</th></tr>
-  </thead>
-  <tbody>
-    {% for debt in last.debts %}
-    <tr>
-      <td><a href="{{ extension.account_url(debt.account, last.year) }}">{{ debt.account }}</a></td>
-      <td class="num">{{ money(debt.start) }}</td>
-      <td class="num">{{ money(debt.borrowed) }}</td>
-      <td class="num">{{ money(debt.paid) }}</td>
-      <td class="num">{{ money(debt.end) }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-  <tfoot>
-    <tr>
-      <th>Total</th>
-      <th class="num">{{ money(last.debts|sum(attribute='start')) }}</th>
-      <th class="num">{{ money(last.debts|sum(attribute='borrowed')) }}</th>
-      <th class="num">{{ money(last.debts|sum(attribute='paid')) }}</th>
-      <th class="num">{{ money(last.debts|sum(attribute='end')) }}</th>
-    </tr>
-  </tfoot>
-</table>
-<p>Paid down is principal: payments to the loan accounts. Interest is in expenses.</p>
-{% else %}
-<p>No loans (liabilities with the <code>financing</code> role) with a balance or activity.</p>
-{% endif %}
+<div class="ye-columns" style="margin-top: 1rem">
+  <section class="ye-panel">
+    <h3>Expenses by category</h3>
+    {% set categories = extension.categories(result) %}
+    {% if categories %}
+    <table>
+      {{ year_header() }}
+      <tbody>
+        {% for category in categories %}
+        {% set values = extension.category_values(result, category) %}
+        {% set found = extension.changes(values, years, higher_is_better=false, flow=true) %}
+        {% set share = (100 * values[-1] / last.expenses) if last.expenses else 0 %}
+        <tr>
+          <td>
+            <a href="{{ extension.account_url(category, last.year) }}">{{ category }}</a>
+            <div class="ye-bar ye-share" title="{{ '%.1f'|format(share) }}% of {{ last.year }}'s expenses"><span style="width: {{ '%.1f'|format(share if share > 0 else 0) }}%"></span></div>
+          </td>
+          {% for value in values %}
+          <td class="num"><a href="{{ extension.account_url(category, years[loop.index0].year) }}">{{ extension.money(value) }}</a>{{ delta(found[loop.index0]) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        {{ yearly_row("Total", years|map(attribute="expenses")|list, higher=false, flow=true, total=true) }}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No expenses.</p>
+    {% endif %}
+  </section>
+  <section class="ye-panel">
+    <h3>Debt paydown in {{ last.year }}</h3>
+    {% if last.debts %}
+    <table>
+      <thead><tr><th>Loan</th><th class="num">Owed at start</th><th class="num">Borrowed</th><th class="num">Paid down</th><th class="num">Owed at end</th></tr></thead>
+      <tbody>
+        {% for debt in last.debts %}
+        <tr>
+          <td>
+            <a href="{{ extension.account_url(debt.account, last.year) }}">{{ debt.account }}</a>
+            <div class="ye-bar" title="{{ '%.1f'|format(extension.paid_share(debt)) }}% of the starting balance paid down"><span style="width: {{ '%.1f'|format(extension.paid_share(debt)) }}%"></span></div>
+          </td>
+          <td class="num">{{ extension.money(debt.start) }}</td>
+          <td class="num{% if debt.borrowed %} ye-bad{% endif %}">{{ extension.money(debt.borrowed) }}</td>
+          <td class="num{% if debt.paid %} ye-good{% endif %}">{{ extension.money(debt.paid) }}</td>
+          <td class="num">{{ extension.money(debt.end) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="ye-total">
+          <td>Total</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='start')) }}</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='borrowed')) }}</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='paid')) }}</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='end')) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="ye-card-note">Paid down is principal: payments to the loan accounts. Interest is in expenses.</p>
+    {% else %}
+    <p>No loans (liabilities with the <code>financing</code> role) with a balance or activity.</p>
+    {% endif %}
+  </section>
+</div>
 {% endif %}
 
 <details>
@@ -157,12 +264,17 @@
     <li>The review shows up to five years, ending with the last year of Fava's time filter, or this
       year without one. Other filters don't apply: it always covers whole years of the whole
       ledger.</li>
-    <li>Values are in the first operating currency: holdings at market value at each year's end
-      (or at cost without a price), income and expenses at their value on each transaction's
-      date.</li>
+    <li>Values are in the first operating currency, rounded to whole units: holdings at market
+      value at each year's end (or at cost without a price), income and expenses at their value on
+      each transaction's date.</li>
+    <li>Changes from the previous year are green when they're good (e.g. more savings, less
+      spending or debt) and red when they're bad. A year-to-date year's income and spending
+      aren't compared with whole years.</li>
     <li><em>Spending / net worth</em> is a year's expenses as a share of net worth at its start,
-      like a withdrawal rate in retirement. <em>Net worth in years of spending</em> is its inverse,
-      at the year's end (25 years is a 4% rate).</li>
-    <li>Click a year for its income statement, or a category or loan for its account page.</li>
+      like a withdrawal rate in retirement. <em>Years of spending</em> is its inverse, at the
+      year's end (25 years is a 4% rate).</li>
+    <li>Click a year for its income statement, a category or loan for its account page, or a bar
+      in the charts to make that the final year.</li>
   </ul>
 </details>
+</div>

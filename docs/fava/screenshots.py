@@ -1,21 +1,26 @@
-"""Regenerate the Fava extension screenshots in ``images/`` from ``example.beancount``.
+"""Regenerate the Fava extension screenshots in ``images/`` from the example ledgers.
 
-Run from the repository root:
+Run from the repository root, naming the screenshots to regenerate (all of them
+without names), so that changing one extension doesn't touch the others':
 
-    uv run --with playwright python docs/fava/screenshots.py
+    uv run --with playwright python docs/fava/screenshots.py year-in-review
 
 (If Playwright has no browser yet, first run
 ``uv run --with playwright playwright install chromium``.)
 
-It serves the example ledger with Fava on a free port, opens each extension's
+It serves the example ledgers with Fava on a free port, opens each extension's
 page in headless Chromium and saves the page's content area as a PNG. It only
 looks at pages: Batch Edit's search is previewed, never applied.
+
+``example.beancount`` holds the data for most screenshots. An extension whose
+data would change the others' (e.g. years of history) has a ledger of its own.
 """
 
 from __future__ import annotations
 
 import socket
 import subprocess
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -23,7 +28,11 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 
 HERE = Path(__file__).parent
-LEDGER = HERE / "example.beancount"
+# The example ledgers, by the URL slug Fava gives them (from their titles).
+LEDGERS = {
+    "example": HERE / "example.beancount",
+    "household": HERE / "year-in-review.beancount",
+}
 IMAGES = HERE / "images"
 
 
@@ -75,48 +84,83 @@ def save(page: Page, name: str, selector: str = "article", margin: int = 24) -> 
     print(f"wrote {IMAGES / name}.png")
 
 
-def main() -> None:
+def report_url(root: str, ledger: str, report: str) -> str:
+    """The URL of an extension's report, e.g. ``Checkbook/``, in one of the ledgers."""
+    return f"{root}/{ledger}/extension/{report}"
+
+
+def checkbook(page: Page, root: str) -> None:
+    page.goto(report_url(root, "example", "Checkbook/"), wait_until="networkidle")
+    save(page, "checkbook")
+
+
+def batch_edit(page: Page, root: str) -> None:
+    search = "payee_regex=sq%20%5C*corner&new_payee=%7Bplaid_payee%7D"
+    page.goto(report_url(root, "example", f"BatchEdit/?{search}"), wait_until="networkidle")
+    page.locator("#batch-edit-apply").wait_for()
+    save(page, "batch-edit")
+
+
+def rewards(page: Page, root: str) -> None:
+    page.goto(report_url(root, "example", "CreditCardRewards/"), wait_until="networkidle")
+    page.get_by_text("Icicle", exact=True).click()
+    save(page, "rewards")
+
+
+def update_status(page: Page, root: str) -> None:
+    page.goto(report_url(root, "example", "UpdateStatus/"), wait_until="networkidle")
+    save(page, "update-status")
+
+
+def travel(page: Page, root: str) -> None:
+    page.goto(report_url(root, "example", "Travel/"), wait_until="networkidle")
+    page.get_by_text("Icicle", exact=True).click()
+    save(page, "travel")
+    page.click('a[href*="chart=Over"]')
+    page.wait_for_load_state("networkidle")
+    save(page, "travel-over-time", "svelte-component", margin=0)
+
+
+def payees(page: Page, root: str) -> None:
+    page.goto(report_url(root, "example", "PayeeReview/"), wait_until="networkidle")
+    save(page, "payees")
+
+
+def year_in_review(page: Page, root: str) -> None:
+    page.goto(report_url(root, "household", "YearInReview/?time=2024"), wait_until="networkidle")
+    save(page, "year-in-review")
+
+
+# Each screenshot's name, and the function that saves it (``travel`` saves two).
+SCREENSHOTS = {
+    "checkbook": checkbook,
+    "batch-edit": batch_edit,
+    "rewards": rewards,
+    "update-status": update_status,
+    "travel": travel,
+    "payees": payees,
+    "year-in-review": year_in_review,
+}
+
+
+def main(names: list[str]) -> None:
+    unknown = set(names) - set(SCREENSHOTS)
+    if unknown:
+        sys.exit(f"Unknown screenshots: {sorted(unknown)}; choose from {sorted(SCREENSHOTS)}")
     port = free_port()
-    base = f"http://127.0.0.1:{port}/example/extension"
+    root = f"http://127.0.0.1:{port}"
     fava = subprocess.Popen(
-        ["fava", str(LEDGER), "--port", str(port)],
+        ["fava", *map(str, LEDGERS.values()), "--port", str(port)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     try:
-        wait_for(f"{base}/Checkbook/")
+        wait_for(f"{root}/example/")
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page(viewport={"width": 1300, "height": 800}, device_scale_factor=2)
-
-            page.goto(f"{base}/Checkbook/", wait_until="networkidle")
-            save(page, "checkbook")
-
-            search = "payee_regex=sq%20%5C*corner&new_payee=%7Bplaid_payee%7D"
-            page.goto(f"{base}/BatchEdit/?{search}", wait_until="networkidle")
-            page.locator("#batch-edit-apply").wait_for()
-            save(page, "batch-edit")
-
-            page.goto(f"{base}/CreditCardRewards/", wait_until="networkidle")
-            page.get_by_text("Icicle", exact=True).click()
-            save(page, "rewards")
-
-            page.goto(f"{base}/UpdateStatus/", wait_until="networkidle")
-            save(page, "update-status")
-
-            page.goto(f"{base}/Travel/", wait_until="networkidle")
-            page.get_by_text("Icicle", exact=True).click()
-            save(page, "travel")
-            page.click('a[href*="chart=Over"]')
-            page.wait_for_load_state("networkidle")
-            save(page, "travel-over-time", "svelte-component", margin=0)
-
-            page.goto(f"{base}/PayeeReview/", wait_until="networkidle")
-            save(page, "payees")
-
-            page.goto(f"{base}/YearInReview/?time=2024", wait_until="networkidle")
-            save(page, "year-in-review")
-
+            for name in names or SCREENSHOTS:
+                SCREENSHOTS[name](page, root)
             browser.close()
     finally:
         fava.terminate()
@@ -124,4 +168,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

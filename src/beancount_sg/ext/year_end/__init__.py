@@ -29,6 +29,8 @@ Accounts are classified with ``cash-flow-role`` metadata, or by their names; see
 from __future__ import annotations
 
 import datetime
+from collections.abc import Iterable
+from dataclasses import dataclass
 from decimal import Decimal
 
 from beancount.core.account_types import get_account_type
@@ -44,6 +46,7 @@ from flask import url_for
 
 from beancount_sg.year_end import (
     ONE_DAY,
+    Debt,
     Role,
     YearEnd,
     YearSummary,
@@ -53,11 +56,100 @@ from beancount_sg.year_end import (
 )
 
 
+@dataclass(frozen=True)
+class Change:
+    """A metric's change from the previous year, and whether that's good."""
+
+    diff: Decimal
+    percent: Decimal | None  # relative to the previous value, if it isn't zero
+    good: bool | None  # None when unchanged
+
+    @property
+    def tone(self) -> str:
+        """The change's CSS class: good, bad or flat."""
+        if self.good is None:
+            return "flat"
+        return "good" if self.good else "bad"
+
+    @property
+    def arrow(self) -> str:
+        return "▲" if self.diff > 0 else "▼" if self.diff < 0 else "■"
+
+    def label(self, unit: str = "money") -> str:
+        """The change as shown: an amount and percentage, percentage ``points``, or a ``number``."""
+        if not self.diff:
+            return "no change"
+        if unit == "points":
+            return f"{_signed(self.diff, 1)} pts"
+        if unit == "number":
+            return _signed(self.diff, 1)
+        percent = f" ({_signed(self.percent, 1)}%)" if self.percent is not None else ""
+        return _signed(self.diff, 0) + percent
+
+
+def _signed(value: Decimal, digits: int) -> str:
+    """A number with a + or − sign (a minus, not a hyphen) and thousands separators."""
+    sign = "+" if value > 0 else "−" if value < 0 else ""
+    return f"{sign}{abs(value):,.{digits}f}"
+
+
+def change(
+    current: Decimal | None, previous: Decimal | None, *, higher_is_better: bool = True
+) -> Change | None:
+    """The change from ``previous`` to ``current``, if both are known."""
+    if current is None or previous is None:
+        return None
+    diff = current - previous
+    percent = 100 * diff / abs(previous) if previous else None
+    good = None if not diff else (diff > 0) == higher_is_better
+    return Change(diff, percent, good)
+
+
+def changes(
+    values: Iterable[Decimal | None],
+    years: list[YearSummary],
+    *,
+    higher_is_better: bool = True,
+    flow: bool = False,
+) -> list[Change | None]:
+    """Each year's change from the previous year (None for the first).
+
+    A ``flow`` (e.g. income) isn't compared for a year-to-date year, whose total
+    isn't comparable with a whole year's.
+    """
+    values = list(values)
+    found: list[Change | None] = [None]
+    for i in range(1, len(values)):
+        if flow and not years[i].complete:
+            found.append(None)
+        else:
+            found.append(change(values[i], values[i - 1], higher_is_better=higher_is_better))
+    return found
+
+
+def money(value: Decimal | None) -> str:
+    """An amount rounded to whole units, with thousands separators."""
+    return "—" if value is None else f"{value:,.0f}"
+
+
 class YearInReview(FavaExtensionBase):
     """Fava report of yearly financial metrics."""
 
     report_title = "Year in Review"
     one_day = ONE_DAY
+    # For the template.
+    changes = staticmethod(changes)
+    money = staticmethod(money)
+
+    @staticmethod
+    def category_values(result: YearEnd, category: str) -> list[Decimal]:
+        """A category's expenses in each year."""
+        return [year.expenses_by_category.get(category, Decimal(0)) for year in result.years]
+
+    @staticmethod
+    def paid_share(debt: Debt) -> Decimal:
+        """How much of a loan's starting balance was paid down, as a percentage."""
+        return min(Decimal(100), 100 * debt.paid / debt.start) if debt.start > 0 else Decimal(0)
 
     def end_year(self) -> int:
         """The last year of Fava's time filter, or the current year."""
@@ -82,10 +174,21 @@ class YearInReview(FavaExtensionBase):
         if not currency:
             return None
         entries = self.ledger.all_entries
-        first = next((entry.date.year for entry in entries if isinstance(entry, Transaction)), None)
+        account_types = get_account_types(self.ledger.options)
+        # Years start with the first with income or expenses: before that, there are
+        # at most opening balances, which the next year starts from anyway.
+        flows = (account_types.income, account_types.expenses)
+        first = next(
+            (
+                entry.date.year
+                for entry in entries
+                if isinstance(entry, Transaction)
+                and any(get_account_type(p.account) in flows for p in entry.postings)
+            ),
+            None,
+        )
         years = years_ending(self.end_year(), first) if first else []
         roles, _ = self.roles()
-        account_types = get_account_types(self.ledger.options)
         return year_end(entries, roles, account_types, currency, years, local_today())
 
     def classified(self) -> list[tuple[str, Role]]:
