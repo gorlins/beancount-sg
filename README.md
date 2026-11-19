@@ -227,10 +227,6 @@ Accounts' cash-flow roles (`cash`, `operating`, `investing`, `financing`) from `
 metadata on their `open` directives, or their names: the convention Beancount.io's cash-flow report
 uses.
 
-### `beancount_sg.valuation`
-
-Values of postings and holdings in one currency, reporting what couldn't be converted, for reports.
-
 ### `beancount_sg.batch_edit`
 
 The editing logic behind the Batch Edit report, independent of Fava: plan payee and category

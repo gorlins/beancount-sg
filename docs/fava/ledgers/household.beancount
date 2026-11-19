@@ -15,6 +15,7 @@ option "operating_currency" "USD"
   cash-flow-role: "investing"
 2019-12-01 open Liabilities:Home:Mortgage USD
 2019-12-01 open Liabilities:CreditCard USD
+  cash-flow-role: "operating"
 2019-12-01 open Expenses:Food:Groceries USD
 2019-12-01 open Expenses:Food:Restaurants USD
 2019-12-01 open Expenses:Home:MortgageInterest USD

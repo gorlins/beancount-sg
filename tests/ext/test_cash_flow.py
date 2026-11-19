@@ -49,23 +49,32 @@ def panel(body, title):
     return text(body[start : body.index("</section>", start)])
 
 
-def test_defaults_to_this_year_to_date(tmp_path):
+def test_defaults_to_the_last_12_months(tmp_path):
     body = text(page(tmp_path))
-    assert "2024-01-01 to 2024-09-30, in USD." in body
+    # Today is 2024-09-30: this month and the 11 before.
+    assert "2023-10-01 to 2024-09-30, in USD." in body
 
 
-def test_cards(tmp_path):
+def test_cards_say_what_each_total_means(tmp_path):
     body = page(tmp_path, query="?time=2024")
     cards = text(
         body[body.index('<div class="cf-cards">') : body.index('<div class="cf-columns">')]
     )
-    assert "Net change in cash +2,900 10,000 → 12,900" in cards
-    assert "operating activities +4,400" in cards
-    assert "investing activities −1,000" in cards
-    assert "financing activities −500" in cards
-    # Money in is green, money out red.
-    assert '<span class="cf-good">+4,400</span>' in body
-    assert '<span class="cf-bad">−1,000</span>' in body
+    assert "operating activities +4,400 income exceeded spending" in cards
+    assert "investing activities −1,000 net invested" in cards
+    assert "financing activities −500 net repaid (loans and cards)" in cards
+    assert "Net change in cash +2,900 cash grew: 10,000 → 12,900" in cards
+    # 600 spent in 2024: 49.9 a month, which 12,900 of cash covers 258.5 times.
+    assert "Emergency fund 258.5 mo of spending (50/mo); 258.5 mo without savings accounts" in cards
+
+
+def test_only_operating_cash_is_colored(tmp_path):
+    body = page(tmp_path, query="?time=2024")
+    assert '<span class="cf-good">+4,400</span>' in body  # a surplus
+    assert '<span class="cf-neutral">−1,000</span>' in body  # invested: not bad
+    assert '<span class="cf-neutral">−500</span>' in body
+    deficit = LEDGER.replace("Assets:Bank:Checking  5000 USD", "Assets:Bank:Checking  50 USD")
+    assert '<span class="cf-bad">−550</span>' in page(tmp_path, deficit, query="?time=2024")
 
 
 def test_statement(tmp_path):

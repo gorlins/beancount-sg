@@ -11,10 +11,14 @@ cash (accounts with the ``cash`` role) over the period by every other account's
 flows, in operating, investing and financing sections; see
 `beancount_sg.ext.cash_flow.statement`.
 
-The period is Fava's time filter, or this year (to date) without one. Fava's
+The period is Fava's time filter, or the last 12 months without one. Fava's
 account and advanced filters apply, as on Fava's own reports. The page has:
 
-- Cards with the net change in cash and each activity's total.
+- Cards with each activity's total and what it means (e.g. investing -9,640 is
+  "net invested"), the net change in cash, and the emergency fund: how many
+  months of the period's average spending cash covers, with and without savings
+  accounts. Only operating cash is colored, green for a surplus and red for a
+  deficit: investing and financing flows aren't good or bad by their sign.
 - The statement: each activity's lines and total, and the net change in cash.
 - A chart of each activity's flows per interval (Fava's interval menu).
 - The reconciliation: each cash account at the start and end, with the change
@@ -38,7 +42,7 @@ from fava.internal_api import BarChart
 from fava.util.date import dateranges, local_today
 from flask import request, url_for
 
-from beancount_sg.cash_flow_roles import CASH, Role, account_roles
+from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, Role, account_roles
 
 from .statement import ACTIVITIES, ONE_DAY, Statement, by_interval, role_of, statement
 
@@ -56,9 +60,34 @@ def balance(value: Decimal) -> str:
     return f"{value:,.0f}"
 
 
-def tone(value: Decimal) -> str:
-    """A flow's CSS class: money in is good, money out bad."""
-    return "good" if value > 0 else "bad" if value < 0 else "flat"
+def tone(activity: str | None, value: Decimal) -> str:
+    """A total's CSS class: colored only where its sign is clearly good or bad.
+
+    Only operating cash is: a surplus (income over spending) is good, and a
+    deficit bad. Investing and financing go either way: money out of cash into
+    investments, or to repay a loan, is usually good.
+    """
+    if activity != OPERATING or not value:
+        return "neutral"
+    return "good" if value > 0 else "bad"
+
+
+# What an activity's total means, when it's money in (+) or out (-) of cash.
+MEANINGS = {
+    (OPERATING, True): "income exceeded spending",
+    (OPERATING, False): "spending exceeded income",
+    (INVESTING, True): "net withdrawn from investments",
+    (INVESTING, False): "net invested",
+    (FINANCING, True): "net borrowed",
+    (FINANCING, False): "net repaid (loans and cards)",
+    (CASH, True): "cash grew",
+    (CASH, False): "cash shrank",
+}
+
+
+def meaning(activity: str, value: Decimal) -> str:
+    """What an activity's total (or, for ``cash``, the net change) means."""
+    return MEANINGS[(activity, value >= 0)] if value else "no change"
 
 
 class CashFlow(FavaExtensionBase):
@@ -72,14 +101,19 @@ class CashFlow(FavaExtensionBase):
     money = staticmethod(money)
     balance = staticmethod(balance)
     tone = staticmethod(tone)
+    meaning = staticmethod(meaning)
 
     def period(self) -> tuple[datetime.date, datetime.date]:
-        """Fava's time filter, or this year to date: the first day, and the day after the last."""
+        """Fava's time filter, or the last 12 months: the first day, and the day after the last.
+
+        The last 12 months are this month to date and the 11 before it.
+        """
         date_range = g.filtered.date_range
         if date_range:
             return date_range.begin, date_range.end
         today = local_today()
-        return datetime.date(today.year, 1, 1), today + ONE_DAY
+        months = today.year * 12 + today.month - 1 - 11
+        return datetime.date(months // 12, months % 12 + 1, 1), today + ONE_DAY
 
     def currency(self) -> str | None:
         """The ledger's first operating currency, which values are shown in."""

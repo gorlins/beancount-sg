@@ -1,8 +1,10 @@
-"""Values of postings and holdings in one currency, for reports.
+"""Values of postings and holdings in one currency, for the Fava reports.
 
-Unlike Beancount's own conversions, which leave amounts they can't convert as they
-are, these report what couldn't be converted (for lack of prices) by currency, so
-a report can total the rest and say what it left out.
+Beancount's conversion functions return an amount they can't convert (for lack
+of a price) unchanged, in its own currency. A report that adds values up in one
+currency has to catch those, or it adds numbers in different currencies. These
+do that, leave such amounts out and collect their currencies for the report to
+show. Holdings without a market price yet are valued at cost.
 """
 
 from __future__ import annotations

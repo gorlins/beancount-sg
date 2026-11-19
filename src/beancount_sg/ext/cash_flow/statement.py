@@ -15,11 +15,16 @@ at each transaction's date. Cash at the start and end is valued at its market
 value then: the difference, if any (e.g. from exchange rates moving while cash is
 held in another currency), is shown as its own line, so the statement always
 reconciles.
+
+The statement also totals the period's spending (its expense accounts), for the
+emergency fund: how many months of average spending cash at the end covers, with
+and without cash accounts named Savings.
 """
 
 from __future__ import annotations
 
 import datetime
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -39,10 +44,14 @@ from beancount_sg.cash_flow_roles import (
     Role,
     default_role,
 )
-from beancount_sg.valuation import market_values, posting_value
+
+from .._valuation import market_values, posting_value
 
 ACTIVITIES = (OPERATING, INVESTING, FINANCING)
 ONE_DAY = datetime.timedelta(days=1)
+# Cash accounts that hold savings, rather than money to spend, by name.
+SAVINGS_NAMES = re.compile(r"savings", re.IGNORECASE)
+DAYS_PER_MONTH = Decimal("365.25") / 12
 
 
 @dataclass
@@ -62,6 +71,8 @@ class Statement:
     # Cash accounts' values at the start and end.
     cash_start: dict[str, Decimal] = field(default_factory=dict)
     cash_end: dict[str, Decimal] = field(default_factory=dict)
+    # Spending over the period: the expense accounts' total.
+    expenses: Decimal = Decimal(0)
     unconverted: set[str] = field(default_factory=set)
 
     def lines(self, activity: str) -> list[tuple[str, Decimal]]:
@@ -89,6 +100,29 @@ class Statement:
     def valuation_change(self) -> Decimal:
         """The change in cash's value the activities don't explain, e.g. exchange rates."""
         return self.cash_end_total - self.cash_start_total - self.net_change
+
+    @property
+    def monthly_expenses(self) -> Decimal:
+        """Average spending per month over the period."""
+        return self.expenses / (Decimal((self.end - self.begin).days) / DAYS_PER_MONTH)
+
+    def months_of_cash(self, *, savings: bool = True) -> Decimal | None:
+        """How many months of the period's average spending cash at the end covers.
+
+        Without ``savings``, only cash accounts not named Savings: the money on
+        hand to spend.
+        """
+        if self.monthly_expenses <= 0:
+            return None
+        cash = sum(
+            (
+                value
+                for account, value in self.cash_end.items()
+                if savings or not SAVINGS_NAMES.search(account)
+            ),
+            Decimal(0),
+        )
+        return cash / self.monthly_expenses
 
     @property
     def cash_accounts(self) -> list[str]:
@@ -139,6 +173,8 @@ def statement(
                 value = posting_value(posting, currency, price_map, txn.date, result.unconverted)
                 # Money into the account is money out of cash, and the reverse.
                 result.sections[role][line_of(posting.account, account_types)] -= value
+                if get_account_type(posting.account) == account_types.expenses:
+                    result.expenses += value
     result.cash_start = market_values(
         start_balances, currency, price_map, begin - ONE_DAY, result.unconverted
     )

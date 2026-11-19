@@ -38,7 +38,8 @@ from beancount.core.data import Directive, Open, Transaction
 from beancount.core.inventory import Inventory
 
 from beancount_sg.cash_flow_roles import CASH, FINANCING, Role
-from beancount_sg.valuation import market_values, posting_value
+
+from .._valuation import market_values, posting_value
 
 INVESTABLE_KEY = "investable"
 # Names of liabilities that are credit cards, rather than loans, by default.

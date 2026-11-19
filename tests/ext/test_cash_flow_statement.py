@@ -1,6 +1,7 @@
 """Tests for the Cash Flow report's calculations (see test_cash_flow.py for the page)."""
 
 import datetime
+from decimal import Decimal
 
 from beancount.core import prices
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
@@ -116,6 +117,24 @@ def test_exchange_rates_change_cash_value():
     assert result.cash_start["Assets:Bank:Euro"] == 110
     assert result.cash_end["Assets:Bank:Euro"] == 120
     assert result.valuation_change == 10  # not from any activity
+
+
+def test_emergency_fund():
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Assets:Bank:Savings USD
+2023-12-31 * "Savings"
+  Assets:Bank:Savings  6000 USD
+  Equity:Opening
+"""
+    )
+    result = run(ledger)
+    # 600 spent over 2024's 366 days.
+    assert result.expenses == 600
+    assert result.monthly_expenses == Decimal(600) / (Decimal(366) / (Decimal("365.25") / 12))
+    assert result.months_of_cash() == (12900 + 6000) / result.monthly_expenses
+    assert result.months_of_cash(savings=False) == 12900 / result.monthly_expenses
 
 
 def test_by_interval():

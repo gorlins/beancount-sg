@@ -24,17 +24,36 @@ on the account's `open` directive:
   between cash accounts doesn't show up.
 - **Operating, investing and financing** (`operating`, `investing`, `financing`): every other
   account's flows over the period are a line in its role's section, as its effect on cash: money
-  in is positive (green), money out negative (red). Income and expenses are rolled up to their
-  top-level category, e.g. `Expenses:Food`.
+  in is positive, money out negative. Income and expenses are rolled up to their top-level
+  category, e.g. `Expenses:Food`.
+
+What each section's total means:
+
+| Section | Positive | Negative |
+| --- | --- | --- |
+| **Operating** | Income exceeded spending: a surplus to save | Spending exceeded income |
+| **Investing** | More withdrawn from investments than put in | More invested than withdrawn |
+| **Financing** | More borrowed than repaid | More repaid (loans, and cards if `financing`) than borrowed |
+
+Only the operating total is colored, green for a surplus and red for a deficit, since that's
+clearly good or bad. Investing and financing aren't: a negative investing total is money out of
+cash, but it's savings going into investments.
 
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
 income and expenses `operating`. An unknown role is reported, and the default used. The page's
 "How accounts are classified" section lists each account's role and where it came from.
 
-**Credit cards** are liabilities, so `financing` by default: spending on a card is operating
-spending borrowed from the card, and paying it off repays it. Declare `cash-flow-role: "operating"`
-on a card to keep it in operating, where card spending and payments net out.
+**Declare credit cards `operating`.** The default for every liability, credit cards included, is
+`financing`: the convention doesn't single cards out, and neither does this report's inference. So
+by default, card spending shows as borrowing (financing in) and paying the card off as repaying it
+(financing out), which mixes everyday spending into financing. Declared `operating`, a card's
+balance change sits beside the spending it paid for, and financing is left to loans:
+
+```beancount
+2020-01-01 open Liabilities:CreditCard:Visa
+  cash-flow-role: "operating"
+```
 
 ## Reconciliation
 
@@ -44,9 +63,16 @@ end. Flows are valued at each transaction's date and cash at its market value at
 end, in the first `operating_currency`. If those differ, e.g. from exchange rates moving on cash
 held in another currency, a **change in value** line shows the difference.
 
+## Emergency fund
+
+How many months of spending your cash covers: cash at the end of the period, divided by the
+period's average monthly spending (its expenses). It's also shown without cash accounts named
+Savings, i.e. counting only the money on hand to spend.
+
 ## Period and filters
 
-The period is Fava's time filter, or this year to date without one. Fava's account and advanced
+The period is Fava's time filter, or the last 12 months (this month to date and the 11 before it)
+without one. Fava's account and advanced
 filters apply, as on Fava's own reports.
 
 The chart shows each activity's flows per interval, from the chart's interval menu (e.g. monthly).
