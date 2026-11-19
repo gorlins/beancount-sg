@@ -32,12 +32,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from beancount.core import account as account_lib
-from beancount.core import convert, prices
+from beancount.core import prices
 from beancount.core.account_types import AccountTypes, get_account_type
-from beancount.core.data import Directive, Open, Posting, Transaction
+from beancount.core.data import Directive, Open, Transaction
 from beancount.core.inventory import Inventory
 
 from beancount_sg.cash_flow_roles import CASH, FINANCING, Role, self_and_parents
+from beancount_sg.valuation import market_values, posting_value
 
 INVESTABLE_KEY = "investable"
 # Names of liabilities that are credit cards, rather than loans, by default.
@@ -283,7 +284,7 @@ def year_end(
             if not counted:
                 continue
             if root in (account_types.income, account_types.expenses):
-                value = _flow_value(posting, currency, price_map, txn.date, unconverted)
+                value = posting_value(posting, currency, price_map, txn.date, unconverted)
                 if root == account_types.income:
                     summary.income -= value
                 else:
@@ -294,8 +295,10 @@ def year_end(
 
     for summary in summaries:
         start, end = snapshots[summary.start], snapshots[summary.end]
-        start_values = _values(start, currency, price_map, summary.start - ONE_DAY, unconverted)
-        end_values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
+        start_values = market_values(
+            start, currency, price_map, summary.start - ONE_DAY, unconverted
+        )
+        end_values = market_values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
         summary.holdings_start = _by_group(start_values, classes)
         summary.holdings = _by_group(end_values, classes)
         summary.debts = _debts(
@@ -332,44 +335,6 @@ def _snapshot(
         snapshots[boundaries.pop(0)] = {account: Inventory(i) for account, i in balances.items()}
 
 
-def _flow_value(
-    posting: Posting,
-    currency: str,
-    price_map: prices.PriceMap,
-    date: datetime.date,
-    unconverted: set[str],
-) -> Decimal:
-    """A posting's value in ``currency`` on its date, or 0 if it can't be converted."""
-    amount = convert.convert_amount(convert.get_weight(posting), currency, price_map, date)
-    if amount.currency != currency:
-        unconverted.add(amount.currency)
-        return Decimal(0)
-    return amount.number
-
-
-def _values(
-    balances: Mapping[str, Inventory],
-    currency: str,
-    price_map: prices.PriceMap,
-    date: datetime.date,
-    unconverted: set[str],
-) -> dict[str, Decimal]:
-    """Each account's market value in ``currency`` on the date, or its cost without a price."""
-    values: dict[str, Decimal] = defaultdict(Decimal)
-    for account, inventory in balances.items():
-        for position in inventory:
-            amount = convert.convert_position(position, currency, price_map, date)
-            if amount.currency != currency and position.cost:
-                # No market price yet: value it at cost.
-                cost = convert.get_cost(position)
-                amount = convert.convert_amount(cost, currency, price_map, date)
-            if amount.currency != currency:
-                unconverted.add(amount.currency)
-                continue
-            values[account] += amount.number
-    return values
-
-
 def _debts(
     entries: list[Directive],
     summary: YearSummary,
@@ -399,7 +364,7 @@ def _debts(
             if _group(posting.account, classes) != DEBT:
                 continue
             debt = debts.setdefault(posting.account, Debt(posting.account))
-            value = _flow_value(posting, currency, price_map, txn.date, unconverted)
+            value = posting_value(posting, currency, price_map, txn.date, unconverted)
             if value > 0:
                 debt.paid += value
             else:

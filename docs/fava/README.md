@@ -20,3 +20,4 @@ account and filter selection; Update Status covers the whole ledger.
 | [`beancount_sg.ext.travel`](travel.md) | Travel | Travel spending by trip and category |
 | [`beancount_sg.ext.payees`](payees.md) | Payee Review | Payees likely miscategorized or duplicated |
 | [`beancount_sg.ext.year_end`](year-in-review.md) | Year in Review | Year-end dashboard of key metrics |
+| [`beancount_sg.ext.cash_flow`](cash-flow.md) | Cash Flow | Cash-flow statement by activity |

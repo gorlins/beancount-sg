@@ -1,9 +1,11 @@
-; Example ledger for the Year in Review screenshot (see screenshots.py): two years
-; of a household's pay, home and mortgage, savings, investments and spending.
+; Example ledger for the Year in Review and Cash Flow screenshots (see
+; screenshots.py): two years of a household's pay, home and mortgage, savings,
+; investments and spending.
 option "title" "Household"
 option "operating_currency" "USD"
 
 2022-12-01 custom "fava-extension" "beancount_sg.ext.year_end"
+2022-12-01 custom "fava-extension" "beancount_sg.ext.cash_flow"
 
 2022-12-01 open Equity:Opening-Balances
 2022-12-01 open Income:Salary USD
