@@ -228,15 +228,16 @@ class CashFlow(ECharts, FavaExtensionBase):
             for title, values in series
         ]
 
-    @extension_endpoint("sankey")
+    @extension_endpoint
     def sankey(self) -> dict[str, object]:
         """The Sankey diagram's data, for the page's filters: what flowed into cash, and out.
 
         The page's template has the rest of the diagram's ECharts option. Its
         nodes are the accounting totals, not their accounts: income and expenses
         (gross), investing and debt (net, named for which way they went, like
-        the cards), and what was added to or taken from cash, which balances the
-        two sides. ECharts' Sankey diagram takes nodes and links, not a dataset.
+        the cards), and the net cash saved or drawn, which balances the two
+        sides. They meet in the middle, at the period's total cash flow.
+        ECharts' Sankey diagram takes nodes and links, not a dataset.
         """
         result = self.statement()
         if result is None:
@@ -272,9 +273,11 @@ class CashFlow(ECharts, FavaExtensionBase):
             ),
             (result.total(FINANCING), "Borrowed", "Debt paid down", "debt", balance_sheet),
             # Cash that grew takes money out of the flows, and the reverse.
-            (-result.net_change, "Taken from cash", "Added to cash", "cash", None),
+            (-result.net_change, "Net cash drawn", "Net cash saved", "cash", None),
         ]
-        nodes: list[dict[str, object]] = [{"name": "Cash", "itemStyle": {"color": COLORS["cash"]}}]
+        nodes: list[dict[str, object]] = [
+            {"name": "Cash flow", "itemStyle": {"color": COLORS["cash"]}}
+        ]
         links = []
         for effect, into, out_of, kind, url in totals:
             if not effect:
@@ -288,7 +291,7 @@ class CashFlow(ECharts, FavaExtensionBase):
                     "label": {"formatter": f"{name} {self.balance(abs(effect))}"},
                 }
             )
-            source, target = (name, "Cash") if effect > 0 else ("Cash", name)
+            source, target = (name, "Cash flow") if effect > 0 else ("Cash flow", name)
             links.append({"source": source, "target": target, "value": float(abs(effect))})
         return {"series": [{"data": nodes, "links": links}]}
 

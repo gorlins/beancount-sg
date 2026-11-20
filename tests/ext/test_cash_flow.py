@@ -184,29 +184,29 @@ def test_the_sankey_chart_loads_its_data_from_the_endpoint(tmp_path):
     assert "data" not in series
 
 
-def test_the_echarts_url_can_be_configured(tmp_path):
+def test_the_echarts_url_can_be_set_for_the_ledger(tmp_path):
     url = "https://cdn.example.com/echarts.esm.mjs"
-    ledger = LEDGER.replace(ENABLE, f"{ENABLE} \"{{'echarts_url': '{url}'}}\"")
+    ledger = LEDGER + f'2020-01-01 custom "beancount-sg-option" "echarts-url" "{url}"\n'
     assert f'data-library="{url}"' in page(tmp_path, ledger)
 
 
 def test_sankey(tmp_path):
     series = sankey(tmp_path)
     # Only the accounting totals: into cash, income; out of it, expenses, investing,
-    # paying down debt, and what was added to cash.
+    # paying down debt, and the net cash saved.
     assert {(link["source"], link["target"], link["value"]) for link in series["links"]} == {
-        ("Income", "Cash", 5000),
-        ("Cash", "Expenses", 600),
-        ("Cash", "Invested", 1000),
-        ("Cash", "Debt paid down", 500),
-        ("Cash", "Added to cash", 2900),
+        ("Income", "Cash flow", 5000),
+        ("Cash flow", "Expenses", 600),
+        ("Cash flow", "Invested", 1000),
+        ("Cash flow", "Debt paid down", 500),
+        ("Cash flow", "Net cash saved", 2900),
     }
     nodes = {node["name"]: node for node in series["data"]}
     assert nodes["Income"]["label"] == {"formatter": "Income 5,000"}
     assert nodes["Invested"]["label"]["formatter"] == "Invested 1,000"
     assert "income_statement" in nodes["Expenses"]["url"]
     assert "balance_sheet" in nodes["Debt paid down"]["url"]
-    assert nodes["Added to cash"]["url"] is None
+    assert nodes["Net cash saved"]["url"] is None
 
 
 def test_sankey_balances_when_cash_is_used_and_debt_grows(tmp_path):
@@ -217,14 +217,14 @@ def test_sankey_balances_when_cash_is_used_and_debt_grows(tmp_path):
         for link in sankey(tmp_path, ledger)["links"]
     }
     assert links == {
-        ("Income", "Cash"): 50,
-        ("Borrowed", "Cash"): 500,
-        ("Taken from cash", "Cash"): 1050,
-        ("Cash", "Expenses"): 600,
-        ("Cash", "Invested"): 1000,
+        ("Income", "Cash flow"): 50,
+        ("Borrowed", "Cash flow"): 500,
+        ("Net cash drawn", "Cash flow"): 1050,
+        ("Cash flow", "Expenses"): 600,
+        ("Cash flow", "Invested"): 1000,
     }
-    into = sum(value for (_, target), value in links.items() if target == "Cash")
-    assert into == sum(value for (source, _), value in links.items() if source == "Cash")
+    into = sum(value for (_, target), value in links.items() if target == "Cash flow")
+    assert into == sum(value for (source, _), value in links.items() if source == "Cash flow")
 
 
 def test_the_sankey_filters_by_the_period(tmp_path):
@@ -232,7 +232,11 @@ def test_the_sankey_filters_by_the_period(tmp_path):
         (link["source"], link["target"])
         for link in sankey(tmp_path, query="?time=2024-08")["links"]
     }
-    assert links == {("Cash", "Expenses"), ("Cash", "Debt paid down"), ("Taken from cash", "Cash")}
+    assert links == {
+        ("Cash flow", "Expenses"),
+        ("Cash flow", "Debt paid down"),
+        ("Net cash drawn", "Cash flow"),
+    }
 
 
 def test_the_echarts_helper_is_served(tmp_path):

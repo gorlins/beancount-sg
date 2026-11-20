@@ -12,7 +12,7 @@ using it:
 2. Serves each chart's data from an endpoint of its own, as the part of an
    ECharts option that holds data, e.g. ``{"dataset": {"source": [...]}}``::
 
-       @extension_endpoint("totals")
+       @extension_endpoint
        def totals(self) -> dict[str, object]: ...
 
 3. Places the chart in its template: an element with class ``echart``, the
@@ -41,10 +41,10 @@ it in (ECharts' dynamic data loading). Clicking a node or data item with a
 ``url`` opens that Fava page.
 
 ECharts is loaded from `ECHARTS_URL`, the latest 5.x release on a CDN, unless
-the extension's config sets ``echarts_url``, e.g. to pin a version::
+the ledger sets another URL for all its reports, e.g. to pin a version, with a
+``beancount-sg-option`` like Fava's ``fava-option``::
 
-    2020-01-01 custom "fava-extension" "beancount_sg.ext.cash_flow" "{
-      'echarts_url': 'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.esm.min.mjs'}"
+    2020-01-01 custom "beancount-sg-option" "echarts-url" "https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.esm.min.mjs"
 """
 
 from __future__ import annotations
@@ -53,19 +53,23 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from beancount.core.data import Custom
 from fava.application import url_for
 from fava.ext import extension_endpoint
 from flask import Response, send_file
 
 ECHARTS_URL = "https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.esm.min.mjs"
 HELPER = Path(__file__).with_name("echarts.js")
+# The custom directive type, and its option, that set where ECharts loads from.
+OPTION = "beancount-sg-option"
+URL_OPTION = "echarts-url"
 
 
 class ECharts:
     """A mixin for a Fava extension that draws ECharts charts."""
 
     # From `FavaExtensionBase`.
-    config: Any
+    ledger: Any
     name: str
 
     @extension_endpoint("echarts.js")
@@ -75,9 +79,17 @@ class ECharts:
 
     @property
     def echarts_url(self) -> str:
-        """Where to load ECharts from: the extension's ``echarts_url`` config, or `ECHARTS_URL`."""
-        config = self.config if isinstance(self.config, dict) else {}
-        return config.get("echarts_url", ECHARTS_URL)
+        """Where to load ECharts from: the ledger's ``echarts-url`` option (the last), or
+        `ECHARTS_URL`."""
+        urls = [
+            entry.values[1].value
+            for entry in self.ledger.all_entries_by_type.Custom
+            if isinstance(entry, Custom)
+            and entry.type == OPTION
+            and len(entry.values) == 2
+            and entry.values[0].value == URL_OPTION
+        ]
+        return urls[-1] if urls else ECHARTS_URL
 
     def endpoint_url(self, endpoint: str) -> str:
         """The URL of one of the extension's endpoints, with the page's filters."""
