@@ -82,6 +82,23 @@ expense category, and the card's line in financing is only its net change over t
 charges minus payments. A card paid in full each month nets to about zero; one carrying a balance
 shows as borrowing, or as repaying it.
 
+**Capital gains, dividends and interest** are income accounts, so by default they're in operating
+and net income. When they stay invested, that overstates net income and the amount invested by the
+same amount: e.g. a retirement plan rollover that sells funds and buys them again shows years of
+gains as income, then as invested. Declare such accounts `investing`, and their lines move to the
+investing section, where they net against the investment accounts they were earned in:
+
+```beancount
+2020-01-01 open Income:Retirement:Gains
+  cash-flow-role: "investing"
+```
+
+For the rollover, net income is then just your income and spending, and invested is what actually
+went in. The change in cash is the same either way. Gains in a taxable account are a choice:
+declare them `investing` if they stay invested, or leave them in net income if you spend them. The
+[Year in Review](year-in-review.md) reads the same declarations, counting such accounts as
+investment returns rather than income.
+
 ## Reconciliation
 
 The **Cash & cash equivalents** panel lists each cash account at the start and end of the period,

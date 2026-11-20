@@ -320,3 +320,32 @@ def test_changes_skip_a_year_to_dates_flows():
     values = [Decimal(100), Decimal(50)]
     assert changes(values, [complete, partial], flow=True) == [None, None]
     assert changes(values, [complete, partial])[1].label() == "−50 (−50.0%)"
+
+
+def test_investment_returns_have_their_own_row(tmp_path):
+    ledger = (
+        LEDGER
+        + """
+2018-01-01 open Assets:Retirement
+2018-01-01 open Income:CapitalGains USD
+  cash-flow-role: "investing"
+2019-06-01 * "Sold and bought again"
+  Assets:Retirement  3000 USD
+  Income:CapitalGains
+"""
+    )
+    body = page(tmp_path, ledger, query="?time=2019")
+    income = panel(body, "Income &amp; savings")
+    # Income and savings are unchanged; the gain is on its own row.
+    assert "Income 50,000 50,000 ■ no change" in income
+    assert "Savings 43,000 42,900" in income
+    assert "Investment returns 0 3,000" in income
+    assert "Income:CapitalGains investment returns investing, declared on Income:CapitalGains" in (
+        text(body)
+    )
+
+
+def test_no_investment_returns_row_without_any(tmp_path):
+    assert "Investment returns" not in panel(
+        page(tmp_path, query="?time=2019"), "Income &amp; savings"
+    )

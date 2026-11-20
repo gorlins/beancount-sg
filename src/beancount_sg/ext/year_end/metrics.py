@@ -13,12 +13,19 @@ Net worth is assets minus liabilities (what's owed), in groups:
 
 Investable assets are cash and investments: what spending could be drawn from.
 
+Income and expense accounts are income and expenses, unless they're declared
+with a cash-flow role other than ``operating``: e.g. capital gains declared
+``investing``. Those are **investment returns**, kept out of income, expenses and
+savings: a gain realized when investments are sold and bought again (say, in a
+retirement plan's rollover) never reached your spending money. They're in net
+worth already, where the investments are.
+
 Each year's metrics are one of three kinds:
 
 - **Balances** at the year's end (for the current year, today): net worth and
   its groups, investable assets, and each loan's balance.
 - **Flows** during the year (for the current year, so far): income, expenses,
-  savings, the savings rate, and debt paid down.
+  savings, the savings rate, debt paid down, and investment returns.
 - **Spending ratios**: the 12 months of spending up to the year's end, against
   balances then: the withdrawal rate, spending / net worth, and the emergency
   fund. For a whole year, the 12 months are the year; for the current year,
@@ -44,18 +51,20 @@ from beancount.core.account_types import AccountTypes, get_account_type
 from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
-from beancount_sg.cash_flow_roles import CASH, FINANCING, Role
+from beancount_sg.cash_flow_roles import CASH, FINANCING, OPERATING, Role
 
 INVESTABLE_KEY = "investable"
 INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
 GROUPS = (CASH, INVESTMENTS, PROPERTY, DEBT, OTHER)
+# Income and expense accounts that aren't income or expenses, but investment returns.
+RETURNS = "investment returns"
 MAX_YEARS = 5
 ONE_DAY = datetime.timedelta(days=1)
 
 
 @dataclass(frozen=True)
 class Classification:
-    """An asset or liability's net worth group, and why."""
+    """An account's net worth group (or, for income and expenses, `RETURNS`), and why."""
 
     group: str
     reason: str
@@ -64,7 +73,8 @@ class Classification:
 def classify(
     opens: Iterable[Open], roles: Mapping[str, Role], account_types: AccountTypes
 ) -> dict[str, Classification]:
-    """Each asset and liability's net worth group."""
+    """Each asset and liability's net worth group, and the income and expense accounts
+    that are investment returns: those declared with a role other than ``operating``."""
     opens = list(opens)
     investable = {
         entry.account: entry.meta[INVESTABLE_KEY] for entry in opens if INVESTABLE_KEY in entry.meta
@@ -78,6 +88,8 @@ def classify(
             found[account] = _asset(account, role, investable)
         elif root == account_types.liabilities:
             found[account] = _liability(role)
+        elif root in (account_types.income, account_types.expenses) and role.role != OPERATING:
+            found[account] = Classification(RETURNS, _role_reason(role))
     return found
 
 
@@ -139,6 +151,9 @@ class YearSummary:
     expenses_by_category: dict[str, Decimal] = field(default_factory=lambda: defaultdict(Decimal))
     # Expenses over the 12 months up to the end: for a whole year, the year's.
     trailing_expenses: Decimal = Decimal(0)
+    # Income less costs in accounts that are investment returns, e.g. capital gains:
+    # not in income, expenses or savings.
+    investment_returns: Decimal = Decimal(0)
     debts: list[Debt] = field(default_factory=list)
 
     @property
@@ -279,7 +294,12 @@ def year_end(
             if not windows or root not in (account_types.income, account_types.expenses):
                 continue
             value = _flow_value(posting, currency, price_map, txn.date, unconverted)
+            returns = _group(posting.account, classes) == RETURNS
             for summary in windows:
+                if returns:
+                    if txn.date >= summary.start:
+                        summary.investment_returns -= value
+                    continue
                 if root == account_types.expenses:
                     summary.trailing_expenses += value
                 if txn.date < summary.start:

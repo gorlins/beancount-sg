@@ -57,10 +57,11 @@ Each metric is one of three kinds, which differ for the current, year-to-date ye
 | --- | --- | --- |
 | **Net worth** | Balance | Assets minus liabilities (what's owed), in [groups](#net-worth-groups). |
 | **Investable assets** | Balance | Cash and investments: what spending could be drawn from, unlike a home. |
-| **Income**, **expenses** | Flow | |
+| **Income**, **expenses** | Flow | Income and expense accounts, except [investment returns](#investment-returns). |
 | **Savings** | Flow | Income minus expenses, wherever the money went: to a savings account, investments or paying down debt. |
 | **Savings rate** | Flow | Savings as a percentage of income. As a ratio of two flows over the same months, it isn't annualized, and a year-to-date rate is compared with whole years'. |
 | **Debt paid down** | Flow | The fall in what's owed on [debts](#net-worth-groups): payments minus new borrowing, so negative when debt grew. Interest is in expenses. |
+| **Investment returns** | Flow | [Investment returns](#investment-returns), e.g. capital gains declared `investing`: not in income, expenses or savings. Shown only when there are any. |
 | **Withdrawal rate** | Spending ratio | Spending as a percentage of investable assets: like a withdrawal rate in retirement, what share of your cash and investments a year's spending would take. |
 | **Spending / net worth** | Spending ratio | Spending as a percentage of net worth, which also counts property and debt. |
 | **Emergency fund** | Spending ratio | Cash, in months of average spending. |
@@ -104,6 +105,32 @@ secured by it doesn't change that. A mortgage under `Liabilities:Home` and a mar
 `Liabilities:Brokerage` are both debt, and net worth subtracts both, but only the home is
 property.
 
+## Investment returns
+
+Capital gains, dividends and interest are income in Beancount, so by default they count as income
+and savings here. That overstates both when the money never reached you: e.g. a retirement plan
+rollover that sells funds in one plan and buys them again in another realizes years of gains at
+once, though nothing was earned or spent.
+
+Declare such accounts with the `investing` [cash-flow role](#cash-flow-roles) (any role other
+than `operating` works), and they're **investment returns** instead:
+
+```beancount
+2020-01-01 open Income:Retirement:Gains
+  cash-flow-role: "investing"
+```
+
+Investment returns are left out of income, expenses, savings, the savings rate and the spending
+ratios, and shown on their own row. Net worth is unchanged: the gains are in your investments'
+value either way. A role on a parent account (e.g. `Income:CapitalGains`) applies to its
+subaccounts, and an expense account can be declared the same way, e.g. fees paid out of an
+investment account.
+
+Gains in a taxable account are a choice: declare them `investing` if they stay invested, or leave
+them as income if you spend them. Keeping retirement-plan gains, dividends and interest in their
+own accounts makes the choice per account. The [Cash Flow](cash-flow.md) report reads the same
+declarations, moving these accounts from net income to investing.
+
 ## Cash-flow roles
 
 Accounts' roles use the same metadata and defaults as
@@ -121,8 +148,9 @@ other assets `investing`, and liabilities `financing`. A declared value that isn
 typo) is reported as an error and ignored. The page's "How accounts are classified" section lists
 each account's group and why.
 
-Here, roles only decide which assets are **cash** (the cash group and the emergency fund) and
-which liabilities are **debt**. `cash` is money available now at a fixed value, such as checking
+Here, roles decide which assets are **cash** (the cash group and the emergency fund), which
+liabilities are **debt**, and which income and expense accounts are
+[investment returns](#investment-returns). `cash` is money available now at a fixed value, such as checking
 and savings accounts; `investing` is assets whose value moves with markets, such as a brokerage
-account. Roles don't affect savings: money moved into a savings account or a brokerage account is
-saved either way, since savings are income minus expenses.
+account. Where money goes doesn't affect savings: money moved into a savings account or a
+brokerage account is saved either way, since savings are income minus expenses.
