@@ -23,8 +23,8 @@ end; see `beancount_sg.ext.year_end.metrics`. The dashboard has:
   expenses by category.
 - Net worth (assets minus liabilities) by group.
 - Income, expenses, savings and the savings rate per year, investment returns
-  (income accounts declared with a cash-flow role other than operating, e.g.
-  capital gains declared investing, left out of income and savings), and the spending
+  (income and expense accounts declared investing, e.g. capital gains, left out of
+  income and savings), and the spending
   ratios: the withdrawal rate (spending as a share of investable assets: cash and
   investments), spending as a share of net worth, and the emergency fund.
 - Expenses by top-level category (e.g. ``Expenses:Food``) per year, with a chart.

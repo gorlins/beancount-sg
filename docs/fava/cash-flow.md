@@ -73,7 +73,8 @@ on the account's `open` directive:
 
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
-income and expenses `operating`. A declared value that isn't a role (e.g. a typo) is reported as
+income and expenses `operating`, except debt-payment accounts (see below), which are `financing`. A
+declared value that isn't a role (e.g. a typo) is reported as
 an error and ignored. The page's "How accounts are classified" section lists each account's role
 and where it came from.
 
@@ -98,6 +99,13 @@ went in. The change in cash is the same either way. Gains in a taxable account a
 declare them `investing` if they stay invested, or leave them in net income if you spend them. The
 [Year in Review](year-in-review.md) reads the same declarations, counting such accounts as
 investment returns rather than income.
+
+**Debt-payment accounts**, e.g. an expense account that card or loan payments pass through on
+their way from checking to the debt, are `financing`: both legs are in financing, next to the debt,
+and a payment that reaches the loan in a later period doesn't show as spending meanwhile. Accounts
+whose names say so are `financing` without a declaration: names containing Repayment, or Payment
+after Loan, Mortgage or Card, such as `Expenses:CreditCardPayment` or `Expenses:Mortgage:Payment`
+(but not `Expenses:Rent:Payment`). Declare any other `financing`.
 
 ## Reconciliation
 

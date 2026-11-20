@@ -1,6 +1,14 @@
+import pytest
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
 
-from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, account_roles
+from beancount_sg.cash_flow_roles import (
+    CASH,
+    FINANCING,
+    INVESTING,
+    OPERATING,
+    account_roles,
+    default_role,
+)
 from beancount_sg.testing import load
 
 LEDGER = """
@@ -66,3 +74,20 @@ def test_inheritance_does_not_depend_on_open_order():
     roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
     assert roles["Assets:Retirement:Cash"].role == INVESTING
     assert roles["Assets:Retirement:Cash"].declared_by == "Assets:Retirement"
+
+
+@pytest.mark.parametrize(
+    ("account", "role"),
+    [
+        ("Expenses:CreditCardPayment", FINANCING),
+        ("Expenses:LoanRepayment", FINANCING),
+        ("Expenses:MortgageRepayment", FINANCING),
+        ("Expenses:Mortgage:Payment", FINANCING),
+        ("Expenses:Car:LoanPayment", FINANCING),
+        ("Expenses:Rent:Payment", OPERATING),
+        ("Expenses:Mortgage:Interest", OPERATING),
+        ("Expenses:Insurance", OPERATING),
+    ],
+)
+def test_debt_payment_accounts_default_to_financing(account, role):
+    assert default_role(account, DEFAULT_ACCOUNT_TYPES) == role

@@ -1,6 +1,10 @@
 ; Example ledger for the Year in Review and Cash Flow screenshots (see
 ; screenshots.py): five years of a household's pay, home and mortgage, savings,
-; investments and spending.
+; investments and spending. It also shows two accounts declared out of income and
+; expenses: retirement-plan gains, realized by a 2024 rollover that sells a fund in
+; the old plan and buys it again in the new one (investing), and a loan-repayment
+; account that a mortgage payment passes through across a year end (financing, from
+; its name).
 option "title" "Household"
 option "operating_currency" "USD"
 
@@ -14,6 +18,11 @@ option "operating_currency" "USD"
 2019-12-01 open Assets:Bank:Savings USD
 2019-12-01 open Assets:Brokerage
   cash-flow-role: "investing"
+2019-12-01 open Assets:Retirement:OldPlan
+2019-12-01 open Assets:Retirement:NewPlan
+2019-12-01 open Income:Retirement:Gains USD
+  cash-flow-role: "investing"
+2019-12-01 open Expenses:LoanRepayment USD
 2019-12-01 open Liabilities:Home:Mortgage USD
 2019-12-01 open Liabilities:CreditCard USD
 2019-12-01 open Expenses:Food:Groceries USD
@@ -29,6 +38,7 @@ option "operating_currency" "USD"
   Liabilities:Home:Mortgage  -320000.00 USD
   Assets:Bank:Savings  12000.00 USD
   Assets:Brokerage  1200 VTI {150.00 USD}
+  Assets:Retirement:OldPlan  1000 TDF {50.00 USD}
   Equity:Opening-Balances
 
 2020-01-01 * "Employer" "Payroll"
@@ -1376,10 +1386,14 @@ option "operating_currency" "USD"
   Assets:Bank:Savings  4631.00 USD
   Income:Salary
 
-2023-12-02 * "Lender" "Mortgage payment"
-  Liabilities:Home:Mortgage  1235.00 USD
+2023-12-28 * "Lender" "Mortgage payment"
+  Expenses:LoanRepayment  1235.00 USD
   Expenses:Home:MortgageInterest  1165.00 USD
   Assets:Bank:Savings
+
+2024-01-03 * "Lender" "Mortgage payment applied to the loan"
+  Liabilities:Home:Mortgage  1235.00 USD
+  Expenses:LoanRepayment
 
 2023-12-15 * "City Utilities" "Utilities"
   Expenses:Home:Utilities  220.00 USD
@@ -1750,3 +1764,18 @@ option "operating_currency" "USD"
 2024-12-15 * "Employer" "Year-end bonus"
   Assets:Bank:Savings  4500.00 USD
   Income:Salary
+
+2020-12-28 price TDF  55.00 USD
+2021-12-28 price TDF  62.00 USD
+2022-12-28 price TDF  54.00 USD
+2023-12-28 price TDF  64.00 USD
+2024-12-28 price TDF  74.00 USD
+
+2024-04-15 * "Old plan" "Rollover: sell"
+  Assets:Retirement:OldPlan  -1000 TDF {50.00 USD} @ 68.00 USD
+  Assets:Retirement:OldPlan  68000.00 USD
+  Income:Retirement:Gains
+
+2024-04-16 * "New plan" "Rollover: buy"
+  Assets:Retirement:OldPlan  -68000.00 USD
+  Assets:Retirement:NewPlan  1000 TDF {68.00 USD}

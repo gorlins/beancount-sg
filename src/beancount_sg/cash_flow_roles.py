@@ -14,7 +14,12 @@ addition to that convention), or else the convention's default:
 - Assets: ``cash`` if the name contains Cash, Checking, Savings or Bank, else
   ``investing``.
 - Liabilities and Equity: ``financing``.
-- Income and Expenses: ``operating``.
+- Income and Expenses: ``operating``, except (another addition) ``financing`` if
+  the name says it's a debt payment: it contains Repayment, or Payment after
+  Loan, Mortgage or Card, e.g. ``Expenses:CreditCardPayment`` or
+  ``Expenses:Mortgage:Payment``. Such accounts carry payments on their way to a
+  loan or card, so they take the debt's role. ``Expenses:Rent:Payment`` and
+  ``Expenses:Mortgage:Interest`` stay ``operating``.
 
 A declaration that isn't one of these roles (e.g. a typo) is reported as an
 error and ignored, so the account resolves as if it weren't there.
@@ -36,6 +41,8 @@ CASH, OPERATING, INVESTING, FINANCING = "cash", "operating", "investing", "finan
 ROLES = (CASH, OPERATING, INVESTING, FINANCING)
 # Names of asset accounts that default to cash.
 CASH_NAMES = re.compile(r"cash|checking|savings|bank", re.IGNORECASE)
+# Names of income and expense accounts that carry debt payments, financing by default.
+DEBT_PAYMENT_NAMES = re.compile(r"repayment|(loan|mortgage|card).*payment", re.IGNORECASE)
 
 
 class RoleError(NamedTuple):
@@ -106,4 +113,4 @@ def default_role(account: str, account_types: AccountTypes) -> str:
         return CASH if CASH_NAMES.search(account) else INVESTING
     if root in (account_types.liabilities, account_types.equity):
         return FINANCING
-    return OPERATING
+    return FINANCING if DEBT_PAYMENT_NAMES.search(account) else OPERATING

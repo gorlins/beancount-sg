@@ -166,3 +166,23 @@ def test_by_interval():
     ]
     assert found[0].totals == {OPERATING: 4600, INVESTING: -1000, FINANCING: 0}
     assert found[1].totals == {OPERATING: -200, INVESTING: 0, FINANCING: -500}
+
+
+def test_spending_is_operating_expenses_only():
+    # A loan payment passing through an expense account declared financing isn't spending.
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Expenses:LoanRepayment USD
+  cash-flow-role: "financing"
+2024-09-01 * "Mortgage payment"
+  Expenses:LoanRepayment  500 USD
+  Assets:Bank:Checking
+2024-09-02 * "Mortgage payment applied"
+  Liabilities:Mortgage  500 USD
+  Expenses:LoanRepayment
+"""
+    )
+    result = run(ledger)
+    assert result.trailing_expenses == 600
+    assert result.lines(FINANCING) == [("Liabilities:Mortgage", -1000)]  # the two legs net out

@@ -189,7 +189,7 @@
         {{ yearly_row("Debt paid down", years|map(attribute="debt_paid_down")|list, flow=true, title="The fall in what's owed: payments minus new borrowing") }}
         {% if years|selectattr("investment_returns")|list %}
         {{ yearly_row("Investment returns", years|map(attribute="investment_returns")|list, flow=true,
-                      title="Gains and other income from accounts declared with a cash-flow role other than operating, e.g. investing: in net worth, not in income or savings") }}
+                      title="Gains and other income from accounts declared investing: in net worth, not in income or savings") }}
         {% endif %}
         <tr class="ye-section"><td colspan="{{ years|length + 1 }}" title="For a whole year, its 12 months; for this year, the last 12 months">12 months' spending, against balances at the year's end</td></tr>
         {{ yearly_row("Withdrawal rate", years|map(attribute="withdrawal_rate")|list, "points", higher=false,
@@ -267,10 +267,12 @@
 <details>
   <summary>How accounts are classified</summary>
   <p>Each asset and liability account's <code>cash-flow-role</code> and net worth group, and the
-    income and expense accounts counted as investment returns. Declare a
+    income and expense accounts counted as investment returns or transfers. Declare a
     role on the account's <code>open</code> directive, where it also applies to subaccounts;
     without one, assets are <code>cash</code> if their name contains Cash, Checking, Savings or
-    Bank, else <code>investing</code>, and liabilities are <code>financing</code>.</p>
+    Bank, else <code>investing</code>, liabilities are <code>financing</code>, and income and
+    expense accounts <code>operating</code>, except debt-payment accounts (e.g.
+    <code>Expenses:CreditCardPayment</code>), which are <code>financing</code>.</p>
   <pre>2020-01-01 open Assets:Bank:CD
   cash-flow-role: "investing"
 
@@ -279,10 +281,14 @@
   <p>Assets with the <code>cash</code> role are cash, and other assets are investments, unless
     marked <code>investable: FALSE</code> (e.g. a home or a car): property. Liabilities with the
     <code>financing</code> role, the default, are debt. Income and expense accounts declared with
-    a role other than <code>operating</code>, e.g. capital gains declared <code>investing</code>,
-    are investment returns: left out of income, expenses and savings.</p>
+    a role other than <code>operating</code> are left out of income, expenses and savings:
+    <code>investing</code> ones, e.g. capital gains, are investment returns, and others, e.g. a
+    loan-repayment expense account declared <code>financing</code>, transfers.</p>
   <pre>2020-01-01 open Income:CapitalGains
-  cash-flow-role: "investing"</pre>
+  cash-flow-role: "investing"
+
+2020-01-01 open Expenses:LoanRepayment
+  cash-flow-role: "financing"</pre>
   <table>
     <thead><tr><th>Account</th><th>Counted as</th><th>Because</th></tr></thead>
     <tbody>

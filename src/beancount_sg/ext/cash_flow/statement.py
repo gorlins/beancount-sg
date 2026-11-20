@@ -16,7 +16,7 @@ value then: the difference, if any (e.g. from exchange rates moving while cash i
 held in another currency), is shown as its own line, so the statement always
 reconciles.
 
-The statement also totals the spending (expense accounts) over the 12 months up
+The statement also totals the spending (``operating`` expense accounts) over the 12 months up
 to the period's end, for the emergency fund: how many months of that average
 spending cash at the end covers. It uses 12 months whatever the period, so a
 short or partial period doesn't make it seasonal.
@@ -216,8 +216,11 @@ def statement(
                     start_balances[posting.account].add_position(posting)
                 continue
             in_period = txn.date >= begin
+            # Spending: operating expense accounts, not e.g. a loan-repayment account
+            # declared financing.
             spent = (
                 txn.date >= trailing_start
+                and role == OPERATING
                 and get_account_type(posting.account) == account_types.expenses
             )
             if not in_period and not spent:

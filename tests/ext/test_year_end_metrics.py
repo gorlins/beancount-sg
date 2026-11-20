@@ -15,6 +15,7 @@ from beancount_sg.ext.year_end.metrics import (
     OTHER,
     PROPERTY,
     RETURNS,
+    TRANSFERS,
     Debt,
     YearSummary,
     classify,
@@ -311,3 +312,31 @@ def test_investment_returns_are_not_income_or_expenses():
     assert "Expenses:Retirement" not in summary.expenses_by_category
     # The gain, less the fee.
     assert summary.investment_returns == 30000 - 400
+
+
+def test_transfers_are_neither_expenses_nor_returns():
+    # A loan payment passes through an expense account, reaching the loan next year.
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Expenses:LoanRepayment USD
+  cash-flow-role: "financing"
+
+2024-12-30 * "Mortgage payment"
+  Expenses:LoanRepayment  1000 USD
+  Assets:Bank:Checking
+
+2025-01-03 * "Mortgage payment applied"
+  Liabilities:Home:Mortgage  1000 USD
+  Expenses:LoanRepayment
+"""
+    )
+    _, found = classes(ledger)
+    assert found["Expenses:LoanRepayment"].group == TRANSFERS
+    found_years, _ = summaries(ledger, years=(2024, 2025))
+    for summary in found_years.values():
+        assert summary.investment_returns == 0
+    assert found_years[2024].expenses == 8000  # not the payment
+    assert found_years[2025].expenses == 0
+    # The loan counts it, when it arrives.
+    assert found_years[2025].debt_paid_down == 1000

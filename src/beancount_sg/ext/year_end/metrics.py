@@ -14,11 +14,16 @@ Net worth is assets minus liabilities (what's owed), in groups:
 Investable assets are cash and investments: what spending could be drawn from.
 
 Income and expense accounts are income and expenses, unless they're declared
-with a cash-flow role other than ``operating``: e.g. capital gains declared
-``investing``. Those are **investment returns**, kept out of income, expenses and
-savings: a gain realized when investments are sold and bought again (say, in a
-retirement plan's rollover) never reached your spending money. They're in net
-worth already, where the investments are.
+with a cash-flow role other than ``operating``, which keeps them out of income,
+expenses, savings and the spending ratios:
+
+- ``investing``: **investment returns**, e.g. capital gains. A gain realized when
+  investments are sold and bought again (say, in a retirement plan's rollover)
+  never reached your spending money; it's in net worth already, where the
+  investments are.
+- Any other role, e.g. ``financing``: **transfers**, e.g. an expense account that
+  loan payments pass through on their way to the loan. The loan's balance
+  already counts them, in debt paid down.
 
 Each year's metrics are one of three kinds:
 
@@ -51,20 +56,22 @@ from beancount.core.account_types import AccountTypes, get_account_type
 from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
-from beancount_sg.cash_flow_roles import CASH, FINANCING, OPERATING, Role
+from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, Role
 
 INVESTABLE_KEY = "investable"
 INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
 GROUPS = (CASH, INVESTMENTS, PROPERTY, DEBT, OTHER)
-# Income and expense accounts that aren't income or expenses, but investment returns.
-RETURNS = "investment returns"
+# Income and expense accounts that aren't income or expenses: investment returns, or
+# transfers (e.g. to a loan) counted elsewhere.
+RETURNS, TRANSFERS = "investment returns", "transfers"
 MAX_YEARS = 5
 ONE_DAY = datetime.timedelta(days=1)
 
 
 @dataclass(frozen=True)
 class Classification:
-    """An account's net worth group (or, for income and expenses, `RETURNS`), and why."""
+    """An account's net worth group (or, for income and expenses, `RETURNS` or
+    `TRANSFERS`), and why."""
 
     group: str
     reason: str
@@ -74,7 +81,8 @@ def classify(
     opens: Iterable[Open], roles: Mapping[str, Role], account_types: AccountTypes
 ) -> dict[str, Classification]:
     """Each asset and liability's net worth group, and the income and expense accounts
-    that are investment returns: those declared with a role other than ``operating``."""
+    declared with a role other than ``operating``: investment returns (``investing``)
+    or transfers."""
     opens = list(opens)
     investable = {
         entry.account: entry.meta[INVESTABLE_KEY] for entry in opens if INVESTABLE_KEY in entry.meta
@@ -89,7 +97,8 @@ def classify(
         elif root == account_types.liabilities:
             found[account] = _liability(role)
         elif root in (account_types.income, account_types.expenses) and role.role != OPERATING:
-            found[account] = Classification(RETURNS, _role_reason(role))
+            group = RETURNS if role.role == INVESTING else TRANSFERS
+            found[account] = Classification(group, _role_reason(role))
     return found
 
 
@@ -294,10 +303,10 @@ def year_end(
             if not windows or root not in (account_types.income, account_types.expenses):
                 continue
             value = _flow_value(posting, currency, price_map, txn.date, unconverted)
-            returns = _group(posting.account, classes) == RETURNS
+            group = _group(posting.account, classes)
             for summary in windows:
-                if returns:
-                    if txn.date >= summary.start:
+                if group in (RETURNS, TRANSFERS):
+                    if group == RETURNS and txn.date >= summary.start:
                         summary.investment_returns -= value
                     continue
                 if root == account_types.expenses:
