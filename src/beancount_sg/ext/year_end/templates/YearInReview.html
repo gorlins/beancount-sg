@@ -1,0 +1,315 @@
+<style>
+  .ye { --ye-radius: 8px; }
+  .ye-subtitle { color: var(--text-color-lightest); margin-top: -0.5rem; }
+  .ye-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 1.25rem;
+  }
+  @media (max-width: 900px) {
+    .ye-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .ye-card {
+    background: var(--background-darker);
+    border: 1px solid var(--border);
+    border-radius: var(--ye-radius);
+    padding: 0.75rem 1rem;
+  }
+  .ye-card-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-color-lightest);
+  }
+  .ye-card-value { font-size: 1.7rem; font-weight: 600; line-height: 1.3; }
+  .ye-card-note { font-size: 0.8rem; color: var(--text-color-lightest); }
+  .ye-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  /* Five years of figures need room: side by side only on wide screens. */
+  .ye-tables { grid-template-columns: repeat(auto-fit, minmax(640px, 1fr)); }
+  .ye-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--ye-radius);
+    padding: 0.75rem 1rem 1rem;
+    overflow-x: auto;
+  }
+  .ye-panel h3 { margin: 0 0 0.5rem; }
+  .ye-panel table { width: 100%; }
+  .ye-panel td, .ye-panel th { vertical-align: top; }
+  .ye-total td { font-weight: 600; border-top: 2px solid var(--border-darker); }
+  .ye-section td {
+    padding-top: 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-color-lightest);
+  }
+  .ye-delta { display: block; font-size: 0.75rem; white-space: nowrap; }
+  .ye-good { color: var(--green); }
+  .ye-bad { color: var(--red); }
+  .ye-flat { color: var(--text-color-lightest); }
+  .ye-bar {
+    height: 6px;
+    margin-top: 4px;
+    border-radius: 3px;
+    background: var(--background-darkest);
+  }
+  .ye-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--link-color); }
+  .ye details { margin-top: 1rem; }
+</style>
+
+{# A change from the previous year: ▲/▼, signed, green when good and red when bad. #}
+{% macro delta(change, unit="money", vs=none) -%}
+{%- if change -%}
+<span class="ye-delta ye-{{ change.tone }}">{{ change.arrow }} {{ change.label(unit) }}{% if vs %} vs {{ vs }}{% endif %}</span>
+{%- endif -%}
+{%- endmacro %}
+{% macro ratio(value, suffix="", digits=1) -%}
+{%- if value is none %}&mdash;{% else %}{{ ('%.' ~ digits ~ 'f')|format(value) }}{{ suffix }}{% endif -%}
+{%- endmacro %}
+{# A row of yearly values, each with its change from the previous year. #}
+{% macro yearly_row(label, values, unit="money", higher=true, flow=false, title="", total=false) -%}
+{% set found = extension.changes(values, years, higher_is_better=higher, flow=flow) %}
+<tr{% if total %} class="ye-total"{% endif %}>
+  <td title="{{ title }}">{{ label }}</td>
+  {% for value in values %}
+  <td class="num">
+    {%- if unit == "money" %}{{ extension.money(value) }}{% elif unit == "points" %}{{ ratio(value, '%') }}{% else %}{{ ratio(value) }}{% endif -%}
+    {{ delta(found[loop.index0], unit) }}
+  </td>
+  {% endfor %}
+</tr>
+{%- endmacro %}
+{% macro year_header(first="") -%}
+<thead><tr><th>{{ first }}</th>{% for year in years %}<th class="num"><a href="{{ extension.year_url(year.year) }}">{{ year.year }}{% if not year.complete %} YTD{% endif %}</a></th>{% endfor %}</tr></thead>
+{%- endmacro %}
+
+<div class="ye">
+<h2>Year in Review</h2>
+
+{% set role_errors = extension.roles()[1] %}
+{% set result = extension.review() %}
+{% if result is none %}
+<ul class="error"><li>Set an <code>operating_currency</code> option: the review shows values in the ledger's first operating currency.</li></ul>
+{% elif not result.years %}
+<p>No transactions up to {{ extension.years_filtered()[1] }}.</p>
+{% else %}
+{% set years = result.years %}
+{% set currency = result.currency %}
+{% set last = years[-1] %}
+{% set previous = years[-2] if years|length > 1 else none %}
+{% set vs = previous.year if previous else none %}
+<p class="ye-subtitle">
+  {{ years[0].year }}{% if years|length > 1 %}&ndash;{{ last.year }}{% endif %}, in {{ currency }}.
+  {% if not last.complete %}{{ last.year }} is year-to-date, through {{ last.end - extension.one_day }}: its
+  balances are as of today, its income and spending so far (not compared with whole years), and
+  its spending ratios use the last 12 months.{% endif %}
+  Pick the years with Fava's time filter.
+</p>
+{% if role_errors or result.unconverted %}
+<ul class="error">
+  {% for error in role_errors %}<li>{{ error }}</li>{% endfor %}
+  {% if result.unconverted %}<li>Left out, for lack of prices in {{ currency }}: {{ result.unconverted|sort|join(', ') }}.</li>{% endif %}
+</ul>
+{% endif %}
+
+{# Headline metrics for the final year. #}
+{% macro card(label, value, change=none, unit="money", note="", title="") -%}
+<div class="ye-card" title="{{ title }}">
+  <div class="ye-card-label">{{ label }}</div>
+  <div class="ye-card-value">{{ value }}</div>
+  {{ delta(change, unit, vs) }}
+  {% if note %}<div class="ye-card-note">{{ note }}</div>{% endif %}
+</div>
+{%- endmacro %}
+{% set pair = [previous, last] if previous else none %}
+{% set at_end = "today" if not last.complete else "at the year's end" %}
+{% set during = "year to date" if not last.complete else "in " ~ last.year %}
+<div class="ye-cards">
+  {{ card("Net worth", extension.money(last.net_worth), extension.changes([previous.net_worth, last.net_worth], pair)[1] if previous else none,
+          note="assets minus liabilities, " ~ at_end) }}
+  {{ card("Investable assets", extension.money(last.investable), extension.changes([previous.investable, last.investable], pair)[1] if previous else none,
+          note="cash and investments, " ~ at_end) }}
+  {{ card("Income", extension.money(last.income), extension.changes([previous.income, last.income], pair, flow=true)[1] if previous else none,
+          note=during) }}
+  {{ card("Expenses", extension.money(last.expenses), extension.changes([previous.expenses, last.expenses], pair, higher_is_better=false, flow=true)[1] if previous else none,
+          note=during) }}
+  {{ card("Savings rate", ratio(last.savings_rate, '%'), extension.changes([previous.savings_rate, last.savings_rate], pair)[1] if previous else none, "points",
+          extension.money(last.savings) ~ " saved " ~ during, "Savings (income minus expenses) as a share of income") }}
+  {{ card("Debt paid down", extension.money(last.debt_paid_down), extension.changes([previous.debt_paid_down, last.debt_paid_down], pair, flow=true)[1] if previous else none,
+          note=during ~ "; " ~ extension.money(last.holdings["debt"]|abs) ~ " still owed",
+          title="The fall in what's owed: payments minus new borrowing") }}
+  {{ card("Withdrawal rate", ratio(last.withdrawal_rate, '%', 2), extension.changes([previous.withdrawal_rate, last.withdrawal_rate], pair, higher_is_better=false)[1] if previous else none, "points",
+          "12 months' spending ÷ investable assets " ~ at_end,
+          "A year's spending as a share of the cash and investments it could be drawn from, like a withdrawal rate in retirement") }}
+  {{ card("Emergency fund", ratio(last.months_of_cash) ~ " mo", extension.changes([previous.months_of_cash, last.months_of_cash], pair)[1] if previous else none, "number",
+          extension.money(last.holdings["cash"]) ~ " cash " ~ at_end ~ ", in months of spending",
+          "Cash, in months of the last 12 months' average spending") }}
+</div>
+
+<div class="ye-columns">
+  <section class="ye-panel">
+    <svelte-component type="charts"><script type="application/json">{{ extension.net_worth_charts(result)|tojson }}</script></svelte-component>
+  </section>
+  <section class="ye-panel">
+    <svelte-component type="charts"><script type="application/json">{{ [extension.expenses_chart(result)]|tojson }}</script></svelte-component>
+  </section>
+</div>
+
+<div class="ye-columns ye-tables">
+  <section class="ye-panel">
+    <h3>Net worth</h3>
+    <table>
+      {{ year_header("At the year's end") }}
+      <tbody>
+        {{ yearly_row("Cash", years|map(attribute="holdings.cash")|list, title="Assets with the cash role") }}
+        {{ yearly_row("Investments", years|map(attribute="holdings.investments")|list, title="Other assets, at market value") }}
+        {{ yearly_row("Property", years|map(attribute="holdings.property")|list, title="Assets that aren't investable, e.g. a home") }}
+        {{ yearly_row("Debt", years|map(attribute="holdings.debt")|list, higher=true, title="Loans and credit cards (as negative amounts owed)") }}
+        {{ yearly_row("Other", years|map(attribute="holdings.other")|list, title="Liabilities declared with a role other than financing") }}
+        {{ yearly_row("Net worth", years|map(attribute="net_worth")|list, total=true, title="Assets minus liabilities") }}
+        {{ yearly_row("Investable assets", years|map(attribute="investable")|list, title="Cash and investments") }}
+      </tbody>
+    </table>
+  </section>
+  <section class="ye-panel">
+    <h3>Income &amp; savings</h3>
+    <table>
+      {{ year_header("During the year") }}
+      <tbody>
+        {{ yearly_row("Income", years|map(attribute="income")|list, flow=true) }}
+        {{ yearly_row("Expenses", years|map(attribute="expenses")|list, higher=false, flow=true) }}
+        {{ yearly_row("Savings", years|map(attribute="savings")|list, flow=true, title="Income minus expenses") }}
+        {{ yearly_row("Savings rate", years|map(attribute="savings_rate")|list, "points", title="Savings as a share of income") }}
+        {{ yearly_row("Debt paid down", years|map(attribute="debt_paid_down")|list, flow=true, title="The fall in what's owed: payments minus new borrowing") }}
+        <tr class="ye-section"><td colspan="{{ years|length + 1 }}" title="For a whole year, its 12 months; for this year, the last 12 months">12 months' spending, against balances at the year's end</td></tr>
+        {{ yearly_row("Withdrawal rate", years|map(attribute="withdrawal_rate")|list, "points", higher=false,
+                      title="Spending as a share of investable assets (cash and investments)") }}
+        {{ yearly_row("Spending / net worth", years|map(attribute="spending_rate")|list, "points", higher=false,
+                      title="Spending as a share of net worth") }}
+        {{ yearly_row("Emergency fund (months)", years|map(attribute="months_of_cash")|list, "number",
+                      title="Cash, in months of average spending") }}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<div class="ye-columns ye-tables">
+  <section class="ye-panel">
+    <h3>Expenses by category</h3>
+    {% set categories = extension.categories(result) %}
+    {% if categories %}
+    <table>
+      {{ year_header() }}
+      <tbody>
+        {% for category in categories %}
+        {% set values = extension.category_values(result, category) %}
+        {% set found = extension.changes(values, years, higher_is_better=false, flow=true) %}
+        {% set share = (100 * values[-1] / last.expenses) if last.expenses else 0 %}
+        <tr>
+          <td>
+            <a href="{{ extension.account_url(category, last.year) }}">{{ category }}</a>
+            <div class="ye-bar" title="{{ '%.1f'|format(share) }}% of {{ last.year }}'s expenses"><span style="width: {{ '%.1f'|format(share if share > 0 else 0) }}%"></span></div>
+          </td>
+          {% for value in values %}
+          <td class="num"><a href="{{ extension.account_url(category, years[loop.index0].year) }}">{{ extension.money(value) }}</a>{{ delta(found[loop.index0]) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        {{ yearly_row("Total", years|map(attribute="expenses")|list, higher=false, flow=true, total=true) }}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No expenses.</p>
+    {% endif %}
+  </section>
+  <section class="ye-panel">
+    <h3>Debt in {{ last.year }}</h3>
+    {% if last.debts %}
+    <table>
+      <thead><tr><th>Debt</th><th class="num" title="Owed at the start of the year">Start</th><th class="num" title="Owed {{ at_end }}">End</th><th class="num" title="The fall in the balance: payments minus new borrowing">Paid down</th></tr></thead>
+      <tbody>
+        {% for debt in last.debts %}
+        <tr>
+          <td><a href="{{ extension.account_url(debt.account, last.year) }}">{{ debt.account }}</a></td>
+          <td class="num">{{ extension.money(debt.start) }}</td>
+          <td class="num">{{ extension.money(debt.end) }}</td>
+          <td class="num ye-{{ 'good' if debt.paid_down > 0 else 'bad' if debt.paid_down < 0 else 'flat' }}">{{ extension.money(debt.paid_down) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="ye-total">
+          <td>Total</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='start')) }}</td>
+          <td class="num">{{ extension.money(last.debts|sum(attribute='end')) }}</td>
+          <td class="num">{{ extension.money(last.debt_paid_down) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="ye-card-note">Paid down is the fall in the balance: payments minus new borrowing or
+      charges, so negative when it grew. A credit card paid in full each month comes to about zero.
+      Interest is in expenses.</p>
+    {% else %}
+    <p>No debts (liabilities with the <code>financing</code> role) with a balance.</p>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+
+<details>
+  <summary>How accounts are classified</summary>
+  <p>Each asset and liability account's <code>cash-flow-role</code> and net worth group. Declare a
+    role on the account's <code>open</code> directive, where it also applies to subaccounts;
+    without one, assets are <code>cash</code> if their name contains Cash, Checking, Savings or
+    Bank, else <code>investing</code>, and liabilities are <code>financing</code>.</p>
+  <pre>2020-01-01 open Assets:Bank:CD
+  cash-flow-role: "investing"
+
+2020-01-01 open Assets:Car
+  investable: FALSE</pre>
+  <p>Assets with the <code>cash</code> role are cash, and other assets are investments, unless
+    marked <code>investable: FALSE</code> (e.g. a home or a car): property. Liabilities with the
+    <code>financing</code> role, the default, are debt.</p>
+  <table>
+    <thead><tr><th>Account</th><th>Counted as</th><th>Because</th></tr></thead>
+    <tbody>
+      {% for account, role, classification in extension.classified() %}
+      <tr>
+        <td>{{ account }}</td>
+        <td>{{ classification.group }}</td>
+        <td>{{ classification.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>The review shows the years of Fava's time filter, or up to five years ending with its year
+      (or this year, without one), at most five. Fava's account and advanced filters apply, but
+      balances always include everything before the years shown.</li>
+    <li>Values are in the first operating currency, rounded to whole units: holdings at market
+      value at each year's end (or at cost without a price), income and expenses at their value on
+      each transaction's date.</li>
+    <li>Balances are at each year's end (this year: today), and income, expenses, savings and
+      debt paid down are during the year (this year: so far). The spending ratios use the 12
+      months of spending up to the year's end, against balances then: for this year, the last 12
+      months, so they compare with whole years.</li>
+    <li>Changes from the previous year are green when they're good (e.g. more savings, less
+      spending or debt) and red when they're bad. A year-to-date year's income and spending
+      aren't compared with whole years.</li>
+    <li>The <em>withdrawal rate</em> is spending as a share of investable assets (cash and
+      investments), like a withdrawal rate in retirement; <em>spending / net worth</em> also
+      counts property and debt.</li>
+    <li>Click a year for its income statement, a category or loan for its account page, or a bar's
+      date in a chart to make that the final year. Below the net worth chart, switch between net
+      worth and assets &amp; liabilities.</li>
+  </ul>
+</details>
+</div>
