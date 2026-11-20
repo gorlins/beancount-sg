@@ -22,7 +22,7 @@ Fava's account and advanced filters apply, as on Fava's own reports. The page ha
 - A Sankey diagram of where cash came from and went: income, expenses, investing,
   debt and the change in cash (drawn with ECharts; see `beancount_sg.ext.echarts`).
 - The statement: each activity's lines and total in its own direction, like the
-  cards (see `SECTIONS`), and the change in cash.
+  cards (see `CashFlow.sections`), and the change in cash.
 - Charts of each card's amount per interval (Fava's interval menu).
 - The reconciliation: each cash account at the start and end, with the change
   the activities explain.
@@ -42,7 +42,7 @@ from fava.context import g
 from fava.core import FilteredLedger
 from fava.core.charts import DateAndBalanceWithBudget
 from fava.core.inventory import SimpleCounterInventory
-from fava.ext import FavaExtensionBase
+from fava.ext import FavaExtensionBase, extension_endpoint
 from fava.internal_api import BarChart
 from fava.util.date import dateranges, local_today
 from flask import request, url_for
@@ -51,31 +51,6 @@ from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, 
 from beancount_sg.ext.echarts import ECharts
 
 from .statement import ACTIVITIES, ONE_DAY, Statement, by_interval, role_of, statement
-
-
-def money(value: Decimal | None) -> str:
-    """An amount rounded to whole units, with thousands separators and a sign."""
-    if value is None:
-        return "—"
-    sign = "+" if value > 0 else "−" if value < 0 else ""
-    return f"{sign}{abs(value):,.0f}"
-
-
-def balance(value: Decimal) -> str:
-    """A balance rounded to whole units, with thousands separators."""
-    return f"{value:,.0f}"
-
-
-def tone(activity: str | None, value: Decimal) -> str:
-    """A total's CSS class: colored only where its sign is clearly good or bad.
-
-    Only operating cash is: a surplus (income over spending) is good, and a
-    deficit bad. Investing and financing go either way: money out of cash into
-    investments, or to repay a loan, is usually good.
-    """
-    if activity != OPERATING or not value:
-        return "neutral"
-    return "good" if value > 0 else "bad"
 
 
 @dataclass(frozen=True)
@@ -101,13 +76,6 @@ CARDS = {
 }
 
 
-def card(activity: str, value: Decimal) -> Card:
-    """The card for an activity's total."""
-    title, detail = CARDS[(activity, value > 0)]
-    amount = money(value) if activity == OPERATING else balance(abs(value))
-    return Card(title, amount, tone(activity, value), detail)
-
-
 @dataclass(frozen=True)
 class Section:
     """How the page shows an activity: in its own direction, like its card."""
@@ -115,16 +83,6 @@ class Section:
     title: str  # for the total, and the chart
     sign: int  # turns an effect on cash into the activity's direction
     lines: str  # what a line's sign means
-
-
-# The statement's lines are effects on cash. The page turns investing and
-# financing around, so that money into investments and debt paid down are
-# positive, as on the cards: e.g. invested 9,640 rather than -9,640.
-SECTIONS = {
-    OPERATING: Section("Net income", 1, "income (+) and spending (−)"),
-    INVESTING: Section("Invested", -1, "money put in (+) or taken out (−)"),
-    FINANCING: Section("Debt paid down", -1, "payments (+) or new borrowing (−)"),
-}
 
 
 # The Sankey diagram's colors: income, spending, investments, debt and cash.
@@ -144,12 +102,46 @@ class CashFlow(ECharts, FavaExtensionBase):
     has_js_module = True
     activities = ACTIVITIES
     one_day = ONE_DAY
-    # For the template.
-    money = staticmethod(money)
-    balance = staticmethod(balance)
-    tone = staticmethod(tone)
-    card = staticmethod(card)
-    sections = SECTIONS
+    # The statement's lines are effects on cash. The page turns investing and
+    # financing around, so that money into investments and debt paid down are
+    # positive, as on the cards: e.g. invested 9,640 rather than -9,640.
+    sections = {
+        OPERATING: Section("Net income", 1, "income (+) and spending (−)"),
+        INVESTING: Section("Invested", -1, "money put in (+) or taken out (−)"),
+        FINANCING: Section("Debt paid down", -1, "payments (+) or new borrowing (−)"),
+    }
+
+    @staticmethod
+    def money(value: Decimal | None) -> str:
+        """An amount rounded to whole units, with thousands separators and a sign."""
+        if value is None:
+            return "—"
+        sign = "+" if value > 0 else "−" if value < 0 else ""
+        return f"{sign}{abs(value):,.0f}"
+
+    @staticmethod
+    def balance(value: Decimal) -> str:
+        """A balance rounded to whole units, with thousands separators."""
+        return f"{value:,.0f}"
+
+    @staticmethod
+    def tone(activity: str | None, value: Decimal) -> str:
+        """A total's CSS class: colored only where its sign is clearly good or bad.
+
+        Only operating cash is: a surplus (income over spending) is good, and a
+        deficit bad. Investing and financing go either way: money out of cash into
+        investments, or to repay a loan, is usually good.
+        """
+        if activity != OPERATING or not value:
+            return "neutral"
+        return "good" if value > 0 else "bad"
+
+    @classmethod
+    def card(cls, activity: str, value: Decimal) -> Card:
+        """The card for an activity's total."""
+        title, detail = CARDS[(activity, value > 0)]
+        amount = cls.money(value) if activity == OPERATING else cls.balance(abs(value))
+        return Card(title, amount, cls.tone(activity, value), detail)
 
     def period(self) -> tuple[datetime.date, datetime.date]:
         """Fava's time filter, or the last 12 months: the first day, and the day after the last.
@@ -213,9 +205,12 @@ class CashFlow(ECharts, FavaExtensionBase):
         )
         series = [
             (
-                SECTIONS[activity].title,
+                self.sections[activity].title,
                 # `or 0`: turned around, a zero is -0.
-                [SECTIONS[activity].sign * i.totals[activity] or Decimal(0) for i in intervals],
+                [
+                    self.sections[activity].sign * i.totals[activity] or Decimal(0)
+                    for i in intervals
+                ],
             )
             for activity in ACTIVITIES
         ]
@@ -233,14 +228,19 @@ class CashFlow(ECharts, FavaExtensionBase):
             for title, values in series
         ]
 
-    def sankey(self, result: Statement) -> dict[str, object]:
-        """The Sankey diagram, as an ECharts option: what flowed into cash, and out.
+    @extension_endpoint("sankey")
+    def sankey(self) -> dict[str, object]:
+        """The Sankey diagram's data, for the page's filters: what flowed into cash, and out.
 
-        Its nodes are the accounting totals, not their accounts: income and
-        expenses (gross), investing and debt (net, named for which way they
-        went, like the cards), and what was added to or taken from cash, which
-        balances the two sides.
+        The page's template has the rest of the diagram's ECharts option. Its
+        nodes are the accounting totals, not their accounts: income and expenses
+        (gross), investing and debt (net, named for which way they went, like
+        the cards), and what was added to or taken from cash, which balances the
+        two sides. ECharts' Sankey diagram takes nodes and links, not a dataset.
         """
+        result = self.statement()
+        if result is None:
+            return {}
         account_types = get_account_types(self.ledger.options)
         income = sum(
             (
@@ -274,13 +274,7 @@ class CashFlow(ECharts, FavaExtensionBase):
             # Cash that grew takes money out of the flows, and the reverse.
             (-result.net_change, "Taken from cash", "Added to cash", "cash", None),
         ]
-        nodes: list[dict[str, object]] = [
-            {
-                "name": "Cash",
-                "itemStyle": {"color": COLORS["cash"]},
-                "label": {"position": "top"},
-            }
-        ]
+        nodes: list[dict[str, object]] = [{"name": "Cash", "itemStyle": {"color": COLORS["cash"]}}]
         links = []
         for effect, into, out_of, kind, url in totals:
             if not effect:
@@ -291,33 +285,12 @@ class CashFlow(ECharts, FavaExtensionBase):
                     "name": name,
                     "url": url,
                     "itemStyle": {"color": COLORS[kind]},
-                    "label": {
-                        "position": "left" if effect > 0 else "right",
-                        "formatter": f"{name} {balance(abs(effect))}",
-                    },
+                    "label": {"formatter": f"{name} {self.balance(abs(effect))}"},
                 }
             )
             source, target = (name, "Cash") if effect > 0 else ("Cash", name)
             links.append({"source": source, "target": target, "value": float(abs(effect))})
-        return {
-            "animation": False,
-            "series": [
-                {
-                    "type": "sankey",
-                    "left": 200,
-                    "right": 200,
-                    "top": 24,
-                    "bottom": 8,
-                    "nodeWidth": 14,
-                    "nodeGap": 10,
-                    "layoutIterations": 0,
-                    "lineStyle": {"color": "gradient", "curveness": 0.5, "opacity": 0.45},
-                    "emphasis": {"focus": "adjacency"},
-                    "data": nodes,
-                    "links": links,
-                }
-            ],
-        }
+        return {"series": [{"data": nodes, "links": links}]}
 
     @staticmethod
     def interval_label() -> str:

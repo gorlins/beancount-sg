@@ -97,7 +97,37 @@
 
 <section class="cf-panel cf-sankey-panel">
   <h3>Where cash came from and went</h3>
-  {{ extension.echart(extension.sankey(result)) }}
+  {# The diagram's option; its data, for the page's filters, comes from the sankey endpoint. #}
+  <div class="echart" style="height: 300px"
+       data-library="{{ extension.echarts_url }}"
+       data-source="{{ extension.endpoint_url('sankey') }}">
+    <script type="application/json">
+    {% raw %}
+    {
+      "animation": false,
+      "series": [
+        {
+          "type": "sankey",
+          "left": 200,
+          "right": 200,
+          "top": 24,
+          "bottom": 8,
+          "nodeWidth": 14,
+          "nodeGap": 10,
+          "layoutIterations": 0,
+          "lineStyle": { "color": "gradient", "curveness": 0.5, "opacity": 0.45 },
+          "emphasis": { "focus": "adjacency" },
+          "levels": [
+            { "depth": 0, "label": { "position": "left" } },
+            { "depth": 1, "label": { "position": "top" } },
+            { "depth": 2, "label": { "position": "right" } }
+          ]
+        }
+      ]
+    }
+    {% endraw %}
+    </script>
+  </div>
 </section>
 
 <div class="cf-columns">

@@ -72,8 +72,8 @@ def test_cards_have_plain_titles(tmp_path):
 
 
 def test_a_zero_total_keeps_the_usual_title():
-    assert cash_flow_ext.card(INVESTING, Decimal(0)).title == "Invested"
-    assert cash_flow_ext.card(FINANCING, Decimal(0)).title == "Debt paid down"
+    assert cash_flow_ext.CashFlow.card(INVESTING, Decimal(0)).title == "Invested"
+    assert cash_flow_ext.CashFlow.card(FINANCING, Decimal(0)).title == "Debt paid down"
 
 
 def test_a_card_for_withdrawing_and_borrowing(tmp_path):
@@ -154,19 +154,44 @@ def test_charts(tmp_path):
     }
 
 
-def sankey(body):
-    """The Sankey diagram's ECharts series."""
-    [data] = re.findall(
-        r'<div class="echart" data-echarts="[^"]+" style="height: 300px">'
-        r'<script type="application/json">(.*?)</script>',
-        body,
-    )
-    [series] = json.loads(data)["series"]
+def get(tmp_path, path, text=LEDGER):
+    ledger = tmp_path / "main.beancount"
+    ledger.write_text(text)
+    return create_app([ledger], load=True).test_client().get(f"/test/extension/CashFlow/{path}")
+
+
+def sankey(tmp_path, text=LEDGER, query="?time=2024"):
+    """The Sankey diagram's data, from its endpoint."""
+    response = get(tmp_path, f"sankey{query}", text)
+    assert response.status_code == 200
+    [series] = response.get_json()["series"]
     return series
 
 
+def test_the_sankey_chart_loads_its_data_from_the_endpoint(tmp_path):
+    body = page(tmp_path, query="?time=2024")
+    [source] = re.findall(r'<div class="echart"[^>]*data-source="([^"]+)"', body)
+    url = urlsplit(html.unescape(source))
+    assert url.path == "/test/extension/CashFlow/sankey"
+    assert parse_qs(url.query)["time"] == ["2024"]  # the page's filters
+    assert 'data-library="https://cdn.jsdelivr.net/npm/echarts@5/' in body
+    # The option in the template has no data.
+    [option] = re.findall(
+        r'<div class="echart".*?<script type="application/json">(.*?)</script>', body, re.S
+    )
+    [series] = json.loads(option)["series"]
+    assert series["type"] == "sankey"
+    assert "data" not in series
+
+
+def test_the_echarts_url_can_be_configured(tmp_path):
+    url = "https://cdn.example.com/echarts.esm.mjs"
+    ledger = LEDGER.replace(ENABLE, f"{ENABLE} \"{{'echarts_url': '{url}'}}\"")
+    assert f'data-library="{url}"' in page(tmp_path, ledger)
+
+
 def test_sankey(tmp_path):
-    series = sankey(page(tmp_path, query="?time=2024"))
+    series = sankey(tmp_path)
     # Only the accounting totals: into cash, income; out of it, expenses, investing,
     # paying down debt, and what was added to cash.
     assert {(link["source"], link["target"], link["value"]) for link in series["links"]} == {
@@ -177,7 +202,7 @@ def test_sankey(tmp_path):
         ("Cash", "Added to cash", 2900),
     }
     nodes = {node["name"]: node for node in series["data"]}
-    assert nodes["Income"]["label"] == {"position": "left", "formatter": "Income 5,000"}
+    assert nodes["Income"]["label"] == {"formatter": "Income 5,000"}
     assert nodes["Invested"]["label"]["formatter"] == "Invested 1,000"
     assert "income_statement" in nodes["Expenses"]["url"]
     assert "balance_sheet" in nodes["Debt paid down"]["url"]
@@ -189,7 +214,7 @@ def test_sankey_balances_when_cash_is_used_and_debt_grows(tmp_path):
     ledger = ledger.replace("Liabilities:Mortgage  500 USD", "Liabilities:Mortgage  -500 USD")
     links = {
         (link["source"], link["target"]): link["value"]
-        for link in sankey(page(tmp_path, ledger, query="?time=2024"))["links"]
+        for link in sankey(tmp_path, ledger)["links"]
     }
     assert links == {
         ("Income", "Cash"): 50,
@@ -202,11 +227,16 @@ def test_sankey_balances_when_cash_is_used_and_debt_grows(tmp_path):
     assert into == sum(value for (source, _), value in links.items() if source == "Cash")
 
 
+def test_the_sankey_filters_by_the_period(tmp_path):
+    links = {
+        (link["source"], link["target"])
+        for link in sankey(tmp_path, query="?time=2024-08")["links"]
+    }
+    assert links == {("Cash", "Expenses"), ("Cash", "Debt paid down"), ("Taken from cash", "Cash")}
+
+
 def test_the_echarts_helper_is_served(tmp_path):
-    ledger = tmp_path / "main.beancount"
-    ledger.write_text(LEDGER)
-    client = create_app([ledger], load=True).test_client()
-    response = client.get("/test/extension/CashFlow/echarts.js")
+    response = get(tmp_path, "echarts.js")
     assert response.status_code == 200
     assert response.mimetype == "text/javascript"
     assert "export async function renderECharts" in response.get_data(as_text=True)

@@ -230,8 +230,9 @@ uses.
 ### `beancount_sg.ext.echarts`
 
 [ECharts](https://echarts.apache.org) charts in Fava extension reports, for charts Fava doesn't
-have (e.g. Sankey diagrams): a mixin that serves a browser helper loading ECharts from a CDN, and a
-template function that places a chart from an option built in Python.
+have (e.g. Sankey diagrams): a mixin that serves a browser helper, which loads ECharts from a CDN
+(configurable), draws each chart from its option in the template, and loads its data from one of
+the extension's endpoints.
 
 ### `beancount_sg.batch_edit`
 

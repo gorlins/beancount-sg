@@ -36,7 +36,13 @@ grew only shrinks the debt paid down.
 
 Each band fades from its source's color to its target's. Click income or expenses for Fava's
 income statement, or investing or debt for its balance sheet, for the period. The diagram is drawn
-with [ECharts](https://echarts.apache.org), loaded from a CDN.
+with [ECharts](https://echarts.apache.org), loaded from a CDN: the latest 5.x release, unless the
+extension's config sets `echarts_url`, e.g. to pin a version:
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.cash_flow" "{
+  'echarts_url': 'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.esm.min.mjs'}"
+```
 
 ## The statement
 
