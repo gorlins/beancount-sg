@@ -33,7 +33,7 @@ What each section's total means:
 | --- | --- | --- |
 | **Operating** | Income exceeded spending: a surplus to save | Spending exceeded income |
 | **Investing** | More withdrawn from investments than put in | More invested than withdrawn |
-| **Financing** | More borrowed than repaid | More repaid (loans, and cards if `financing`) than borrowed |
+| **Financing** | More borrowed than repaid | More repaid (loans and cards) than borrowed |
 
 Only the operating total is colored, green for a surplus and red for a deficit, since that's
 clearly good or bad. Investing and financing aren't: a negative investing total is money out of
@@ -42,18 +42,13 @@ cash, but it's savings going into investments.
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
 income and expenses `operating`. A declared value that isn't a role (e.g. a typo) is reported as
-an error and ignored. The page's "How accounts are classified" section lists each account's role and where it came from.
+an error and ignored. The page's "How accounts are classified" section lists each account's role
+and where it came from.
 
-**Declare credit cards `operating`.** The default for every liability, credit cards included, is
-`financing`: the convention doesn't single cards out, and neither does this report's inference. So
-by default, card spending shows as borrowing (financing in) and paying the card off as repaying it
-(financing out), which mixes everyday spending into financing. Declared `operating`, a card's
-balance change sits beside the spending it paid for, and financing is left to loans:
-
-```beancount
-2020-01-01 open Liabilities:CreditCard:Visa
-  cash-flow-role: "operating"
-```
+**Credit cards** are `financing`, like any liability. Spending on a card is in operating, by
+expense category, and the card's line in financing is only its net change over the period:
+charges minus payments. A card paid in full each month nets to about zero; one carrying a balance
+shows as borrowing, or as repaying it.
 
 ## Reconciliation
 
@@ -65,15 +60,17 @@ held in another currency, a **change in value** line shows the difference.
 
 ## Emergency fund
 
-How many months of spending your cash covers: cash at the end of the period, divided by the
-period's average monthly spending (its expenses). It's also shown without cash accounts named
-Savings, i.e. counting only the money on hand to spend.
+How many months of spending your cash covers: cash at the end of the period, divided by average
+monthly spending (expenses) over the 12 months up to it. It uses 12 months whatever the period, so
+a month's filter or a year-to-date year doesn't make it seasonal. It's also shown without cash
+accounts named Savings, i.e. counting only the money on hand to spend; the card names the
+accounts left out.
 
 ## Period and filters
 
 The period is Fava's time filter, or the last 12 months (this month to date and the 11 before it)
-without one. Fava's account and advanced
-filters apply, as on Fava's own reports.
+without one. A time filter ends today at the latest, so this year is year-to-date. Fava's account
+and advanced filters apply, as on Fava's own reports.
 
 The chart shows each activity's flows per interval, from the chart's interval menu (e.g. monthly).
 Click a bar's date for that interval, or part of a bar for the income statement (operating) or

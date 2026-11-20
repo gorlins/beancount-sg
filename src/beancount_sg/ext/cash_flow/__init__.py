@@ -11,13 +11,13 @@ cash (accounts with the ``cash`` role) over the period by every other account's
 flows, in operating, investing and financing sections; see
 `beancount_sg.ext.cash_flow.statement`.
 
-The period is Fava's time filter, or the last 12 months without one. Fava's
+The period is Fava's time filter, up to today, or the last 12 months without one. Fava's
 account and advanced filters apply, as on Fava's own reports. The page has:
 
 - Cards with each activity's total and what it means (e.g. investing -9,640 is
   "net invested"), the net change in cash, and the emergency fund: how many
-  months of the period's average spending cash covers, with and without savings
-  accounts. Only operating cash is colored, green for a surplus and red for a
+  months of average spending over the last 12 months cash covers, with and
+  without savings accounts. Only operating cash is colored, green for a surplus and red for a
   deficit: investing and financing flows aren't good or bad by their sign.
 - The statement: each activity's lines and total, and the net change in cash.
 - A chart of each activity's flows per interval (Fava's interval menu).
@@ -106,12 +106,13 @@ class CashFlow(FavaExtensionBase):
     def period(self) -> tuple[datetime.date, datetime.date]:
         """Fava's time filter, or the last 12 months: the first day, and the day after the last.
 
-        The last 12 months are this month to date and the 11 before it.
+        The last 12 months are this month to date and the 11 before it. A time
+        filter ends today at the latest, e.g. this year is year-to-date.
         """
+        today = local_today()
         date_range = g.filtered.date_range
         if date_range:
-            return date_range.begin, date_range.end
-        today = local_today()
+            return date_range.begin, max(date_range.begin, min(date_range.end, today + ONE_DAY))
         months = today.year * 12 + today.month - 1 - 11
         return datetime.date(months // 12, months % 12 + 1, 1), today + ONE_DAY
 

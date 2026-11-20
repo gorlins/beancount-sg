@@ -64,8 +64,29 @@ def test_cards_say_what_each_total_means(tmp_path):
     assert "investing activities −1,000 net invested" in cards
     assert "financing activities −500 net repaid (loans and cards)" in cards
     assert "Net change in cash +2,900 cash grew: 10,000 → 12,900" in cards
-    # 600 spent in 2024: 49.9 a month, which 12,900 of cash covers 258.5 times.
-    assert "Emergency fund 258.5 mo of spending (50/mo); 258.5 mo without savings accounts" in cards
+    # 600 spent in the 12 months up to today: 50 a month, which 12,900 of cash covers 258 times.
+    assert "Emergency fund 258.0 mo of the last 12 months' spending (50/mo)" in cards
+    assert "without" not in cards  # no savings accounts
+
+
+def test_the_emergency_fund_names_the_savings_accounts_it_leaves_out(tmp_path):
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Assets:Bank:Savings USD
+2023-12-31 * "Savings"
+  Assets:Bank:Savings  6000 USD
+  Equity:Opening
+"""
+    )
+    body = text(page(tmp_path, ledger, query="?time=2024"))
+    assert "Emergency fund 378.0 mo of the last 12 months' spending (50/mo);" in body
+    assert "258.0 mo without Assets:Bank:Savings" in body
+
+
+def test_a_time_filter_ends_today(tmp_path):
+    # Today is 2024-09-30, so 2024 is year-to-date.
+    assert "2024-01-01 to 2024-09-30, in USD." in text(page(tmp_path, query="?time=2024"))
 
 
 def test_only_operating_cash_is_colored(tmp_path):
@@ -105,7 +126,7 @@ def test_lines_link_to_their_accounts_for_the_period(tmp_path):
     [href] = re.findall(r'<a href="([^"]+)">Assets:Brokerage</a>', body)
     url = urlsplit(html.unescape(href))
     assert unquote(url.path) == "/test/account/Assets:Brokerage/"
-    assert parse_qs(url.query)["time"] == ["2024-01-01 - 2024-12-31"]
+    assert parse_qs(url.query)["time"] == ["2024-01-01 - 2024-09-30"]  # up to today
 
 
 def test_chart(tmp_path):
@@ -118,8 +139,7 @@ def test_chart(tmp_path):
     assert [bar["date"] for bar in chart["data"]] == [
         "2024-03-31",
         "2024-06-30",
-        "2024-09-30",
-        "2024-12-31",
+        "2024-09-30",  # up to today
     ]
     assert chart["data"][0]["account_balances"] == {
         "Operating": {"USD": "4600"},

@@ -88,10 +88,10 @@
   </div>
   {% set months = result.months_of_cash() %}
   {% set spendable = result.months_of_cash(savings=false) %}
-  <div class="cf-card" title="Cash at the end, divided by the period's average monthly spending">
+  <div class="cf-card" title="Cash at the end, divided by average monthly spending over the 12 months up to it ({{ result.trailing_start }} to {{ result.end - extension.one_day }})">
     <div class="cf-card-label">Emergency fund</div>
     <div class="cf-card-value">{% if months is none %}&mdash;{% else %}{{ '%.1f'|format(months) }} mo{% endif %}</div>
-    <div class="cf-note">of spending ({{ extension.balance(result.monthly_expenses) }}/mo){% if spendable is not none %}; {{ '%.1f'|format(spendable) }} mo without savings accounts{% endif %}</div>
+    <div class="cf-note">of the last 12 months' spending ({{ extension.balance(result.monthly_expenses) }}/mo){% if spendable is not none and result.savings_accounts %}; {{ '%.1f'|format(spendable) }} mo without {{ result.savings_accounts|join(', ') }}{% endif %}</div>
   </div>
 </div>
 
@@ -180,20 +180,20 @@
 <details>
   <summary>How to use</summary>
   <ul>
-    <li>The period is Fava's time filter, or the last 12 months (this month and the 11 before)
-      without one. Fava's account and advanced filters apply, as on Fava's own reports.</li>
+    <li>The period is Fava's time filter, up to today, or the last 12 months (this month and the
+      11 before) without one. Fava's account and advanced filters apply, as on Fava's own
+      reports.</li>
     <li>Each line is an account's effect on cash: money in is positive, money out negative. So
       investing −9,640 means 9,640 more was invested than withdrawn, and financing −5,000 that
       5,000 more was repaid than borrowed. Only operating cash is green (a surplus) or red (a
       deficit): investing and financing aren't good or bad by their sign. Income and expenses are
       rolled up to their top-level category, e.g. <code>Expenses:Food</code>.</li>
-    <li>The <em>emergency fund</em> is cash at the end, in months of the period's average spending;
-      also without accounts named Savings, i.e. the money on hand to spend.</li>
-    <li><strong>Declare credit cards <code>operating</code></strong>: the default for every
-      liability, cards included, is <code>financing</code>, so card spending would show as borrowing
-      (financing in) and paying the card as repaying it (financing out). As <code>operating</code>,
-      a card's balance change sits beside the spending it paid for, and financing is left to
-      loans.</li>
+    <li>The <em>emergency fund</em> is cash at the end, in months of average spending over the 12
+      months up to it, whatever the period; also without accounts named Savings, i.e. the money
+      on hand to spend.</li>
+    <li>Credit cards are <code>financing</code>, like any liability: spending on a card is in
+      operating, by category, and the card's line in financing is its net change. A card paid in
+      full nets to about zero; one carrying a balance shows as borrowing or repaying it.</li>
     <li>Values are in the first operating currency, rounded to whole units: flows at each
       transaction's date, cash at market value at the start and end. A <em>change in value</em>
       line shows any difference, e.g. from exchange rates.</li>

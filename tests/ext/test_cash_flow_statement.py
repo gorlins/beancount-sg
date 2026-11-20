@@ -130,11 +130,26 @@ def test_emergency_fund():
 """
     )
     result = run(ledger)
-    # 600 spent over 2024's 366 days.
-    assert result.expenses == 600
-    assert result.monthly_expenses == Decimal(600) / (Decimal(366) / (Decimal("365.25") / 12))
-    assert result.months_of_cash() == (12900 + 6000) / result.monthly_expenses
-    assert result.months_of_cash(savings=False) == 12900 / result.monthly_expenses
+    # The 12 months up to the end are 2024: 600 spent, 50 a month.
+    assert result.trailing_start == BEGIN
+    assert (result.trailing_expenses, result.monthly_expenses) == (600, 50)
+    assert result.savings_accounts == ["Assets:Bank:Savings"]
+    assert result.months_of_cash() == Decimal(12900 + 6000) / 50
+    assert result.months_of_cash(savings=False) == Decimal(12900) / 50
+
+
+def test_emergency_fund_uses_12_months_whatever_the_period():
+    # September alone has no spending, but the 12 months up to its end do: groceries, dining
+    # and interest from February and August.
+    result = run(begin=datetime.date(2024, 9, 1), end=datetime.date(2024, 10, 1))
+    assert result.trailing_start == datetime.date(2023, 10, 1)
+    assert result.trailing_expenses == 600
+    assert result.lines(OPERATING) == []
+
+
+def test_the_12_months_before_february_29th():
+    result = run(begin=datetime.date(2028, 2, 1), end=datetime.date(2028, 2, 29))
+    assert result.trailing_start == datetime.date(2027, 2, 28)
 
 
 def test_by_interval():

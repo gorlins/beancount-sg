@@ -16,9 +16,11 @@ value then: the difference, if any (e.g. from exchange rates moving while cash i
 held in another currency), is shown as its own line, so the statement always
 reconciles.
 
-The statement also totals the period's spending (its expense accounts), for the
-emergency fund: how many months of average spending cash at the end covers, with
-and without cash accounts named Savings.
+The statement also totals the spending (expense accounts) over the 12 months up
+to the period's end, for the emergency fund: how many months of that average
+spending cash at the end covers, with and without cash accounts named Savings.
+It uses 12 months whatever the period, so a short or partial period doesn't make
+it seasonal.
 """
 
 from __future__ import annotations
@@ -51,7 +53,6 @@ ACTIVITIES = (OPERATING, INVESTING, FINANCING)
 ONE_DAY = datetime.timedelta(days=1)
 # Cash accounts that hold savings, rather than money to spend, by name.
 SAVINGS_NAMES = re.compile(r"savings", re.IGNORECASE)
-DAYS_PER_MONTH = Decimal("365.25") / 12
 
 
 @dataclass
@@ -71,8 +72,8 @@ class Statement:
     # Cash accounts' values at the start and end.
     cash_start: dict[str, Decimal] = field(default_factory=dict)
     cash_end: dict[str, Decimal] = field(default_factory=dict)
-    # Spending over the period: the expense accounts' total.
-    expenses: Decimal = Decimal(0)
+    # Spending over the 12 months up to the end: the expense accounts' total.
+    trailing_expenses: Decimal = Decimal(0)
     unconverted: set[str] = field(default_factory=set)
 
     def lines(self, activity: str) -> list[tuple[str, Decimal]]:
@@ -102,24 +103,35 @@ class Statement:
         return self.cash_end_total - self.cash_start_total - self.net_change
 
     @property
+    def trailing_start(self) -> datetime.date:
+        """The first day of the 12 months up to the end."""
+        return _year_before(self.end)
+
+    @property
     def monthly_expenses(self) -> Decimal:
-        """Average spending per month over the period."""
-        return self.expenses / (Decimal((self.end - self.begin).days) / DAYS_PER_MONTH)
+        """Average spending per month over the 12 months up to the end."""
+        return self.trailing_expenses / 12
+
+    @property
+    def savings_accounts(self) -> list[str]:
+        """The cash accounts named Savings with a balance at the end."""
+        return sorted(
+            account
+            for account, value in self.cash_end.items()
+            if value and SAVINGS_NAMES.search(account)
+        )
 
     def months_of_cash(self, *, savings: bool = True) -> Decimal | None:
-        """How many months of the period's average spending cash at the end covers.
+        """How many months of average spending (see `monthly_expenses`) cash at the end covers.
 
         Without ``savings``, only cash accounts not named Savings: the money on
         hand to spend.
         """
         if self.monthly_expenses <= 0:
             return None
+        excluded = set() if savings else set(self.savings_accounts)
         cash = sum(
-            (
-                value
-                for account, value in self.cash_end.items()
-                if savings or not SAVINGS_NAMES.search(account)
-            ),
+            (value for account, value in self.cash_end.items() if account not in excluded),
             Decimal(0),
         )
         return cash / self.monthly_expenses
@@ -132,6 +144,13 @@ class Statement:
             for account in self.cash_start.keys() | self.cash_end.keys()
             if self.cash_start.get(account) or self.cash_end.get(account)
         )
+
+
+def _year_before(date: datetime.date) -> datetime.date:
+    """The same day a year earlier (February 28th for February 29th)."""
+    if (date.month, date.day) == (2, 29):
+        return date.replace(year=date.year - 1, day=28)
+    return date.replace(year=date.year - 1)
 
 
 def role_of(account: str, roles: Mapping[str, Role], account_types: AccountTypes) -> str:
@@ -160,6 +179,7 @@ def statement(
     result = Statement(begin, end, currency)
     start_balances: dict[str, Inventory] = defaultdict(Inventory)
     end_balances: dict[str, Inventory] = defaultdict(Inventory)
+    trailing_start = result.trailing_start
     for txn in entries:
         if not isinstance(txn, Transaction) or txn.date >= end:
             continue
@@ -169,12 +189,20 @@ def statement(
                 end_balances[posting.account].add_position(posting)
                 if txn.date < begin:
                     start_balances[posting.account].add_position(posting)
-            elif txn.date >= begin:
-                value = posting_value(posting, currency, price_map, txn.date, result.unconverted)
+                continue
+            in_period = txn.date >= begin
+            spent = (
+                txn.date >= trailing_start
+                and get_account_type(posting.account) == account_types.expenses
+            )
+            if not in_period and not spent:
+                continue
+            value = posting_value(posting, currency, price_map, txn.date, result.unconverted)
+            if in_period:
                 # Money into the account is money out of cash, and the reverse.
                 result.sections[role][line_of(posting.account, account_types)] -= value
-                if get_account_type(posting.account) == account_types.expenses:
-                    result.expenses += value
+            if spent:
+                result.trailing_expenses += value
     result.cash_start = market_values(
         start_balances, currency, price_map, begin - ONE_DAY, result.unconverted
     )
