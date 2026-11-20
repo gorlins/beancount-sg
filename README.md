@@ -283,4 +283,7 @@ git push origin v0.2.0
 
 ## License
 
-[MIT](LICENSE).
+Copyright (C) 2026 Scott Gorlin.
+
+Licensed under the [GNU General Public License, version 2](LICENSE) only (GPL-2.0-only), like
+Beancount itself.
