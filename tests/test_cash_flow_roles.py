@@ -8,6 +8,7 @@ from beancount_sg.cash_flow_roles import (
     OPERATING,
     account_roles,
     default_role,
+    notable_accounts,
 )
 from beancount_sg.testing import load
 
@@ -91,3 +92,24 @@ def test_inheritance_does_not_depend_on_open_order():
 )
 def test_debt_payment_accounts_default_to_financing(account, role):
     assert default_role(account, DEFAULT_ACCOUNT_TYPES) == role
+
+
+def test_notable_accounts_skip_those_classified_as_their_parent():
+    classified = {
+        "Assets:Bank": CASH,
+        "Assets:Bank:Checking": CASH,  # as its parent
+        "Assets:Bank:CD": INVESTING,  # differs
+        "Assets:Bank:CD:Ladder": INVESTING,  # as its parent, Assets:Bank:CD
+        "Assets:Brokerage": INVESTING,  # two levels: always
+        "Assets:Retirement:401k": INVESTING,  # no parent listed
+        "Assets:Retirement:401k:Cash": CASH,  # differs
+        "Liabilities:CreditCard:Visa": FINANCING,  # no parent listed
+    }
+    assert notable_accounts(classified) == [
+        "Assets:Bank",
+        "Assets:Bank:CD",
+        "Assets:Brokerage",
+        "Assets:Retirement:401k",
+        "Assets:Retirement:401k:Cash",
+        "Liabilities:CreditCard:Visa",
+    ]

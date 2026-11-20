@@ -28,7 +28,7 @@ error and ignored, so the account resolves as if it weren't there.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -114,3 +114,29 @@ def default_role(account: str, account_types: AccountTypes) -> str:
     if root in (account_types.liabilities, account_types.equity):
         return FINANCING
     return FINANCING if DEBT_PAYMENT_NAMES.search(account) else OPERATING
+
+
+def notable_accounts(classified: Mapping[str, Hashable], depth: int = 2) -> list[str]:
+    """The accounts worth listing from a classification, e.g. of roles, sorted.
+
+    Those up to ``depth`` components deep (e.g. ``Assets:Bank``), and deeper ones
+    classified differently from their nearest parent in ``classified``, or with
+    none: the rest are classified as their parent, so listing them adds nothing.
+    """
+    found = []
+    for account in sorted(classified):
+        parent = next(
+            (
+                name
+                for name in account_lib.parents(account)
+                if name != account and name in classified
+            ),
+            None,
+        )
+        if (
+            len(account_lib.split(account)) <= depth
+            or parent is None
+            or classified[parent] != classified[account]
+        ):
+            found.append(account)
+    return found

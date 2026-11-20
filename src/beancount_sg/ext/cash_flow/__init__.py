@@ -47,10 +47,17 @@ from fava.internal_api import BarChart
 from fava.util.date import dateranges, local_today
 from flask import request, url_for
 
-from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, Role, account_roles
+from beancount_sg.cash_flow_roles import (
+    FINANCING,
+    INVESTING,
+    OPERATING,
+    Role,
+    account_roles,
+    notable_accounts,
+)
 from beancount_sg.ext.echarts import ECharts
 
-from .statement import ACTIVITIES, ONE_DAY, Statement, by_interval, role_of, statement
+from .statement import ACTIVITIES, ONE_DAY, Statement, by_interval, statement
 
 
 @dataclass(frozen=True)
@@ -310,22 +317,14 @@ class CashFlow(ECharts, FavaExtensionBase):
         return url_for("account", name=account, time=self._time())
 
     def classified(self) -> list[tuple[str, Role]]:
-        """The open accounts other than cash, and their roles."""
-        roles, _ = self.roles()
-        closed = {entry.account for entry in self.ledger.all_entries_by_type.Close}
-        account_types = get_account_types(self.ledger.options)
-        return [
-            (account, role)
-            for account, role in sorted(roles.items())
-            if account not in closed and role_of(account, roles, account_types) != CASH
-        ]
+        """The open accounts and their roles.
 
-    def cash_accounts(self) -> list[tuple[str, Role]]:
-        """The open accounts counted as cash, and their roles."""
+        Only those two levels deep (e.g. ``Assets:Bank``), and deeper ones with a
+        different role from their parent: the rest have their parent's role.
+        """
         roles, _ = self.roles()
         closed = {entry.account for entry in self.ledger.all_entries_by_type.Close}
-        return [
-            (account, role)
-            for account, role in sorted(roles.items())
-            if account not in closed and role.role == CASH
-        ]
+        open_roles = {
+            account: role.role for account, role in roles.items() if account not in closed
+        }
+        return [(account, roles[account]) for account in notable_accounts(open_roles)]

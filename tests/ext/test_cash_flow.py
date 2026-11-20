@@ -266,6 +266,22 @@ def test_classification(tmp_path):
     assert "Liabilities:CreditCard financing default" in body
 
 
+def classification(body):
+    start = body.index("How accounts are classified")
+    return text(body[start : body.index("</details>", start)])
+
+
+def test_classification_skips_accounts_with_their_parents_role(tmp_path):
+    ledger = LEDGER + (
+        "2020-01-01 open Assets:Brokerage:VTI\n"  # investing, as its parent
+        "2020-01-01 open Assets:Brokerage:Cash USD\n"  # cash, by its name
+    )
+    found = classification(page(tmp_path, ledger))
+    assert "Assets:Brokerage investing" in found
+    assert "Assets:Brokerage:Cash cash" in found
+    assert "Assets:Brokerage:VTI" not in found
+
+
 def test_unknown_role_is_reported(tmp_path):
     ledger = LEDGER.replace(
         "2020-01-01 open Assets:Brokerage",
