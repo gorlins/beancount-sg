@@ -273,6 +273,19 @@ def test_classification_is_shown(tmp_path):
     assert "Liabilities:Mortgage debt financing, by default" in body
 
 
+def test_classification_skips_accounts_in_their_parents_group(tmp_path):
+    ledger = LEDGER + (
+        "2018-01-01 open Assets:Brokerage:VTI\n"  # investments, as its parent
+        "2018-01-01 open Assets:Brokerage:Cash USD\n"  # inherits the declared investing
+    )
+    body = page(tmp_path, ledger)
+    start = body.index("How accounts are classified")
+    found = text(body[start : body.index("</details>", start)])
+    assert "Assets:Brokerage investments" in found
+    assert "Assets:Brokerage:VTI" not in found
+    assert "Assets:Brokerage:Cash" not in found
+
+
 def test_unknown_role_is_reported(tmp_path):
     body = text(page(tmp_path, LEDGER.replace('"investing"', '"invsting"')))
     assert (

@@ -202,10 +202,12 @@
     expenses <code>operating</code>: the same convention as Beancount.io's cash-flow report. Debt-payment
     accounts, named with Repayment or with Payment after Loan, Mortgage or Card (e.g.
     <code>Expenses:CreditCardPayment</code>), are <code>financing</code>.</p>
+  <p>Accounts deeper than two levels are listed only where their role differs from their
+    parent's.</p>
   <table>
     <thead><tr><th>Account</th><th>Role</th><th>From</th></tr></thead>
     <tbody>
-      {% for account, role in extension.cash_accounts() + extension.classified() %}
+      {% for account, role in extension.classified() %}
       <tr>
         <td>{{ account }}</td>
         <td>{{ role.role }}</td>

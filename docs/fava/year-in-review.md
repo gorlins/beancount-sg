@@ -165,7 +165,8 @@ other assets `investing`, liabilities `financing`, and income and expense accoun
 except debt-payment accounts (see [transfers](#investment-returns-and-transfers)), which are
 `financing`. A declared value that isn't a role (e.g. a
 typo) is reported as an error and ignored. The page's "How accounts are classified" section lists
-each account's group and why.
+accounts' groups and why: those two levels deep (e.g. `Assets:Bank`), and deeper ones only where
+their group differs from their parent's.
 
 Here, roles decide which assets are **cash** (the cash group and the emergency fund), which
 liabilities are **debt**, and which income and expense accounts are

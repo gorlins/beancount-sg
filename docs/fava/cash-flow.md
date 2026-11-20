@@ -75,8 +75,9 @@ Without a declared role (a parent's applies to its subaccounts), assets named wi
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
 income and expenses `operating`, except debt-payment accounts (see below), which are `financing`. A
 declared value that isn't a role (e.g. a typo) is reported as
-an error and ignored. The page's "How accounts are classified" section lists each account's role
-and where it came from.
+an error and ignored. The page's "How accounts are classified" section lists
+accounts' roles and where they came from: those two levels deep (e.g. `Assets:Bank`), and deeper
+ones only where their role differs from their parent's.
 
 **Credit cards** are `financing`, like any liability. Spending on a card is in operating, by
 expense category, and the card's line in financing is only its net change over the period:

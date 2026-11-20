@@ -58,7 +58,7 @@ from fava.internal_api import BarChart
 from fava.util.date import local_today
 from flask import request, url_for
 
-from beancount_sg.cash_flow_roles import Role, account_roles
+from beancount_sg.cash_flow_roles import Role, account_roles, notable_accounts
 
 from .metrics import (
     ONE_DAY,
@@ -224,14 +224,21 @@ class YearInReview(FavaExtensionBase):
 
     def classified(self) -> list[tuple[str, Role, Classification]]:
         """The open accounts that are classified, their roles and net worth groups: assets,
-        liabilities, and income and expense accounts that are investment returns."""
+        liabilities, and income and expense accounts that are investment returns or
+        transfers.
+
+        Only those two levels deep (e.g. ``Assets:Bank``), and deeper ones in a
+        different group from their parent: the rest are as their parent.
+        """
         roles, _ = self.roles()
         closed = {entry.account for entry in self.ledger.all_entries_by_type.Close}
-        return [
-            (account, roles[account], classification)
-            for account, classification in sorted(self._classes().items())
+        classes = {
+            account: classification
+            for account, classification in self._classes().items()
             if account not in closed
-        ]
+        }
+        groups = {account: classification.group for account, classification in classes.items()}
+        return [(account, roles[account], classes[account]) for account in notable_accounts(groups)]
 
     @staticmethod
     def categories(result: YearEnd) -> list[str]:
