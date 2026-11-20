@@ -12,21 +12,22 @@ single year shows it and the four before. It shows at most five years.
 Fava's account and advanced filters apply as on Fava's own reports, but the time
 filter only picks the years: balances always include everything before them.
 
-The dashboard has:
+Metrics are balances at each year's end (for the current year, today), flows
+during the year (so far), or spending ratios over the 12 months up to the year's
+end; see `beancount_sg.ext.year_end.metrics`. The dashboard has:
 
 - Cards with the final year's headline metrics and their change from the
-  previous year: net worth, investable assets, savings rate, income, expenses,
-  withdrawal rate, emergency fund and debt paid down.
+  previous year: net worth, investable assets, income, expenses, savings rate,
+  debt paid down, withdrawal rate and emergency fund.
 - Charts of net worth per year (or assets and liabilities, stacked), and of
   expenses by category.
 - Net worth (assets minus liabilities) by group.
-- Income, expenses, savings and ratios per year: savings rate, spending as a
-  share of net worth, and the withdrawal rate (spending as a share of investable
-  assets: cash and investments). For the current year, the spending ratios use
-  spending annualized from the year so far.
+- Income, expenses, savings and the savings rate per year, and the spending
+  ratios: the withdrawal rate (spending as a share of investable assets: cash and
+  investments), spending as a share of net worth, and the emergency fund.
 - Expenses by top-level category (e.g. ``Expenses:Food``) per year, with a chart.
-- Debt paydown in the final year: each loan's balance, new borrowing and
-  principal paid.
+- Debt in the final year: each debt's balance at the start and end, and how much
+  it was paid down.
 - How each asset and liability account is classified.
 
 Changes from the previous year are green when they're good and red when they're
@@ -61,7 +62,6 @@ from .metrics import (
     ONE_DAY,
     PROPERTY,
     Classification,
-    Debt,
     YearEnd,
     YearSummary,
     classify,
@@ -159,11 +159,6 @@ class YearInReview(FavaExtensionBase):
     def category_values(result: YearEnd, category: str) -> list[Decimal]:
         """A category's expenses in each year."""
         return [year.expenses_by_category.get(category, Decimal(0)) for year in result.years]
-
-    @staticmethod
-    def paid_share(debt: Debt) -> Decimal:
-        """How much of a loan's starting balance was paid down, as a percentage."""
-        return min(Decimal(100), 100 * debt.paid / debt.start) if debt.start > 0 else Decimal(0)
 
     def years_filtered(self) -> tuple[int | None, int]:
         """The first and last years of Fava's time filter, or no first year and this year.
