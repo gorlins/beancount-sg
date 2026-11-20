@@ -2,12 +2,14 @@ import datetime
 import html
 import json
 import re
+from decimal import Decimal
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 from fava.application import create_app
 
 import beancount_sg.ext.cash_flow as cash_flow_ext
+from beancount_sg.cash_flow_roles import FINANCING, INVESTING
 
 from .test_cash_flow_statement import LEDGER as STATEMENT_LEDGER
 
@@ -55,33 +57,32 @@ def test_defaults_to_the_last_12_months(tmp_path):
     assert "2023-10-01 to 2024-09-30, in USD." in body
 
 
-def test_cards_say_what_each_total_means(tmp_path):
-    body = page(tmp_path, query="?time=2024")
-    cards = text(
-        body[body.index('<div class="cf-cards">') : body.index('<div class="cf-columns">')]
-    )
-    assert "operating activities +4,400 income exceeded spending" in cards
-    assert "investing activities −1,000 net invested" in cards
-    assert "financing activities −500 net repaid (loans and cards)" in cards
-    assert "Net change in cash +2,900 cash grew: 10,000 → 12,900" in cards
+def cards(body):
+    return text(body[body.index('<div class="cf-cards">') : body.index('<div class="cf-columns">')])
+
+
+def test_cards_have_plain_titles(tmp_path):
+    found = cards(page(tmp_path, query="?time=2024"))
+    assert "Net income +4,400 income minus spending" in found
+    assert "Invested 1,000 put into investments, minus withdrawals" in found
+    assert "Debt paid down 500 loan and card payments, minus new borrowing" in found
+    assert "Change in cash +2,900 10,000 → 12,900" in found
     # 600 spent in the 12 months up to today: 50 a month, which 12,900 of cash covers 258 times.
-    assert "Emergency fund 258.0 mo of the last 12 months' spending (50/mo)" in cards
-    assert "without" not in cards  # no savings accounts
+    assert "Emergency fund 258.0 months cash ÷ 50 a month" in found
 
 
-def test_the_emergency_fund_names_the_savings_accounts_it_leaves_out(tmp_path):
-    ledger = (
-        LEDGER
-        + """
-2020-01-01 open Assets:Bank:Savings USD
-2023-12-31 * "Savings"
-  Assets:Bank:Savings  6000 USD
-  Equity:Opening
-"""
-    )
-    body = text(page(tmp_path, ledger, query="?time=2024"))
-    assert "Emergency fund 378.0 mo of the last 12 months' spending (50/mo);" in body
-    assert "258.0 mo without Assets:Bank:Savings" in body
+def test_a_zero_total_keeps_the_usual_title():
+    assert cash_flow_ext.card(INVESTING, Decimal(0)).title == "Invested"
+    assert cash_flow_ext.card(FINANCING, Decimal(0)).title == "Debt paid down"
+
+
+def test_a_card_for_withdrawing_and_borrowing(tmp_path):
+    ledger = LEDGER.replace(
+        "Assets:Brokerage  10 VTI {100 USD}", "Assets:Brokerage  -10 USD"
+    ).replace("Liabilities:Mortgage  500 USD", "Liabilities:Mortgage  -500 USD")
+    found = cards(page(tmp_path, ledger, query="?time=2024"))
+    assert "Withdrawn from investments 10" in found
+    assert "Borrowed 500" in found
 
 
 def test_a_time_filter_ends_today(tmp_path):
@@ -89,9 +90,10 @@ def test_a_time_filter_ends_today(tmp_path):
     assert "2024-01-01 to 2024-09-30, in USD." in text(page(tmp_path, query="?time=2024"))
 
 
-def test_only_operating_cash_is_colored(tmp_path):
+def test_only_net_income_is_colored(tmp_path):
     body = page(tmp_path, query="?time=2024")
     assert '<span class="cf-good">+4,400</span>' in body  # a surplus
+    assert '<span class="cf-neutral">1,000</span>' in body  # the Invested card: not bad
     assert '<span class="cf-neutral">−1,000</span>' in body  # invested: not bad
     assert '<span class="cf-neutral">−500</span>' in body
     deficit = LEDGER.replace("Assets:Bank:Checking  5000 USD", "Assets:Bank:Checking  50 USD")

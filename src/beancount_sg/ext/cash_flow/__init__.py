@@ -11,14 +11,14 @@ cash (accounts with the ``cash`` role) over the period by every other account's
 flows, in operating, investing and financing sections; see
 `beancount_sg.ext.cash_flow.statement`.
 
-The period is Fava's time filter, up to today, or the last 12 months without one. Fava's
-account and advanced filters apply, as on Fava's own reports. The page has:
+The period is Fava's time filter, up to today, or the last 12 months without one.
+Fava's account and advanced filters apply, as on Fava's own reports. The page has:
 
-- Cards with each activity's total and what it means (e.g. investing -9,640 is
-  "net invested"), the net change in cash, and the emergency fund: how many
-  months of average spending over the last 12 months cash covers, with and
-  without savings accounts. Only operating cash is colored, green for a surplus and red for a
-  deficit: investing and financing flows aren't good or bad by their sign.
+- Cards in plain terms: net income (operating), invested or withdrawn from
+  investments (investing), debt paid down or borrowed (financing), the change in
+  cash, and the emergency fund: how many months of average spending over the last
+  12 months cash covers. Only net income is colored, green for a surplus and red
+  for a deficit: investing and financing flows aren't good or bad by their sign.
 - The statement: each activity's lines and total, and the net change in cash.
 - A chart of each activity's flows per interval (Fava's interval menu).
 - The reconciliation: each cash account at the start and end, with the change
@@ -29,6 +29,7 @@ account and advanced filters apply, as on Fava's own reports. The page has:
 from __future__ import annotations
 
 import datetime
+from dataclasses import dataclass
 from decimal import Decimal
 
 from beancount.core import prices
@@ -72,22 +73,34 @@ def tone(activity: str | None, value: Decimal) -> str:
     return "good" if value > 0 else "bad"
 
 
-# What an activity's total means, when it's money in (+) or out (-) of cash.
-MEANINGS = {
-    (OPERATING, True): "income exceeded spending",
-    (OPERATING, False): "spending exceeded income",
-    (INVESTING, True): "net withdrawn from investments",
-    (INVESTING, False): "net invested",
-    (FINANCING, True): "net borrowed",
-    (FINANCING, False): "net repaid (loans and cards)",
-    (CASH, True): "cash grew",
-    (CASH, False): "cash shrank",
+@dataclass(frozen=True)
+class Card:
+    """An activity's total as a card: a plain title, the amount, and how it's made up."""
+
+    title: str
+    amount: str
+    tone: str
+    detail: str
+
+
+# Each activity's card title and detail, by whether its total is money into cash.
+# Investing and financing are named for which way the money went, and shown
+# without a sign; net income keeps its sign.
+CARDS = {
+    (OPERATING, True): ("Net income", "income minus spending"),
+    (OPERATING, False): ("Net income", "income minus spending"),
+    (INVESTING, True): ("Withdrawn from investments", "taken out, minus money put in"),
+    (INVESTING, False): ("Invested", "put into investments, minus withdrawals"),
+    (FINANCING, True): ("Borrowed", "new borrowing, minus loan and card payments"),
+    (FINANCING, False): ("Debt paid down", "loan and card payments, minus new borrowing"),
 }
 
 
-def meaning(activity: str, value: Decimal) -> str:
-    """What an activity's total (or, for ``cash``, the net change) means."""
-    return MEANINGS[(activity, value >= 0)] if value else "no change"
+def card(activity: str, value: Decimal) -> Card:
+    """The card for an activity's total."""
+    title, detail = CARDS[(activity, value > 0)]
+    amount = money(value) if activity == OPERATING else balance(abs(value))
+    return Card(title, amount, tone(activity, value), detail)
 
 
 class CashFlow(FavaExtensionBase):
@@ -101,7 +114,7 @@ class CashFlow(FavaExtensionBase):
     money = staticmethod(money)
     balance = staticmethod(balance)
     tone = staticmethod(tone)
-    meaning = staticmethod(meaning)
+    card = staticmethod(card)
 
     def period(self) -> tuple[datetime.date, datetime.date]:
         """Fava's time filter, or the last 12 months: the first day, and the day after the last.

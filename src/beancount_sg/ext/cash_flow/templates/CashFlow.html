@@ -74,24 +74,23 @@
 
 <div class="cf-cards">
   {% for activity in extension.activities %}
-  {% set total = result.total(activity) %}
-  <div class="cf-card">
-    <div class="cf-card-label">{{ activity }} activities</div>
-    <div class="cf-card-value">{{ flow(total, activity) }}</div>
-    <div class="cf-note">{{ extension.meaning(activity, total) }}</div>
+  {% set found = extension.card(activity, result.total(activity)) %}
+  <div class="cf-card" title="Net cash from {{ activity }} activities">
+    <div class="cf-card-label">{{ found.title }}</div>
+    <div class="cf-card-value"><span class="cf-{{ found.tone }}">{{ found.amount }}</span></div>
+    <div class="cf-note">{{ found.detail }}</div>
   </div>
   {% endfor %}
   <div class="cf-card">
-    <div class="cf-card-label">Net change in cash</div>
+    <div class="cf-card-label">Change in cash</div>
     <div class="cf-card-value">{{ flow(result.net_change) }}</div>
-    <div class="cf-note">{{ extension.meaning("cash", result.net_change) }}: {{ extension.balance(result.cash_start_total) }} → {{ extension.balance(result.cash_end_total) }}</div>
+    <div class="cf-note">{{ extension.balance(result.cash_start_total) }} → {{ extension.balance(result.cash_end_total) }}</div>
   </div>
-  {% set months = result.months_of_cash() %}
-  {% set spendable = result.months_of_cash(savings=false) %}
-  <div class="cf-card" title="Cash at the end, divided by average monthly spending over the 12 months up to it ({{ result.trailing_start }} to {{ result.end - extension.one_day }})">
+  {% set months = result.months_of_cash %}
+  <div class="cf-card" title="Average spending over {{ result.trailing_start }} to {{ result.end - extension.one_day }}">
     <div class="cf-card-label">Emergency fund</div>
-    <div class="cf-card-value">{% if months is none %}&mdash;{% else %}{{ '%.1f'|format(months) }} mo{% endif %}</div>
-    <div class="cf-note">of the last 12 months' spending ({{ extension.balance(result.monthly_expenses) }}/mo){% if spendable is not none and result.savings_accounts %}; {{ '%.1f'|format(spendable) }} mo without {{ result.savings_accounts|join(', ') }}{% endif %}</div>
+    <div class="cf-card-value">{% if months is none %}&mdash;{% else %}{{ '%.1f'|format(months) }} months{% endif %}</div>
+    <div class="cf-note">cash ÷ {{ extension.balance(result.monthly_expenses) }} a month, the last 12 months' average spending</div>
   </div>
 </div>
 
@@ -183,14 +182,15 @@
     <li>The period is Fava's time filter, up to today, or the last 12 months (this month and the
       11 before) without one. Fava's account and advanced filters apply, as on Fava's own
       reports.</li>
-    <li>Each line is an account's effect on cash: money in is positive, money out negative. So
-      investing −9,640 means 9,640 more was invested than withdrawn, and financing −5,000 that
-      5,000 more was repaid than borrowed. Only operating cash is green (a surplus) or red (a
-      deficit): investing and financing aren't good or bad by their sign. Income and expenses are
-      rolled up to their top-level category, e.g. <code>Expenses:Food</code>.</li>
+    <li>The cards name each activity's total in plain terms: <em>net income</em> (operating),
+      <em>invested</em> or <em>withdrawn from investments</em> (investing), and <em>debt paid
+      down</em> or <em>borrowed</em> (financing). Only net income is green (a surplus) or red (a
+      deficit): investing and financing aren't good or bad by which way they go.</li>
+    <li>In the statement, each line is an account's effect on cash: money in is positive, money
+      out negative, e.g. investing −9,640 is 9,640 invested. Income and expenses are rolled up to
+      their top-level category, e.g. <code>Expenses:Food</code>.</li>
     <li>The <em>emergency fund</em> is cash at the end, in months of average spending over the 12
-      months up to it, whatever the period; also without accounts named Savings, i.e. the money
-      on hand to spend.</li>
+      months up to it, whatever the period.</li>
     <li>Credit cards are <code>financing</code>, like any liability: spending on a card is in
       operating, by category, and the card's line in financing is its net change. A card paid in
       full nets to about zero; one carrying a balance shows as borrowing or repaying it.</li>

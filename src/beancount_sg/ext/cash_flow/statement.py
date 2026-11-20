@@ -18,15 +18,13 @@ reconciles.
 
 The statement also totals the spending (expense accounts) over the 12 months up
 to the period's end, for the emergency fund: how many months of that average
-spending cash at the end covers, with and without cash accounts named Savings.
-It uses 12 months whatever the period, so a short or partial period doesn't make
-it seasonal.
+spending cash at the end covers. It uses 12 months whatever the period, so a
+short or partial period doesn't make it seasonal.
 """
 
 from __future__ import annotations
 
 import datetime
-import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -51,8 +49,6 @@ from .._valuation import market_values, posting_value
 
 ACTIVITIES = (OPERATING, INVESTING, FINANCING)
 ONE_DAY = datetime.timedelta(days=1)
-# Cash accounts that hold savings, rather than money to spend, by name.
-SAVINGS_NAMES = re.compile(r"savings", re.IGNORECASE)
 
 
 @dataclass
@@ -113,28 +109,11 @@ class Statement:
         return self.trailing_expenses / 12
 
     @property
-    def savings_accounts(self) -> list[str]:
-        """The cash accounts named Savings with a balance at the end."""
-        return sorted(
-            account
-            for account, value in self.cash_end.items()
-            if value and SAVINGS_NAMES.search(account)
-        )
-
-    def months_of_cash(self, *, savings: bool = True) -> Decimal | None:
-        """How many months of average spending (see `monthly_expenses`) cash at the end covers.
-
-        Without ``savings``, only cash accounts not named Savings: the money on
-        hand to spend.
-        """
+    def months_of_cash(self) -> Decimal | None:
+        """How many months of average spending (see `monthly_expenses`) cash at the end covers."""
         if self.monthly_expenses <= 0:
             return None
-        excluded = set() if savings else set(self.savings_accounts)
-        cash = sum(
-            (value for account, value in self.cash_end.items() if account not in excluded),
-            Decimal(0),
-        )
-        return cash / self.monthly_expenses
+        return self.cash_end_total / self.monthly_expenses
 
     @property
     def cash_accounts(self) -> list[str]:

@@ -133,9 +133,7 @@ def test_emergency_fund():
     # The 12 months up to the end are 2024: 600 spent, 50 a month.
     assert result.trailing_start == BEGIN
     assert (result.trailing_expenses, result.monthly_expenses) == (600, 50)
-    assert result.savings_accounts == ["Assets:Bank:Savings"]
-    assert result.months_of_cash() == Decimal(12900 + 6000) / 50
-    assert result.months_of_cash(savings=False) == Decimal(12900) / 50
+    assert result.months_of_cash == Decimal(12900 + 6000) / 50
 
 
 def test_emergency_fund_uses_12_months_whatever_the_period():

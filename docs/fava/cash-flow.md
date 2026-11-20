@@ -9,6 +9,22 @@ financing activities, reconciled with the change in your cash.
 
 ![Cash Flow report](images/cash-flow.png)
 
+## The cards
+
+The cards name each section's total in plain terms, with how it's made up below:
+
+| Card | Section | |
+| --- | --- | --- |
+| **Net income** | Operating | Income minus spending: positive is a surplus, negative a deficit. |
+| **Invested**, or **Withdrawn from investments** | Investing | Money put into investments minus money taken out, named for whichever was larger. |
+| **Debt paid down**, or **Borrowed** | Financing | Loan and card payments minus new borrowing, named for whichever was larger. |
+| **Change in cash** | | Cash at the end minus cash at the start. |
+| **Emergency fund** | | Cash at the end, in months of spending (see below). |
+
+Only net income is colored, green for a surplus and red for a deficit, since that's clearly good
+or bad. Investing and financing aren't: investing or paying down debt is usually good, though it
+takes money out of cash.
+
 ## The statement
 
 Accounts are classified by their **cash-flow role**, using the same metadata and defaults as
@@ -24,20 +40,8 @@ on the account's `open` directive:
   between cash accounts doesn't show up.
 - **Operating, investing and financing** (`operating`, `investing`, `financing`): every other
   account's flows over the period are a line in its role's section, as its effect on cash: money
-  in is positive, money out negative. Income and expenses are rolled up to their top-level
-  category, e.g. `Expenses:Food`.
-
-What each section's total means:
-
-| Section | Positive | Negative |
-| --- | --- | --- |
-| **Operating** | Income exceeded spending: a surplus to save | Spending exceeded income |
-| **Investing** | More withdrawn from investments than put in | More invested than withdrawn |
-| **Financing** | More borrowed than repaid | More repaid (loans and cards) than borrowed |
-
-Only the operating total is colored, green for a surplus and red for a deficit, since that's
-clearly good or bad. Investing and financing aren't: a negative investing total is money out of
-cash, but it's savings going into investments.
+  in is positive, money out negative, e.g. investing −9,640 is 9,640 invested. Income and
+  expenses are rolled up to their top-level category, e.g. `Expenses:Food`.
 
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
@@ -62,9 +66,7 @@ held in another currency, a **change in value** line shows the difference.
 
 How many months of spending your cash covers: cash at the end of the period, divided by average
 monthly spending (expenses) over the 12 months up to it. It uses 12 months whatever the period, so
-a month's filter or a year-to-date year doesn't make it seasonal. It's also shown without cash
-accounts named Savings, i.e. counting only the money on hand to spend; the card names the
-accounts left out.
+a month's filter or a year-to-date year doesn't make it seasonal.
 
 ## Period and filters
 
