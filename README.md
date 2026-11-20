@@ -199,6 +199,16 @@ A "Year in Review" dashboard of up to five years, picked with Fava's time filter
 (cash, investments, property, debt), income, expenses and savings rate, withdrawal rate, expenses
 by top-level category, and debt paydown, with year-over-year changes. [Docs](docs/fava/year-in-review.md)
 
+### `beancount_sg.ext.cash_flow`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.cash_flow"
+```
+
+A "Cash Flow" statement: each account's flows in operating, investing and financing activities,
+reconciled with the change in cash, by `cash-flow-role` metadata or account names.
+[Docs](docs/fava/cash-flow.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`
@@ -216,6 +226,13 @@ writing plugins that rewrite transactions or add directives next to them.
 Accounts' cash-flow roles (`cash`, `operating`, `investing`, `financing`) from `cash-flow-role`
 metadata on their `open` directives, or their names: the convention Beancount.io's cash-flow report
 uses.
+
+### `beancount_sg.ext.echarts`
+
+[ECharts](https://echarts.apache.org) charts in Fava extension reports, for charts Fava doesn't
+have (e.g. Sankey diagrams): a mixin that serves a browser helper, which loads ECharts from a CDN
+(configurable), draws each chart from its option in the template, and loads its data from one of
+the extension's endpoints.
 
 ### `beancount_sg.batch_edit`
 

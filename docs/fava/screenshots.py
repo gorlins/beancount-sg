@@ -28,7 +28,7 @@ HERE = Path(__file__).parent
 # The example ledgers, by the URL slug Fava gives them (from their titles).
 LEDGERS = {
     "example": HERE / "ledgers" / "example.beancount",
-    "household": HERE / "ledgers" / "year-in-review.beancount",
+    "household": HERE / "ledgers" / "household.beancount",
 }
 IMAGES = HERE / "images"
 
@@ -128,6 +128,11 @@ def year_in_review(page: Page, root: str) -> None:
     save(page, "year-in-review")
 
 
+def cash_flow(page: Page, root: str) -> None:
+    page.goto(report_url(root, "household", "CashFlow/?time=2024"), wait_until="networkidle")
+    save(page, "cash-flow")
+
+
 # Each screenshot's name, and the function that saves it (``travel`` saves two).
 SCREENSHOTS = {
     "checkbook": checkbook,
@@ -137,6 +142,7 @@ SCREENSHOTS = {
     "travel": travel,
     "payees": payees,
     "year-in-review": year_in_review,
+    "cash-flow": cash_flow,
 }
 
 

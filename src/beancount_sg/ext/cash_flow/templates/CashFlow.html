@@ -1,0 +1,249 @@
+<style>
+  .cf { --cf-radius: 8px; }
+  .cf-subtitle { color: var(--text-color-lightest); margin-top: -0.5rem; }
+  .cf-cards {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 1.25rem;
+  }
+  @media (max-width: 900px) {
+    .cf-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .cf-card {
+    background: var(--background-darker);
+    border: 1px solid var(--border);
+    border-radius: var(--cf-radius);
+    padding: 0.75rem 1rem;
+  }
+  .cf-card-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-color-lightest);
+  }
+  .cf-card-value { font-size: 1.7rem; font-weight: 600; line-height: 1.3; }
+  .cf-note { font-size: 0.8rem; color: var(--text-color-lightest); }
+  .cf-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: start;
+  }
+  .cf-stack { display: grid; gap: 1rem; }
+  .cf-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--cf-radius);
+    padding: 0.75rem 1rem 1rem;
+    overflow-x: auto;
+  }
+  .cf-panel h3 { margin: 0 0 0.5rem; }
+  .cf-panel table { width: 100%; }
+  .cf-section td { font-weight: 600; padding-top: 0.75rem; }
+  .cf-line td:first-child { padding-left: 1.25rem; }
+  .cf-total td { font-weight: 600; border-top: 2px solid var(--border-darker); }
+  .cf-good { color: var(--green); }
+  .cf-bad { color: var(--red); }
+  .cf-neutral { color: inherit; }
+  .cf details { margin-top: 1rem; }
+  .cf-sankey-panel { margin-bottom: 1rem; }
+</style>
+
+{# A flow, signed: colored only where good or bad is clear (operating cash). #}
+{% macro flow(value, activity=none) -%}
+<span class="cf-{{ extension.tone(activity, value) }}">{{ extension.money(value) }}</span>
+{%- endmacro %}
+
+<div class="cf">
+<h2>Cash Flow</h2>
+
+{% set role_errors = extension.roles()[1] %}
+{% set result = extension.statement() %}
+{% if result is none %}
+<ul class="error"><li>Set an <code>operating_currency</code> option: the report shows values in the ledger's first operating currency.</li></ul>
+{% else %}
+{% set currency = result.currency %}
+<p class="cf-subtitle">{{ result.begin }} to {{ result.end - extension.one_day }}, in {{ currency }}.
+  Pick the period with Fava's time filter.</p>
+{% if role_errors or result.unconverted %}
+<ul class="error">
+  {% for error in role_errors %}<li>{{ error }}</li>{% endfor %}
+  {% if result.unconverted %}<li>Left out, for lack of prices in {{ currency }}: {{ result.unconverted|sort|join(', ') }}.</li>{% endif %}
+</ul>
+{% endif %}
+
+<div class="cf-cards">
+  {% for activity in extension.activities %}
+  {% set found = extension.card(activity, result.total(activity)) %}
+  <div class="cf-card" title="Net cash from {{ activity }} activities">
+    <div class="cf-card-label">{{ found.title }}</div>
+    <div class="cf-card-value"><span class="cf-{{ found.tone }}">{{ found.amount }}</span></div>
+    <div class="cf-note">{{ found.detail }}</div>
+  </div>
+  {% endfor %}
+  <div class="cf-card">
+    <div class="cf-card-label">Change in cash</div>
+    <div class="cf-card-value">{{ flow(result.net_change) }}</div>
+    <div class="cf-note">{{ extension.balance(result.cash_start_total) }} → {{ extension.balance(result.cash_end_total) }}</div>
+  </div>
+  {% set months = result.months_of_cash %}
+  <div class="cf-card" title="Average spending over {{ result.trailing_start }} to {{ result.end - extension.one_day }}">
+    <div class="cf-card-label">Emergency fund</div>
+    <div class="cf-card-value">{% if months is none %}&mdash;{% else %}{{ '%.1f'|format(months) }} months{% endif %}</div>
+    <div class="cf-note">cash ÷ {{ extension.balance(result.monthly_expenses) }} a month, the last 12 months' average spending</div>
+  </div>
+</div>
+
+<section class="cf-panel cf-sankey-panel">
+  <h3>Where cash came from and went</h3>
+  {# The diagram's option; its data, for the page's filters, comes from the sankey endpoint. #}
+  <div class="echart" style="height: 300px"
+       data-library="{{ extension.echarts_url }}"
+       data-source="{{ extension.endpoint_url('sankey') }}">
+    <script type="application/json">
+    {% raw %}
+    {
+      "animation": false,
+      "series": [
+        {
+          "type": "sankey",
+          "left": 200,
+          "right": 200,
+          "top": 24,
+          "bottom": 8,
+          "nodeWidth": 14,
+          "nodeGap": 10,
+          "layoutIterations": 0,
+          "lineStyle": { "color": "gradient", "curveness": 0.5, "opacity": 0.45 },
+          "emphasis": { "focus": "adjacency" },
+          "levels": [
+            { "depth": 0, "label": { "position": "left" } },
+            { "depth": 1, "label": { "position": "top" } },
+            { "depth": 2, "label": { "position": "right" } }
+          ]
+        }
+      ]
+    }
+    {% endraw %}
+    </script>
+  </div>
+</section>
+
+<div class="cf-columns">
+  <section class="cf-panel">
+    <h3>Statement</h3>
+    <table>
+      <thead><tr><th></th><th class="num">{{ currency }}</th></tr></thead>
+      <tbody>
+        {% for activity in extension.activities %}
+        {% set section = extension.sections[activity] %}
+        <tr class="cf-section"><td>{{ activity|capitalize }}: {{ section.lines }}</td><td></td></tr>
+        {% for line, value in result.lines(activity) %}
+        <tr class="cf-line"><td><a href="{{ extension.account_url(line) }}">{{ line }}</a></td><td class="num">{{ extension.money(section.sign * value) }}</td></tr>
+        {% else %}
+        <tr class="cf-line"><td class="cf-note">None</td><td></td></tr>
+        {% endfor %}
+        <tr class="cf-total"><td>{{ section.title }}</td><td class="num">{{ flow(section.sign * result.total(activity), activity) }}</td></tr>
+        {% endfor %}
+        <tr class="cf-total"><td title="Net income, minus invested, minus debt paid down">Change in cash</td><td class="num">{{ flow(result.net_change) }}</td></tr>
+      </tbody>
+    </table>
+    <p class="cf-note">Change in cash = net income − invested − debt paid down.</p>
+  </section>
+  <div class="cf-stack">
+    <section class="cf-panel">
+      <h3>{{ extension.interval_label() }}</h3>
+      <svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
+    </section>
+    <section class="cf-panel">
+      <h3>Cash &amp; cash equivalents</h3>
+      <table>
+        <thead><tr><th>Account</th><th class="num">{{ result.begin }}</th><th class="num">{{ result.end - extension.one_day }}</th></tr></thead>
+        <tbody>
+          {% for account in result.cash_accounts %}
+          <tr>
+            <td><a href="{{ extension.account_url(account) }}">{{ account }}</a></td>
+            <td class="num">{{ extension.balance(result.cash_start.get(account, 0)) }}</td>
+            <td class="num">{{ extension.balance(result.cash_end.get(account, 0)) }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="cf-total">
+            <td>Total</td>
+            <td class="num">{{ extension.balance(result.cash_start_total) }}</td>
+            <td class="num">{{ extension.balance(result.cash_end_total) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <table style="margin-top: 0.75rem">
+        <tbody>
+          <tr><td>Cash at the start</td><td class="num">{{ extension.balance(result.cash_start_total) }}</td></tr>
+          <tr><td>Change from net income, investing and debt</td><td class="num">{{ flow(result.net_change) }}</td></tr>
+          {% if result.valuation_change|abs >= 0.5 %}
+          <tr><td title="Changes in cash's value the activities don't explain, e.g. exchange rates on cash in another currency">Change in value</td><td class="num">{{ flow(result.valuation_change) }}</td></tr>
+          {% endif %}
+          <tr class="cf-total"><td>Cash at the end</td><td class="num">{{ extension.balance(result.cash_end_total) }}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+{% endif %}
+
+<details>
+  <summary>How accounts are classified</summary>
+  <p>Each account's <code>cash-flow-role</code>: <code>cash</code> accounts are the cash the
+    statement explains, and every other account's flows are a line in its role's section. Declare a
+    role on the account's <code>open</code> directive, where it also applies to subaccounts:</p>
+  <pre>2020-01-01 open Assets:MoneyMarket
+  cash-flow-role: "cash"</pre>
+  <p>Without one, assets named with Cash, Checking, Savings or Bank are <code>cash</code>, other
+    assets <code>investing</code>, liabilities and equity <code>financing</code>, and income and
+    expenses <code>operating</code>: the same convention as Beancount.io's cash-flow report.</p>
+  <table>
+    <thead><tr><th>Account</th><th>Role</th><th>From</th></tr></thead>
+    <tbody>
+      {% for account, role in extension.cash_accounts() + extension.classified() %}
+      <tr>
+        <td>{{ account }}</td>
+        <td>{{ role.role }}</td>
+        <td>{% if role.declared_by == account %}declared{% elif role.declared_by %}declared on {{ role.declared_by }}{% else %}default, from its name and type{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
+
+<details>
+  <summary>How to use</summary>
+  <ul>
+    <li>The period is Fava's time filter, up to today, or the last 12 months (this month and the
+      11 before) without one. Fava's account and advanced filters apply, as on Fava's own
+      reports.</li>
+    <li>The cards name each activity's total in plain terms: <em>net income</em> (operating),
+      <em>invested</em> or <em>withdrawn from investments</em> (investing), and <em>debt paid
+      down</em> or <em>borrowed</em> (financing). Only net income is green (a surplus) or red (a
+      deficit): investing and financing aren't good or bad by which way they go.</li>
+    <li>The statement and charts read the same way as the cards: income is positive and spending
+      negative, money put into investments positive, and debt payments positive (new borrowing
+      negative). The change in cash is net income, minus invested, minus debt paid down. Income
+      and expenses are rolled up to their top-level category, e.g. <code>Expenses:Food</code>.</li>
+    <li>The diagram shows the same totals: what brought money into cash on the left (income,
+      and money taken out of investments or borrowed) and where it went on the right (expenses,
+      investing, paying down debt), with the net cash saved (or drawn) balancing them, through
+      the period's total cash flow in the middle. Click income or expenses for the income statement, investing or debt for the balance
+      sheet.</li>
+    <li>The <em>emergency fund</em> is cash at the end, in months of average spending over the 12
+      months up to it, whatever the period.</li>
+    <li>Credit cards are <code>financing</code>, like any liability: spending on a card is in
+      operating, by category, and the card's line in financing is its net change. A card paid in
+      full nets to about zero; one carrying a balance shows as borrowing or repaying it.</li>
+    <li>Values are in the first operating currency, rounded to whole units: flows at each
+      transaction's date, cash at market value at the start and end. A <em>change in value</em>
+      line shows any difference, e.g. from exchange rates.</li>
+    <li>Click a line or cash account for its account page. Below the
+      chart, switch between net income, invested, debt paid down and the change in cash; click a
+      bar's date for that interval.</li>
+  </ul>
+</details>
+</div>
