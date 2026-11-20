@@ -3,6 +3,8 @@ name = "beancount-sg"
 dynamic = ["version"]
 description = "Personal collection of Beancount plugins and Fava extensions"
 readme = "README.md"
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
