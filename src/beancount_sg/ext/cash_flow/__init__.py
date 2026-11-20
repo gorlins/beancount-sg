@@ -19,7 +19,8 @@ Fava's account and advanced filters apply, as on Fava's own reports. The page ha
   cash, and the emergency fund: how many months of average spending over the last
   12 months cash covers. Only net income is colored, green for a surplus and red
   for a deficit: investing and financing flows aren't good or bad by their sign.
-- A Sankey diagram of where cash came from and went (drawn by CashFlow.js).
+- A Sankey diagram of where cash came from and went: income, expenses, investing,
+  debt and the change in cash (drawn with ECharts; see `beancount_sg.ext.echarts`).
 - The statement: each activity's lines and total in its own direction, like the
   cards (see `SECTIONS`), and the change in cash.
 - Charts of each card's amount per interval (Fava's interval menu).
@@ -35,6 +36,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from beancount.core import prices
+from beancount.core.account_types import get_account_type
 from beancount.parser.options import get_account_types
 from fava.context import g
 from fava.core import FilteredLedger
@@ -46,6 +48,7 @@ from fava.util.date import dateranges, local_today
 from flask import request, url_for
 
 from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, Role, account_roles
+from beancount_sg.ext.echarts import ECharts
 
 from .statement import ACTIVITIES, ONE_DAY, Statement, by_interval, role_of, statement
 
@@ -124,25 +127,17 @@ SECTIONS = {
 }
 
 
-def _kind(activity: str, inflow: bool) -> str:
-    """A Sankey node's color group: income, spending, investments or debt."""
-    if activity == OPERATING:
-        return "income" if inflow else "spending"
-    return "investments" if activity == INVESTING else "debt"
-
-
-# What a node's flow is, for its tooltip, by activity and whether it's into cash.
-VERBS = {
-    (OPERATING, True): "in",
-    (OPERATING, False): "spent",
-    (INVESTING, True): "taken out",
-    (INVESTING, False): "invested",
-    (FINANCING, True): "borrowed",
-    (FINANCING, False): "paid down",
+# The Sankey diagram's colors: income, spending, investments, debt and cash.
+COLORS = {
+    "income": "#2e9d5b",
+    "spending": "#d9534f",
+    "investments": "#3a7bd5",
+    "debt": "#e08a2b",
+    "cash": "#8a8f98",
 }
 
 
-class CashFlow(FavaExtensionBase):
+class CashFlow(ECharts, FavaExtensionBase):
     """Fava report of cash flows by activity."""
 
     report_title = "Cash Flow"
@@ -238,45 +233,91 @@ class CashFlow(FavaExtensionBase):
             for title, values in series
         ]
 
-    def sankey(self, result: Statement) -> list[dict[str, object]]:
-        """The Sankey diagram's nodes: each statement line, flowing into or out of cash.
+    def sankey(self, result: Statement) -> dict[str, object]:
+        """The Sankey diagram, as an ECharts option: what flowed into cash, and out.
 
-        Lines that brought money into cash (income, money taken out of
-        investments, borrowing) flow in; the rest (spending, investing, paying
-        down debt) flow out. The change in cash balances them: added to cash
-        flows out, and cash used flows in.
+        Its nodes are the accounting totals, not their accounts: income and
+        expenses (gross), investing and debt (net, named for which way they
+        went, like the cards), and what was added to or taken from cash, which
+        balances the two sides.
         """
-        nodes = []
-        for activity in ACTIVITIES:
-            for line, value in result.lines(activity):
-                inflow = value > 0
-                amount = balance(abs(value))
-                nodes.append(
-                    {
-                        "name": line,
-                        "value": float(abs(value)),
-                        "amount": amount,
-                        "inflow": inflow,
-                        "kind": _kind(activity, inflow),
-                        "title": f"{line}: {amount} {VERBS[(activity, inflow)]}",
-                        "url": self.account_url(line),
-                    }
-                )
-        change = result.net_change
-        if change:
-            name = "Added to cash" if change > 0 else "Taken from cash"
+        account_types = get_account_types(self.ledger.options)
+        income = sum(
+            (
+                value
+                for line, value in result.lines(OPERATING)
+                if get_account_type(line) == account_types.income
+            ),
+            Decimal(0),
+        )
+        income_statement = url_for("report", report_name="income_statement", time=self._time())
+        balance_sheet = url_for("report", report_name="balance_sheet", time=self._time())
+        # Each total's effect on cash (+ into it), its names into and out of cash,
+        # its color, and its page.
+        totals = [
+            (income, "Income", "Income", "income", income_statement),
+            (
+                result.total(OPERATING) - income,
+                "Expenses",
+                "Expenses",
+                "spending",
+                income_statement,
+            ),
+            (
+                result.total(INVESTING),
+                "Withdrawn from investments",
+                "Invested",
+                "investments",
+                balance_sheet,
+            ),
+            (result.total(FINANCING), "Borrowed", "Debt paid down", "debt", balance_sheet),
+            # Cash that grew takes money out of the flows, and the reverse.
+            (-result.net_change, "Taken from cash", "Added to cash", "cash", None),
+        ]
+        nodes: list[dict[str, object]] = [
+            {
+                "name": "Cash",
+                "itemStyle": {"color": COLORS["cash"]},
+                "label": {"position": "top"},
+            }
+        ]
+        links = []
+        for effect, into, out_of, kind, url in totals:
+            if not effect:
+                continue
+            name = into if effect > 0 else out_of
             nodes.append(
                 {
                     "name": name,
-                    "value": float(abs(change)),
-                    "amount": balance(abs(change)),
-                    "inflow": change < 0,
-                    "kind": "cash",
-                    "title": f"{name}: {balance(abs(change))}",
-                    "url": None,
+                    "url": url,
+                    "itemStyle": {"color": COLORS[kind]},
+                    "label": {
+                        "position": "left" if effect > 0 else "right",
+                        "formatter": f"{name} {balance(abs(effect))}",
+                    },
                 }
             )
-        return nodes
+            source, target = (name, "Cash") if effect > 0 else ("Cash", name)
+            links.append({"source": source, "target": target, "value": float(abs(effect))})
+        return {
+            "animation": False,
+            "series": [
+                {
+                    "type": "sankey",
+                    "left": 200,
+                    "right": 200,
+                    "top": 24,
+                    "bottom": 8,
+                    "nodeWidth": 14,
+                    "nodeGap": 10,
+                    "layoutIterations": 0,
+                    "lineStyle": {"color": "gradient", "curveness": 0.5, "opacity": 0.45},
+                    "emphasis": {"focus": "adjacency"},
+                    "data": nodes,
+                    "links": links,
+                }
+            ],
+        }
 
     @staticmethod
     def interval_label() -> str:

@@ -27,11 +27,16 @@ takes money out of cash.
 
 ## Where cash came from and went
 
-A Sankey diagram of the same flows. On the left is what brought money into cash: income, money
-taken out of investments, and borrowing. On the right is where it went: spending by category,
-investing, and paying down debt. Cash is in the middle. If cash grew, *added to cash* is on the
-right; if it shrank, *taken from cash* is on the left, so the two sides balance. Each band fades
-from its source's color to its target's. Click an account for its page.
+A Sankey diagram of the totals, balanced like the accounting equation. On the left is what brought
+money into cash: **income**, and, if they went that way, money **withdrawn from investments** and
+**borrowed**. On the right is where it went: **expenses**, money **invested**, and **debt paid
+down**. If cash grew, **added to cash** is on the right; if it shrank, **taken from cash** is on
+the left, so the two sides match. Investing and debt are net, like the cards: a card balance that
+grew only shrinks the debt paid down.
+
+Each band fades from its source's color to its target's. Click income or expenses for Fava's
+income statement, or investing or debt for its balance sheet, for the period. The diagram is drawn
+with [ECharts](https://echarts.apache.org), loaded from a CDN.
 
 ## The statement
 

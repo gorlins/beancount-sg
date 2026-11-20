@@ -48,9 +48,6 @@
   .cf-neutral { color: inherit; }
   .cf details { margin-top: 1rem; }
   .cf-sankey-panel { margin-bottom: 1rem; }
-  #cash-flow-sankey svg { display: block; width: 100%; height: auto; color: inherit; }
-  #cash-flow-sankey .cash-flow-link { cursor: pointer; }
-  #cash-flow-sankey text { font-size: 12px; fill: currentColor; }
 </style>
 
 {# A flow, signed: colored only where good or bad is clear (operating cash). #}
@@ -100,9 +97,7 @@
 
 <section class="cf-panel cf-sankey-panel">
   <h3>Where cash came from and went</h3>
-  <p class="cf-note">Into cash on the left, out of it on the right. Click an account for its page.</p>
-  <div id="cash-flow-sankey"></div>
-  <script type="application/json" id="cash-flow-sankey-data">{{ extension.sankey(result)|tojson }}</script>
+  {{ extension.echart(extension.sankey(result)) }}
 </section>
 
 <div class="cf-columns">
@@ -203,10 +198,11 @@
       negative, money put into investments positive, and debt payments positive (new borrowing
       negative). The change in cash is net income, minus invested, minus debt paid down. Income
       and expenses are rolled up to their top-level category, e.g. <code>Expenses:Food</code>.</li>
-    <li>The diagram shows the same flows: what brought money into cash on the left (income,
-      money taken out of investments, borrowing) and where it went on the right (spending,
+    <li>The diagram shows the same totals: what brought money into cash on the left (income,
+      and money taken out of investments or borrowed) and where it went on the right (expenses,
       investing, paying down debt), with what was added to or taken from cash balancing
-      them.</li>
+      them. Click income or expenses for the income statement, investing or debt for the balance
+      sheet.</li>
     <li>The <em>emergency fund</em> is cash at the end, in months of average spending over the 12
       months up to it, whatever the period.</li>
     <li>Credit cards are <code>financing</code>, like any liability: spending on a card is in
@@ -215,7 +211,7 @@
     <li>Values are in the first operating currency, rounded to whole units: flows at each
       transaction's date, cash at market value at the start and end. A <em>change in value</em>
       line shows any difference, e.g. from exchange rates.</li>
-    <li>Click a line, cash account or account in the diagram for its account page. Below the
+    <li>Click a line or cash account for its account page. Below the
       chart, switch between net income, invested, debt paid down and the change in cash; click a
       bar's date for that interval.</li>
   </ul>

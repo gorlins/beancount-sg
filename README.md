@@ -227,6 +227,12 @@ Accounts' cash-flow roles (`cash`, `operating`, `investing`, `financing`) from `
 metadata on their `open` directives, or their names: the convention Beancount.io's cash-flow report
 uses.
 
+### `beancount_sg.ext.echarts`
+
+[ECharts](https://echarts.apache.org) charts in Fava extension reports, for charts Fava doesn't
+have (e.g. Sankey diagrams): a mixin that serves a browser helper loading ECharts from a CDN, and a
+template function that places a chart from an option built in Python.
+
 ### `beancount_sg.batch_edit`
 
 The editing logic behind the Batch Edit report, independent of Fava: plan payee and category

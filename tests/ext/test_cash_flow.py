@@ -154,42 +154,62 @@ def test_charts(tmp_path):
     }
 
 
+def sankey(body):
+    """The Sankey diagram's ECharts series."""
+    [data] = re.findall(
+        r'<div class="echart" data-echarts="[^"]+" style="height: 300px">'
+        r'<script type="application/json">(.*?)</script>',
+        body,
+    )
+    [series] = json.loads(data)["series"]
+    return series
+
+
 def test_sankey(tmp_path):
-    body = page(tmp_path, query="?time=2024")
-    [data] = re.findall(
-        r'<script type="application/json" id="cash-flow-sankey-data">(.*?)</script>', body
-    )
-    nodes = {node["name"]: node for node in json.loads(data)}
-    # Into cash: income. Out of it: spending, investing, paying down debt, and what was
-    # added to cash.
-    assert {
-        name: (node["inflow"], node["kind"], node["value"]) for name, node in nodes.items()
-    } == {
-        "Income:Salary": (True, "income", 5000),
-        "Expenses:Food": (False, "spending", 400),
-        "Expenses:Housing": (False, "spending", 200),
-        "Assets:Brokerage": (False, "investments", 1000),
-        "Liabilities:Mortgage": (False, "debt", 500),
-        "Added to cash": (False, "cash", 2900),
+    series = sankey(page(tmp_path, query="?time=2024"))
+    # Only the accounting totals: into cash, income; out of it, expenses, investing,
+    # paying down debt, and what was added to cash.
+    assert {(link["source"], link["target"], link["value"]) for link in series["links"]} == {
+        ("Income", "Cash", 5000),
+        ("Cash", "Expenses", 600),
+        ("Cash", "Invested", 1000),
+        ("Cash", "Debt paid down", 500),
+        ("Cash", "Added to cash", 2900),
     }
-    assert nodes["Assets:Brokerage"]["title"] == "Assets:Brokerage: 1,000 invested"
-    assert nodes["Liabilities:Mortgage"]["title"] == "Liabilities:Mortgage: 500 paid down"
+    nodes = {node["name"]: node for node in series["data"]}
+    assert nodes["Income"]["label"] == {"position": "left", "formatter": "Income 5,000"}
+    assert nodes["Invested"]["label"]["formatter"] == "Invested 1,000"
+    assert "income_statement" in nodes["Expenses"]["url"]
+    assert "balance_sheet" in nodes["Debt paid down"]["url"]
     assert nodes["Added to cash"]["url"] is None
-    # What flows in is what flows out.
-    flows = list(nodes.values())
-    assert sum(n["value"] for n in flows if n["inflow"]) == sum(
-        n["value"] for n in flows if not n["inflow"]
-    )
 
 
-def test_sankey_when_cash_is_used(tmp_path):
+def test_sankey_balances_when_cash_is_used_and_debt_grows(tmp_path):
     ledger = LEDGER.replace("Assets:Bank:Checking  5000 USD", "Assets:Bank:Checking  50 USD")
-    body = page(tmp_path, ledger, query="?time=2024")
-    [data] = re.findall(
-        r'<script type="application/json" id="cash-flow-sankey-data">(.*?)</script>', body
-    )
-    nodes = {node["name"]: node for node in json.loads(data)}
-    assert (nodes["Taken from cash"]["inflow"], nodes["Taken from cash"]["value"]) == (True, 2050)
+    ledger = ledger.replace("Liabilities:Mortgage  500 USD", "Liabilities:Mortgage  -500 USD")
+    links = {
+        (link["source"], link["target"]): link["value"]
+        for link in sankey(page(tmp_path, ledger, query="?time=2024"))["links"]
+    }
+    assert links == {
+        ("Income", "Cash"): 50,
+        ("Borrowed", "Cash"): 500,
+        ("Taken from cash", "Cash"): 1050,
+        ("Cash", "Expenses"): 600,
+        ("Cash", "Invested"): 1000,
+    }
+    into = sum(value for (_, target), value in links.items() if target == "Cash")
+    assert into == sum(value for (source, _), value in links.items() if source == "Cash")
+
+
+def test_the_echarts_helper_is_served(tmp_path):
+    ledger = tmp_path / "main.beancount"
+    ledger.write_text(LEDGER)
+    client = create_app([ledger], load=True).test_client()
+    response = client.get("/test/extension/CashFlow/echarts.js")
+    assert response.status_code == 200
+    assert response.mimetype == "text/javascript"
+    assert "export async function renderECharts" in response.get_data(as_text=True)
 
 
 def test_filters_apply(tmp_path):
