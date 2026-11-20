@@ -36,11 +36,11 @@ debt are net, like the cards: a card balance that grew only shrinks the debt pai
 
 Each band fades from its source's color to its target's. Click income or expenses for Fava's
 income statement, or investing or debt for its balance sheet, for the period. The diagram is drawn
-with [ECharts](https://echarts.apache.org), loaded from a CDN: the latest 5.x release, unless the
+with [ECharts](https://echarts.apache.org), loaded from a CDN: the latest 6.x release, unless the
 ledger sets another URL for all its reports, e.g. to pin a version:
 
 ```beancount
-2020-01-01 custom "beancount-sg-option" "echarts-url" "https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.esm.min.mjs"
+2020-01-01 custom "beancount-sg-option" "echarts-url" "https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.esm.min.mjs"
 ```
 
 ## The statement

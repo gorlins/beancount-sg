@@ -40,11 +40,11 @@ color and font, on a transparent background, then fetches its data and merges
 it in (ECharts' dynamic data loading). Clicking a node or data item with a
 ``url`` opens that Fava page.
 
-ECharts is loaded from `ECHARTS_URL`, the latest 5.x release on a CDN, unless
+ECharts is loaded from `ECHARTS_URL`, the latest 6.x release on a CDN, unless
 the ledger sets another URL for all its reports, e.g. to pin a version, with a
 ``beancount-sg-option`` like Fava's ``fava-option``::
 
-    2020-01-01 custom "beancount-sg-option" "echarts-url" "https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.esm.min.mjs"
+    2020-01-01 custom "beancount-sg-option" "echarts-url" "https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.esm.min.mjs"
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ from fava.application import url_for
 from fava.ext import extension_endpoint
 from flask import Response, send_file
 
-ECHARTS_URL = "https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.esm.min.mjs"
+ECHARTS_URL = "https://cdn.jsdelivr.net/npm/echarts@6/dist/echarts.esm.min.mjs"
 HELPER = Path(__file__).with_name("echarts.js")
 # The custom directive type, and its option, that set where ECharts loads from.
 OPTION = "beancount-sg-option"

@@ -174,7 +174,7 @@ def test_the_sankey_chart_loads_its_data_from_the_endpoint(tmp_path):
     url = urlsplit(html.unescape(source))
     assert url.path == "/test/extension/CashFlow/sankey"
     assert parse_qs(url.query)["time"] == ["2024"]  # the page's filters
-    assert 'data-library="https://cdn.jsdelivr.net/npm/echarts@5/' in body
+    assert 'data-library="https://cdn.jsdelivr.net/npm/echarts@6/' in body
     # The option in the template has no data.
     [option] = re.findall(
         r'<div class="echart".*?<script type="application/json">(.*?)</script>', body, re.S
