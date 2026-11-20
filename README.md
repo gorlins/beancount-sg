@@ -225,7 +225,8 @@ writing plugins that rewrite transactions or add directives next to them.
 
 Accounts' cash-flow roles (`cash`, `operating`, `investing`, `financing`) from `cash-flow-role`
 metadata on their `open` directives, or their names: the convention Beancount.io's cash-flow report
-uses.
+uses, plus inheritance by subaccounts and `financing` for debt-payment accounts such as
+`Expenses:CreditCardPayment`.
 
 ### `beancount_sg.ext.echarts`
 

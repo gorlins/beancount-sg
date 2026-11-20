@@ -199,7 +199,9 @@
   cash-flow-role: "cash"</pre>
   <p>Without one, assets named with Cash, Checking, Savings or Bank are <code>cash</code>, other
     assets <code>investing</code>, liabilities and equity <code>financing</code>, and income and
-    expenses <code>operating</code>: the same convention as Beancount.io's cash-flow report.</p>
+    expenses <code>operating</code>: the same convention as Beancount.io's cash-flow report. Debt-payment
+    accounts, named with Repayment or with Payment after Loan, Mortgage or Card (e.g.
+    <code>Expenses:CreditCardPayment</code>), are <code>financing</code>.</p>
   <table>
     <thead><tr><th>Account</th><th>Role</th><th>From</th></tr></thead>
     <tbody>

@@ -14,6 +14,8 @@ from beancount_sg.ext.year_end.metrics import (
     INVESTMENTS,
     OTHER,
     PROPERTY,
+    RETURNS,
+    TRANSFERS,
     Debt,
     YearSummary,
     classify,
@@ -266,3 +268,75 @@ def test_unconverted_currencies_are_reported():
 )
 def test_years_shown(first, start, end, expected):
     assert years_shown(first, start, end) == expected
+
+
+ROLLOVER = """
+2020-01-01 open Assets:Retirement:OldPlan
+2020-01-01 open Assets:Retirement:NewPlan
+2020-01-01 open Income:Retirement:Gains USD
+  cash-flow-role: "investing"
+2020-01-01 open Expenses:Retirement:Fees USD
+  cash-flow-role: "investing"
+
+2023-06-01 * "Old plan"
+  Assets:Retirement:OldPlan  100 VTI {100 USD}
+  Equity:Opening
+
+2024-06-01 * "Rollover: sell in the old plan"
+  Assets:Retirement:OldPlan  -100 VTI {100 USD} @ 400 USD
+  Assets:Retirement:OldPlan  40000 USD
+  Income:Retirement:Gains
+
+2024-06-02 * "Rollover: buy in the new plan, less a fee"
+  Assets:Retirement:OldPlan  -40000 USD
+  Assets:Retirement:NewPlan  99 VXUS {400 USD}
+  Expenses:Retirement:Fees  400 USD
+"""
+
+
+def test_investment_returns_are_classified():
+    _, found = classes(LEDGER + ROLLOVER)
+    assert found["Income:Retirement:Gains"].group == RETURNS
+    assert found["Income:Retirement:Gains"].reason == (
+        "investing, declared on Income:Retirement:Gains"
+    )
+    assert found["Expenses:Retirement:Fees"].group == RETURNS
+    assert "Income:Salary" not in found  # operating, by default: income
+
+
+def test_investment_returns_are_not_income_or_expenses():
+    [summary] = summaries(LEDGER + ROLLOVER)[0].values()
+    # The same income, spending and savings as without the rollover.
+    assert (summary.income, summary.expenses, summary.savings) == (100000, 8000, 92000)
+    assert summary.trailing_expenses == 8000
+    assert "Expenses:Retirement" not in summary.expenses_by_category
+    # The gain, less the fee.
+    assert summary.investment_returns == 30000 - 400
+
+
+def test_transfers_are_neither_expenses_nor_returns():
+    # A loan payment passes through an expense account, reaching the loan next year.
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Expenses:LoanRepayment USD
+  cash-flow-role: "financing"
+
+2024-12-30 * "Mortgage payment"
+  Expenses:LoanRepayment  1000 USD
+  Assets:Bank:Checking
+
+2025-01-03 * "Mortgage payment applied"
+  Liabilities:Home:Mortgage  1000 USD
+  Expenses:LoanRepayment
+"""
+    )
+    _, found = classes(ledger)
+    assert found["Expenses:LoanRepayment"].group == TRANSFERS
+    found_years, _ = summaries(ledger, years=(2024, 2025))
+    for summary in found_years.values():
+        assert summary.investment_returns == 0
+    assert found_years[2024].expenses == 8000  # not the payment
+    assert found_years[2025].expenses == 0
+    # The loan counts it, when it arrives.
+    assert found_years[2025].debt_paid_down == 1000
