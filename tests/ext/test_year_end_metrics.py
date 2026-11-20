@@ -15,6 +15,7 @@ from beancount_sg.ext.year_end.metrics import (
     OTHER,
     PROPERTY,
     Debt,
+    YearSummary,
     classify,
     year_end,
     years_shown,
@@ -27,6 +28,7 @@ option "operating_currency" "USD"
 2020-01-01 open Assets:Bank:Checking USD
 2020-01-01 open Assets:Brokerage
 2020-01-01 open Assets:Home USD
+  investable: FALSE
 2020-01-01 open Liabilities:CreditCard USD
 2020-01-01 open Liabilities:Home:Mortgage USD
 2020-01-01 open Equity:Opening
@@ -84,24 +86,29 @@ def test_classification():
     assert {account: c.group for account, c in found.items()} == {
         "Assets:Bank:Checking": CASH,
         "Assets:Brokerage": INVESTMENTS,
-        "Assets:Home": PROPERTY,  # it secures Liabilities:Home:Mortgage
-        "Liabilities:CreditCard": OTHER,  # a card, by its name
+        "Assets:Home": PROPERTY,
+        "Liabilities:CreditCard": DEBT,  # financing, by default, like a loan
         "Liabilities:Home:Mortgage": DEBT,
     }
-    assert found["Assets:Home"].reason == "secures Liabilities:Home:Mortgage"
-    assert found["Liabilities:CreditCard"].reason == "a credit card, by its name"
+    assert found["Assets:Home"].reason == "investable: False on Assets:Home"
+    assert found["Liabilities:CreditCard"].reason == "financing, by default"
 
 
-def test_investable_metadata_overrides_the_inference():
-    ledger = LEDGER.replace(
-        "2020-01-01 open Assets:Home USD", "2020-01-01 open Assets:Home USD\n  investable: TRUE"
-    ).replace(
+def test_investable_metadata():
+    ledger = LEDGER.replace("investable: FALSE", "investable: TRUE").replace(
         "2020-01-01 open Assets:Brokerage", "2020-01-01 open Assets:Brokerage\n  investable: FALSE"
     )
     _, found = classes(ledger)
     assert found["Assets:Home"].group == INVESTMENTS
     assert found["Assets:Brokerage"].group == PROPERTY
     assert found["Assets:Brokerage"].reason == "investable: False on Assets:Brokerage"
+
+
+def test_a_secured_loan_does_not_make_property():
+    # A margin loan under the brokerage's path: the brokerage is still investable.
+    _, found = classes(LEDGER + "2020-01-01 open Liabilities:Brokerage:Margin USD\n")
+    assert found["Assets:Brokerage"].group == INVESTMENTS
+    assert found["Liabilities:Brokerage:Margin"].group == DEBT
 
 
 def test_investable_inheritance_does_not_depend_on_open_order():
@@ -118,13 +125,13 @@ def test_investable_inheritance_does_not_depend_on_open_order():
     assert found["Assets:Vehicles:Car"].reason == "investable: False on Assets:Vehicles"
 
 
-def test_a_declared_financing_card_is_debt():
+def test_a_liability_with_another_role_is_other():
     ledger = LEDGER.replace(
         "2020-01-01 open Liabilities:CreditCard USD",
-        '2020-01-01 open Liabilities:CreditCard USD\n  cash-flow-role: "financing"',
+        '2020-01-01 open Liabilities:CreditCard USD\n  cash-flow-role: "operating"',
     )
     _, found = classes(ledger)
-    assert found["Liabilities:CreditCard"].group == DEBT
+    assert found["Liabilities:CreditCard"].group == OTHER
 
 
 def test_net_worth_by_group_at_market_value():
@@ -134,12 +141,12 @@ def test_net_worth_by_group_at_market_value():
         CASH: 91000,
         INVESTMENTS: 2500,  # VTI at 250
         PROPERTY: 300000,
-        DEBT: -190000,
-        OTHER: -1000,  # the credit card
+        DEBT: -191000,  # the mortgage and the card
+        OTHER: 0,
     }
     assert summary.net_worth == 202500
     assert summary.net_worth_change == 92500
-    assert (summary.investable_start, summary.investable) == (10000, 93500)
+    assert summary.investable == 93500
 
 
 def test_income_spending_and_savings():
@@ -151,17 +158,36 @@ def test_income_spending_and_savings():
 
 def test_spending_ratios():
     [summary] = summaries()[0].values()
-    # A year's spending against net worth, and investable assets, at its start.
-    assert summary.spending_rate == Decimal(100 * 8000) / 110000
-    assert summary.withdrawal_rate == Decimal(100 * 8000) / 10000
+    # A whole year's 12 months are the year: its spending against balances at its end.
+    assert summary.trailing_start == datetime.date(2024, 1, 1)
+    assert summary.trailing_expenses == summary.expenses == 8000
+    assert summary.spending_rate == Decimal(100 * 8000) / 202500
+    assert summary.withdrawal_rate == Decimal(100 * 8000) / 93500
     assert summary.months_of_cash == Decimal(12 * 91000) / 8000
 
 
-def test_debt_paydown_excludes_credit_cards():
+def test_debt_paid_down_is_the_fall_in_balances():
     [summary] = summaries()[0].values()
     assert summary.debts == [
-        Debt("Liabilities:Home:Mortgage", start=200000, borrowed=0, paid=10000, end=190000)
+        Debt("Liabilities:CreditCard", start=0, end=1000),
+        Debt("Liabilities:Home:Mortgage", start=200000, end=190000),
     ]
+    assert [debt.paid_down for debt in summary.debts] == [-1000, 10000]
+    assert summary.debt_paid_down == 9000
+
+
+def test_a_card_paid_in_full_nets_to_zero():
+    ledger = (
+        LEDGER
+        + """
+2024-02-25 * "Card payment"
+  Liabilities:CreditCard  1000 USD
+  Assets:Bank:Checking
+"""
+    )
+    [summary] = summaries(ledger)[0].values()
+    assert Debt("Liabilities:CreditCard", start=0, end=0) not in summary.debts  # no balance
+    assert summary.debt_paid_down == 10000
 
 
 def test_new_borrowing():
@@ -175,27 +201,44 @@ def test_new_borrowing():
 """
     )
     [summary] = summaries(ledger)[0].values()
-    assert Debt("Liabilities:CarLoan", start=0, borrowed=20000, paid=0, end=20000) in summary.debts
+    assert Debt("Liabilities:CarLoan", start=0, end=20000) in summary.debts
+    assert summary.debt_paid_down == 10000 - 1000 - 20000
 
 
 def test_consecutive_years_chain():
     found, _ = summaries(years=(2023, 2024))
     assert found[2023].net_worth_start == 0
     assert found[2023].net_worth == 110000 == found[2024].net_worth_start
-    assert found[2023].spending_rate is None  # no net worth at its start
-    assert found[2023].withdrawal_rate is None
+    assert found[2023].spending_rate == 0  # no spending
+    assert found[2023].months_of_cash is None
     assert found[2023].savings_rate is None  # no income
 
 
-def test_year_to_date_is_annualized():
-    found, _ = summaries(today=datetime.date(2024, 7, 1))
+def test_year_to_date_spending_ratios_use_the_last_12_months():
+    ledger = (
+        LEDGER
+        + """
+2023-09-01 * "Groceries last year"
+  Expenses:Food:Groceries  1200 USD
+  Assets:Bank:Checking
+"""
+    )
+    found, _ = summaries(ledger, today=datetime.date(2024, 7, 1))
     summary = found[2024]
     assert not summary.complete
     assert summary.end == datetime.date(2024, 7, 2)
-    assert summary.days == 183
-    assert summary.annual_expenses == Decimal(8000) * 365 / 183
-    # VTI's only price, on 2024-12-31, is after today, so it's valued at cost.
+    # Flows are the year so far; the ratios' spending is the last 12 months'.
+    assert summary.expenses == 8000
+    assert summary.trailing_start == datetime.date(2023, 7, 2)
+    assert summary.trailing_expenses == 9200
+    # Balances are today's. VTI's only price, on 2024-12-31, is after today: it's at cost.
     assert summary.holdings[INVESTMENTS] == 2000
+    assert summary.withdrawal_rate == Decimal(100 * 9200) / summary.investable
+
+
+def test_the_12_months_before_february_29th():
+    summary = YearSummary(2028, datetime.date(2028, 2, 29))
+    assert summary.trailing_start == datetime.date(2027, 2, 28)
 
 
 def test_unconverted_currencies_are_reported():

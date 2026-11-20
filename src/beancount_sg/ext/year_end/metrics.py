@@ -5,16 +5,24 @@ Net worth is assets minus liabilities (what's owed), in groups:
 - **Cash**: assets with the ``cash`` cash-flow role (see
   `beancount_sg.cash_flow_roles`).
 - **Investments**: other assets, unless they're property.
-- **Property**: assets you live in or use rather than invest, e.g. a home. An
-  asset is property if its ``open`` directive (or a parent's) says
-  ``investable: FALSE``, or else if a liability is opened under the matching
-  path, e.g. ``Assets:Home`` and ``Liabilities:Home:Mortgage`` (a secured loan).
-  ``investable: TRUE`` makes it an investment, whatever liabilities match it.
-- **Debt**: loans, i.e. liabilities with the ``financing`` role, except credit
-  cards: those without a declared role and named with Card.
-- **Other**: the remaining liabilities, e.g. credit card balances.
+- **Property**: assets you live in or use rather than invest, e.g. a home: those
+  whose ``open`` directive (or a parent's) says ``investable: FALSE``.
+- **Debt**: liabilities with the ``financing`` role (the default), credit cards
+  included.
+- **Other**: liabilities declared with another role.
 
 Investable assets are cash and investments: what spending could be drawn from.
+
+Each year's metrics are one of three kinds:
+
+- **Balances** at the year's end (for the current year, today): net worth and
+  its groups, investable assets, and each loan's balance.
+- **Flows** during the year (for the current year, so far): income, expenses,
+  savings, the savings rate, and debt paid down.
+- **Spending ratios**: the 12 months of spending up to the year's end, against
+  balances then: the withdrawal rate, spending / net worth, and the emergency
+  fund. For a whole year, the 12 months are the year; for the current year,
+  they're the last 12 months, so its ratios compare with whole years'.
 
 All values are in one currency: holdings at their market value on the date (or
 at cost, if they have no price yet), and income and spending at their value on
@@ -25,7 +33,6 @@ are left out and their currencies reported.
 from __future__ import annotations
 
 import datetime
-import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -40,8 +47,6 @@ from beancount.core.inventory import Inventory
 from beancount_sg.cash_flow_roles import CASH, FINANCING, Role
 
 INVESTABLE_KEY = "investable"
-# Names of liabilities that are credit cards, rather than loans, by default.
-CARD_NAMES = re.compile(r"card", re.IGNORECASE)
 INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
 GROUPS = (CASH, INVESTMENTS, PROPERTY, DEBT, OTHER)
 MAX_YEARS = 5
@@ -64,26 +69,19 @@ def classify(
     investable = {
         entry.account: entry.meta[INVESTABLE_KEY] for entry in opens if INVESTABLE_KEY in entry.meta
     }
-    liabilities = [
-        entry.account
-        for entry in opens
-        if get_account_type(entry.account) == account_types.liabilities
-    ]
     found = {}
     for entry in opens:
         account = entry.account
         root = get_account_type(account)
         role = roles[account]
         if root == account_types.assets:
-            found[account] = _asset(account, role, investable, liabilities)
+            found[account] = _asset(account, role, investable)
         elif root == account_types.liabilities:
-            found[account] = _liability(account, role)
+            found[account] = _liability(role)
     return found
 
 
-def _asset(
-    account: str, role: Role, investable: Mapping[str, object], liabilities: list[str]
-) -> Classification:
+def _asset(account: str, role: Role, investable: Mapping[str, object]) -> Classification:
     if role.role == CASH:
         return Classification(CASH, _role_reason(role))
     # Its own investable metadata, or its nearest parent's.
@@ -91,20 +89,11 @@ def _asset(
         if name in investable:
             group = INVESTMENTS if investable[name] else PROPERTY
             return Classification(group, f"{INVESTABLE_KEY}: {investable[name]} on {name}")
-    # A liability under the matching path, e.g. Liabilities:Home:Mortgage for Assets:Home.
-    path = account_lib.split(account)[1:]
-    for liability in liabilities:
-        if path and account_lib.split(liability)[1 : len(path) + 1] == path:
-            return Classification(PROPERTY, f"secures {liability}")
     return Classification(INVESTMENTS, _role_reason(role))
 
 
-def _liability(account: str, role: Role) -> Classification:
-    if role.role != FINANCING:
-        return Classification(OTHER, _role_reason(role))
-    if not role.declared and CARD_NAMES.search(account):
-        return Classification(OTHER, "a credit card, by its name")
-    return Classification(DEBT, _role_reason(role))
+def _liability(role: Role) -> Classification:
+    return Classification(DEBT if role.role == FINANCING else OTHER, _role_reason(role))
 
 
 def _role_reason(role: Role) -> str:
@@ -113,15 +102,21 @@ def _role_reason(role: Role) -> str:
     return f"{role.role}, by default"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Debt:
-    """A loan's balance over a year: owed amounts are positive."""
+    """A debt's balance at the start and end of a year: owed amounts are positive."""
 
     account: str
-    start: Decimal = Decimal(0)
-    borrowed: Decimal = Decimal(0)
-    paid: Decimal = Decimal(0)
-    end: Decimal = Decimal(0)
+    start: Decimal
+    end: Decimal
+
+    @property
+    def paid_down(self) -> Decimal:
+        """The fall in the balance: payments minus new borrowing (negative if it grew).
+
+        A credit card paid in full each month comes to about zero.
+        """
+        return self.start - self.end
 
 
 @dataclass
@@ -129,7 +124,9 @@ class YearSummary:
     """A year's metrics, in one currency.
 
     ``end`` is the day after the last day counted: the next January 1st, or for
-    the current year, tomorrow (so the year is year-to-date).
+    the current year, tomorrow (so the year is year-to-date). Balances are as of
+    the end, flows are during the year, and spending ratios use the 12 months of
+    spending up to the end (``trailing_expenses``).
     """
 
     year: int
@@ -140,6 +137,8 @@ class YearSummary:
     income: Decimal = Decimal(0)
     expenses: Decimal = Decimal(0)
     expenses_by_category: dict[str, Decimal] = field(default_factory=lambda: defaultdict(Decimal))
+    # Expenses over the 12 months up to the end: for a whole year, the year's.
+    trailing_expenses: Decimal = Decimal(0)
     debts: list[Debt] = field(default_factory=list)
 
     @property
@@ -152,8 +151,9 @@ class YearSummary:
         return self.end == datetime.date(self.year + 1, 1, 1)
 
     @property
-    def days(self) -> int:
-        return (self.end - self.start).days
+    def trailing_start(self) -> datetime.date:
+        """The first day of the 12 months up to the end."""
+        return _year_before(self.end)
 
     @property
     def net_worth_start(self) -> Decimal:
@@ -167,10 +167,6 @@ class YearSummary:
     @property
     def net_worth_change(self) -> Decimal:
         return self.net_worth - self.net_worth_start
-
-    @property
-    def investable_start(self) -> Decimal:
-        return _investable(self.holdings_start)
 
     @property
     def investable(self) -> Decimal:
@@ -188,34 +184,40 @@ class YearSummary:
         return 100 * self.savings / self.income if self.income > 0 else None
 
     @property
-    def annual_expenses(self) -> Decimal:
-        """Expenses, scaled to a whole year when the year is year-to-date."""
-        return self.expenses if self.complete else self.expenses * 365 / self.days
-
-    @property
     def spending_rate(self) -> Decimal | None:
-        """Annual expenses as a percentage of net worth at the start of the year."""
-        return _percentage(self.annual_expenses, self.net_worth_start)
+        """The last 12 months' expenses as a percentage of net worth at the end."""
+        return _percentage(self.trailing_expenses, self.net_worth)
 
     @property
     def withdrawal_rate(self) -> Decimal | None:
-        """Annual expenses as a percentage of investable assets at the start of the year.
+        """The last 12 months' expenses as a percentage of investable assets at the end.
 
         Like a withdrawal rate in retirement: what share of the cash and
         investments you could draw on a year's spending would take.
         """
-        return _percentage(self.annual_expenses, self.investable_start)
+        return _percentage(self.trailing_expenses, self.investable)
 
     @property
     def months_of_cash(self) -> Decimal | None:
-        """Cash at the end of the year, in months of annual expenses."""
-        if self.annual_expenses <= 0:
+        """Cash at the end, in months of the last 12 months' average expenses."""
+        if self.trailing_expenses <= 0:
             return None
-        return 12 * self.holdings.get(CASH, Decimal(0)) / self.annual_expenses
+        return 12 * self.holdings.get(CASH, Decimal(0)) / self.trailing_expenses
+
+    @property
+    def debt_paid_down(self) -> Decimal:
+        return sum((debt.paid_down for debt in self.debts), Decimal(0))
 
     @property
     def top_categories(self) -> list[tuple[str, Decimal]]:
         return sorted(self.expenses_by_category.items(), key=lambda item: -item[1])
+
+
+def _year_before(date: datetime.date) -> datetime.date:
+    """The same day a year earlier (February 28th for February 29th)."""
+    if (date.month, date.day) == (2, 29):
+        return date.replace(year=date.year - 1, day=28)
+    return date.replace(year=date.year - 1)
 
 
 def _investable(holdings: Mapping[str, Decimal]) -> Decimal:
@@ -261,7 +263,6 @@ def year_end(
     ]
     # Balances of assets and liabilities, snapshotted at each year's start and end.
     balances: dict[str, Inventory] = defaultdict(Inventory)
-    by_year = {summary.year: summary for summary in summaries}
     boundaries = sorted({summary.start for summary in summaries} | {s.end for s in summaries})
     snapshots: dict[datetime.date, dict[str, Inventory]] = {}
     held = (account_types.assets, account_types.liabilities)
@@ -269,16 +270,20 @@ def year_end(
         if not isinstance(txn, Transaction):
             continue
         _snapshot(boundaries, balances, snapshots, txn.date)
-        summary = by_year.get(txn.date.year)
-        counted = summary and txn.date < summary.end
+        # The years whose 12 months of spending include this date.
+        windows = [s for s in summaries if s.trailing_start <= txn.date < s.end]
         for posting in txn.postings:
             root = get_account_type(posting.account)
             if root in held:
                 balances[posting.account].add_position(posting)
-            if not counted:
+            if not windows or root not in (account_types.income, account_types.expenses):
                 continue
-            if root in (account_types.income, account_types.expenses):
-                value = _flow_value(posting, currency, price_map, txn.date, unconverted)
+            value = _flow_value(posting, currency, price_map, txn.date, unconverted)
+            for summary in windows:
+                if root == account_types.expenses:
+                    summary.trailing_expenses += value
+                if txn.date < summary.start:
+                    continue
                 if root == account_types.income:
                     summary.income -= value
                 else:
@@ -293,9 +298,7 @@ def year_end(
         end_values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
         summary.holdings_start = _by_group(start_values, classes)
         summary.holdings = _by_group(end_values, classes)
-        summary.debts = _debts(
-            entries, summary, classes, currency, price_map, start_values, end_values, unconverted
-        )
+        summary.debts = _debts(classes, start_values, end_values)
     return YearEnd(summaries, currency, unconverted)
 
 
@@ -366,37 +369,14 @@ def _values(
 
 
 def _debts(
-    entries: list[Directive],
-    summary: YearSummary,
     classes: Mapping[str, Classification],
-    currency: str,
-    price_map: prices.PriceMap,
     start_values: Mapping[str, Decimal],
     end_values: Mapping[str, Decimal],
-    unconverted: set[str],
 ) -> list[Debt]:
-    """The year's loans with a balance or activity."""
-    debts: dict[str, Debt] = {}
-    for account in start_values.keys() | end_values.keys():
-        if _group(account, classes) == DEBT and (
-            start_values.get(account) or end_values.get(account)
-        ):
-            # Owed amounts are positive.
-            debts[account] = Debt(
-                account,
-                start=-start_values.get(account, Decimal(0)),
-                end=-end_values.get(account, Decimal(0)),
-            )
-    for txn in entries:
-        if not isinstance(txn, Transaction) or not summary.start <= txn.date < summary.end:
-            continue
-        for posting in txn.postings:
-            if _group(posting.account, classes) != DEBT:
-                continue
-            debt = debts.setdefault(posting.account, Debt(posting.account))
-            value = _flow_value(posting, currency, price_map, txn.date, unconverted)
-            if value > 0:
-                debt.paid += value
-            else:
-                debt.borrowed -= value
-    return sorted(debts.values(), key=lambda item: item.account)
+    """The year's debts with a balance at its start or end."""
+    debts = []
+    for account in sorted(start_values.keys() | end_values.keys()):
+        start, end = start_values.get(account, Decimal(0)), end_values.get(account, Decimal(0))
+        if _group(account, classes) == DEBT and (start or end):
+            debts.append(Debt(account, start=-start, end=-end))  # owed amounts are positive
+    return debts

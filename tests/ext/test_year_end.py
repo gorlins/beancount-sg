@@ -85,7 +85,8 @@ def cards(body):
 
 def year_headers(body):
     start = body.index("<h3>Net worth")
-    return text(body[body.index("<thead>", start) : body.index("</thead>", start)]).split()
+    head = body[body.index("<thead>", start) : body.index("</thead>", start)]
+    return text("".join(re.findall(r'<th class="num">(.*?)</th>', head))).split()
 
 
 def test_defaults_to_five_years_ending_this_year(tmp_path):
@@ -134,15 +135,25 @@ def test_years_start_with_the_first_income_or_expenses(tmp_path):
 def test_cards_show_the_last_year_and_its_change(tmp_path):
     found = cards(page(tmp_path, query="?time=2019"))
     # 2019 ends at checking 98000 - mortgage 90000 - card 12100.
-    assert "Net worth -4,100 ▲ +42,900 (+91.3%) vs 2018 assets minus liabilities" in found
-    assert "Investable assets 98,000 ▲ +44,000 (+81.5%) vs 2018 cash and investments" in found
-    assert "Savings rate 85.8% ▼ −0.2 pts vs 2018 42,900 saved" in found
-    # 2019's spending, 7100, against 2018's ending cash, 54000; 2018 started with nothing.
-    assert "Withdrawal rate 13.15% spending ÷ investable assets" in found
-    assert "Income 50,000 ■ no change vs 2018" in found
-    assert "Expenses 7,100 ▲ +100 (+1.4%) vs 2018" in found
-    assert "Emergency fund 165.6 mo ▲ +73.1 vs 2018 98,000 in cash" in found
-    assert "Debt paid down 5,000 90,000 still owed" in found
+    assert (
+        "Net worth -4,100 ▲ +42,900 (+91.3%) vs 2018 assets minus liabilities, at the year's end"
+        in found
+    )
+    assert (
+        "Investable assets 98,000 ▲ +44,000 (+81.5%) vs 2018"
+        " cash and investments, at the year's end" in found
+    )
+    assert "Income 50,000 ■ no change vs 2018 in 2019" in found
+    assert "Expenses 7,100 ▲ +100 (+1.4%) vs 2018 in 2019" in found
+    assert "Savings rate 85.8% ▼ −0.2 pts vs 2018 42,900 saved in 2019" in found
+    # The mortgage fell 5000, but the unpaid card grew 6100.
+    assert "Debt paid down -1,100 ▲ +99,900 (+98.9%) vs 2018 in 2019; 102,100 still owed" in found
+    # 2019's spending, 7100, against its ending cash and investments, 98000.
+    assert (
+        "Withdrawal rate 7.24% ▼ −5.7 pts vs 2018 12 months' spending ÷ investable assets"
+        " at the year's end" in found
+    )
+    assert "Emergency fund 165.6 mo ▲ +73.1 vs 2018 98,000 cash at the year's end" in found
 
 
 def tone(body, label):
@@ -154,7 +165,7 @@ def tone(body, label):
 def test_changes_are_green_when_good_and_red_when_bad(tmp_path):
     body = page(tmp_path, query="?time=2019")
     assert tone(body, "+42,900 (+91.3%)") == "good"  # net worth up
-    assert tone(body, "+5,000 (+5.3%)") == "good"  # debt down
+    assert tone(body, "−1,100 (−1.1%)") == "bad"  # debt up
     assert tone(body, "+100 (+1.4%) vs 2018") == "bad"  # expenses up
     assert tone(body, "−0.2 pts vs 2018") == "bad"  # savings rate down
     assert tone(body, "no change vs 2018") == "flat"
@@ -165,31 +176,40 @@ def test_net_worth_and_income_panels(tmp_path):
     net_worth = panel(body, "Net worth")
     assert "Cash 54,000 98,000 ▲ +44,000 (+81.5%)" in net_worth
     assert "Property 0 0 ■ no change" in net_worth
-    assert "Debt -95,000 -90,000 ▲ +5,000 (+5.3%)" in net_worth
-    assert "Other -6,000 -12,100 ▼ −6,100 (−101.7%)" in net_worth
+    assert "Debt -101,000 -102,100 ▼ −1,100 (−1.1%)" in net_worth  # the mortgage and card
+    assert "Other 0 0 ■ no change" in net_worth
     assert "Net worth -47,000 -4,100 ▲ +42,900 (+91.3%)" in net_worth
     assert "Investable assets 54,000 98,000" in net_worth
     income = panel(body, "Income &amp; savings")
     assert "Income 50,000 50,000 ■ no change" in income
     assert "Savings 43,000 42,900 ▼ −100 (−0.2%)" in income
     assert "Savings rate 86.0% 85.8% ▼ −0.2 pts" in income
-    # Without a positive net worth at the start, spending / net worth isn't meaningful.
+    # 2018 opened the mortgage: 100000 owed, less 5000 paid and the card's 6000.
+    assert "Debt paid down -101,000 -1,100 ▲ +99,900 (+98.9%)" in income
+    assert "12 months' spending, against balances at the year's end" in income
+    # Each year's spending against its ending cash and investments: 54000, then 98000.
+    assert "Withdrawal rate 13.0% 7.2% ▼ −5.7 pts" in income
+    # Without a positive net worth, spending / net worth isn't meaningful.
     assert "Spending / net worth — —" in income
-    # 2018 starts with nothing; 2019 with 54000 of cash.
-    assert "Withdrawal rate — 13.1%" in income
+    assert "Emergency fund (months) 92.6 165.6 ▲ +73.1" in income
 
 
 def test_a_year_to_dates_flows_are_not_compared(tmp_path):
-    found = cards(page(tmp_path))
+    body = page(tmp_path)
+    found = cards(body)
     assert "Income 50,000 year to date" in found
     assert "Expenses 7,700 year to date" in found
+    # Its spending ratios use the last 12 months, so they are.
+    assert "Withdrawal rate 2.13% ▼ −0.3 pts vs 2024" in found
+    assert "its spending ratios use the last 12 months" in text(body)
 
 
 def test_spending_ratios_with_a_positive_net_worth(tmp_path):
     ledger = LEDGER.replace("Liabilities:Mortgage  -100000 USD", "Liabilities:Mortgage  -20000 USD")
     income = panel(page(tmp_path, ledger, query="?time=2019"), "Income &amp; savings")
-    # 2018 ends at 54000 (checking) - 15000 (mortgage) - 6000 (card) = 33000: 2019's start.
-    assert "Spending / net worth — 21.5%" in income  # 7100 / 33000
+    # 2018 ends at 54000 (checking) - 15000 (mortgage) - 6000 (card) = 33000, and 2019 at
+    # 98000 - 10000 - 12100 = 75900.
+    assert "Spending / net worth 21.2% 9.4%" in income  # 7000 / 33000, 7100 / 75900
 
 
 def test_charts(tmp_path):
@@ -237,17 +257,19 @@ def test_expenses_by_category(tmp_path):
     assert "Total 7,000 7,100 ▲ +100 (+1.4%)" in found
 
 
-def test_debt_paydown_in_the_last_year(tmp_path):
-    found = panel(page(tmp_path, query="?time=2019"), "Debt paydown in 2019")
-    assert "Liabilities:Mortgage 95,000 0 5,000 90,000" in found
-    assert "Liabilities:CreditCard" not in found
+def test_debt_in_the_last_year(tmp_path):
+    found = panel(page(tmp_path, query="?time=2019"), "Debt in 2019")
+    # Start, end, and paid down: negative for the card, whose balance grew.
+    assert "Liabilities:CreditCard 6,000 12,100 -6,100" in found
+    assert "Liabilities:Mortgage 95,000 90,000 5,000" in found
+    assert "Total 101,000 102,100 -1,100" in found
 
 
 def test_classification_is_shown(tmp_path):
     body = text(page(tmp_path))
     assert "Assets:Bank:Checking cash cash, by default" in body
     assert "Assets:Brokerage investments investing, declared on Assets:Brokerage" in body
-    assert "Liabilities:CreditCard other a credit card, by its name" in body
+    assert "Liabilities:CreditCard debt financing, by default" in body
     assert "Liabilities:Mortgage debt financing, by default" in body
 
 

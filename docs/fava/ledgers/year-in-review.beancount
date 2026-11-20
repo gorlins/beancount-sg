@@ -8,6 +8,7 @@ option "operating_currency" "USD"
 2019-12-01 open Equity:Opening-Balances
 2019-12-01 open Income:Salary USD
 2019-12-01 open Assets:Home USD
+  investable: FALSE
 2019-12-01 open Assets:Bank:Savings USD
 2019-12-01 open Assets:Brokerage
   cash-flow-role: "investing"

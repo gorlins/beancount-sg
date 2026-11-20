@@ -33,62 +33,76 @@ left out and their currencies listed.
 - **Charts** of net worth per year, or switched below it to assets and liabilities stacked (Fava
   can't draw net worth as a line over them), and of expenses by category.
 - **Net worth** and **Income & savings** tables.
-- **Expenses by category** and **Debt paydown** tables.
+- **Expenses by category** and **Debt** tables.
 
 On narrower screens, the tables of five years stack rather than sit side by side.
 
 Every change from the previous year has an arrow and a sign, in **green when it's good** and **red
-when it's bad**: more net worth, income or savings is good, and so is less spending or debt. A
-year-to-date year's income and spending aren't compared with whole years, and its spending ratios
-use its spending so far, annualized. Click a bar's date to make that the final year.
+when it's bad**: more net worth, income or savings is good, and so is less spending or debt. Click
+a bar's date to make that the final year.
 
 ## Metrics
 
-| Metric | |
-| --- | --- |
-| **Net worth** | Assets minus liabilities (what's owed) at the year's end, in [groups](#net-worth-groups). |
-| **Investable assets** | Cash and investments: what spending could be drawn from, unlike a home. |
-| **Savings** | Income minus expenses. |
-| **Savings rate** | Savings as a percentage of income. |
-| **Withdrawal rate** | A year's expenses as a percentage of investable assets at its start: like a withdrawal rate in retirement, what share of your cash and investments a year's spending would take. |
-| **Spending / net worth** | A year's expenses as a percentage of net worth at its start, which also counts property and debt. |
-| **Emergency fund** | Cash at the year's end, in months of spending. |
-| **Debt paid down** | Principal paid on loans in the final year. Interest is in expenses. |
+Each metric is one of three kinds, which differ for the current, year-to-date year:
 
-Ratios to an amount that isn't positive aren't shown.
+- **Balances** are at the year's end; for the current year, today.
+- **Flows** are totals during the year; for the current year, so far. A year-to-date total isn't
+  compared with whole years'.
+- **Spending ratios** compare 12 months of spending with balances at the year's end. For a whole
+  year, the 12 months are the year; for the current year, they're the last 12 months, so its
+  ratios compare with whole years' (spending since January 1st would make them meaningless early in
+  the year).
+
+| Metric | Kind | |
+| --- | --- | --- |
+| **Net worth** | Balance | Assets minus liabilities (what's owed), in [groups](#net-worth-groups). |
+| **Investable assets** | Balance | Cash and investments: what spending could be drawn from, unlike a home. |
+| **Income**, **expenses** | Flow | |
+| **Savings** | Flow | Income minus expenses, wherever the money went: to a savings account, investments or paying down debt. |
+| **Savings rate** | Flow | Savings as a percentage of income. As a ratio of two flows over the same months, it isn't annualized, and a year-to-date rate is compared with whole years'. |
+| **Debt paid down** | Flow | The fall in what's owed on [debts](#net-worth-groups): payments minus new borrowing, so negative when debt grew. Interest is in expenses. |
+| **Withdrawal rate** | Spending ratio | Spending as a percentage of investable assets: like a withdrawal rate in retirement, what share of your cash and investments a year's spending would take. |
+| **Spending / net worth** | Spending ratio | Spending as a percentage of net worth, which also counts property and debt. |
+| **Emergency fund** | Spending ratio | Cash, in months of average spending. |
+
+Ratios to an amount that isn't positive aren't shown. The [Cash Flow](cash-flow.md) report covers
+any period, by default the last 12 months.
 
 ## Expenses by category
 
 Expenses per year by top-level category (e.g. `Expenses:Food`, not its subaccounts), with each
 category's share of the final year. Click an amount for the account's page for that year.
 
+## Debt
+
+Each debt with a balance at the final year's start or end: what was owed then, and how much it was
+paid down. Paid down is the net fall in the balance, so it works for revolving credit (a credit card
+or HELOC) as well as a loan: a card paid in full each month comes to about zero, and one carrying a
+balance shows it growing or being paid off.
+
 ## Net worth groups
 
 | Group | Accounts |
 | --- | --- |
 | **Cash** | Assets with the `cash` [cash-flow role](#cash-flow-roles). |
-| **Investments** | Assets with any other role (usually `investing`), unless they're property. |
-| **Property** | Assets you live in or use rather than invest, e.g. a home or a car. |
-| **Debt** | Loans: liabilities with the `financing` role (the default), except credit cards. |
-| **Other** | The remaining liabilities: credit cards without a declared role, and liabilities declared with another role, e.g. `operating`. |
+| **Investments** | Other assets, unless they're property. |
+| **Property** | Assets marked `investable: FALSE`: ones you live in or use rather than invest, e.g. a home or a car. |
+| **Debt** | Liabilities with the `financing` role, the default: loans and credit cards. |
+| **Other** | Liabilities declared with another role. |
 
-The roles say how an account's money flows; the groups say what it's worth to you. So `operating`,
-which marks everyday income and spending, matters here only for a liability: declaring a credit
-card (or any liability) `operating` keeps it out of debt, in *other*.
-
-An asset is **property** if its `open` directive (or a parent's) says `investable: FALSE`, or else
-if a liability is opened under the matching account path, which is how a secured loan is usually
-kept, e.g. `Assets:Home` and `Liabilities:Home:Mortgage`. `investable: TRUE` makes an asset an
-investment whatever liabilities match it.
+Most ledgers need only one declaration: `investable: FALSE` on a home, car or other property, on
+its `open` directive (it also applies to subaccounts). Investable assets leave it out, though net
+worth still counts it.
 
 ```beancount
-2020-01-01 open Assets:Car
+2020-01-01 open Assets:Home
   investable: FALSE
 ```
 
-**Credit cards** aren't counted as debt, since their balances are everyday spending, paid off
-monthly, rather than loans being paid down: a liability without a declared role and named with
-Card is in *other*. Declare `cash-flow-role: "financing"` on a card to count it as debt.
+`investable` says whether an asset counts toward investable assets, and nothing else: a loan
+secured by it doesn't change that. A mortgage under `Liabilities:Home` and a margin loan under
+`Liabilities:Brokerage` are both debt, and net worth subtracts both, but only the home is
+property.
 
 ## Cash-flow roles
 
@@ -104,4 +118,11 @@ on the account's `open` directive:
 The roles are `cash`, `investing`, `financing` and `operating`; a declared role also applies to the
 account's subaccounts. Without one, assets named with Cash, Checking, Savings or Bank are `cash`,
 other assets `investing`, and liabilities `financing`. A declared value that isn't a role (e.g. a
-typo) is reported as an error and ignored. The page's "How accounts are classified" section lists each account's group and why.
+typo) is reported as an error and ignored. The page's "How accounts are classified" section lists
+each account's group and why.
+
+Here, roles only decide which assets are **cash** (the cash group and the emergency fund) and
+which liabilities are **debt**. `cash` is money available now at a fixed value, such as checking
+and savings accounts; `investing` is assets whose value moves with markets, such as a brokerage
+account. Roles don't affect savings: money moved into a savings account or a brokerage account is
+saved either way, since savings are income minus expenses.
