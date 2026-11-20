@@ -39,14 +39,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from beancount.core import account as account_lib
-from beancount.core import prices
+from beancount.core import convert, prices
 from beancount.core.account_types import AccountTypes, get_account_type
-from beancount.core.data import Directive, Open, Transaction
+from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
 from beancount_sg.cash_flow_roles import CASH, FINANCING, Role
-
-from .._valuation import market_values, posting_value
 
 INVESTABLE_KEY = "investable"
 INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
@@ -280,7 +278,7 @@ def year_end(
                 balances[posting.account].add_position(posting)
             if not windows or root not in (account_types.income, account_types.expenses):
                 continue
-            value = posting_value(posting, currency, price_map, txn.date, unconverted)
+            value = _flow_value(posting, currency, price_map, txn.date, unconverted)
             for summary in windows:
                 if root == account_types.expenses:
                     summary.trailing_expenses += value
@@ -296,10 +294,8 @@ def year_end(
 
     for summary in summaries:
         start, end = snapshots[summary.start], snapshots[summary.end]
-        start_values = market_values(
-            start, currency, price_map, summary.start - ONE_DAY, unconverted
-        )
-        end_values = market_values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
+        start_values = _values(start, currency, price_map, summary.start - ONE_DAY, unconverted)
+        end_values = _values(end, currency, price_map, summary.end - ONE_DAY, unconverted)
         summary.holdings_start = _by_group(start_values, classes)
         summary.holdings = _by_group(end_values, classes)
         summary.debts = _debts(classes, start_values, end_values)
@@ -332,6 +328,44 @@ def _snapshot(
     """
     while boundaries and boundaries[0] <= date:
         snapshots[boundaries.pop(0)] = {account: Inventory(i) for account, i in balances.items()}
+
+
+def _flow_value(
+    posting: Posting,
+    currency: str,
+    price_map: prices.PriceMap,
+    date: datetime.date,
+    unconverted: set[str],
+) -> Decimal:
+    """A posting's value in ``currency`` on its date, or 0 if it can't be converted."""
+    amount = convert.convert_amount(convert.get_weight(posting), currency, price_map, date)
+    if amount.currency != currency:
+        unconverted.add(amount.currency)
+        return Decimal(0)
+    return amount.number
+
+
+def _values(
+    balances: Mapping[str, Inventory],
+    currency: str,
+    price_map: prices.PriceMap,
+    date: datetime.date,
+    unconverted: set[str],
+) -> dict[str, Decimal]:
+    """Each account's market value in ``currency`` on the date, or its cost without a price."""
+    values: dict[str, Decimal] = defaultdict(Decimal)
+    for account, inventory in balances.items():
+        for position in inventory:
+            amount = convert.convert_position(position, currency, price_map, date)
+            if amount.currency != currency and position.cost:
+                # No market price yet: value it at cost.
+                cost = convert.get_cost(position)
+                amount = convert.convert_amount(cost, currency, price_map, date)
+            if amount.currency != currency:
+                unconverted.add(amount.currency)
+                continue
+            values[account] += amount.number
+    return values
 
 
 def _debts(

@@ -19,8 +19,10 @@ Fava's account and advanced filters apply, as on Fava's own reports. The page ha
   cash, and the emergency fund: how many months of average spending over the last
   12 months cash covers. Only net income is colored, green for a surplus and red
   for a deficit: investing and financing flows aren't good or bad by their sign.
-- The statement: each activity's lines and total, and the net change in cash.
-- A chart of each activity's flows per interval (Fava's interval menu).
+- A Sankey diagram of where cash came from and went (drawn by CashFlow.js).
+- The statement: each activity's lines and total in its own direction, like the
+  cards (see `SECTIONS`), and the change in cash.
+- Charts of each card's amount per interval (Fava's interval menu).
 - The reconciliation: each cash account at the start and end, with the change
   the activities explain.
 - How each account is classified, declared or by its name, and any invalid roles.
@@ -103,6 +105,43 @@ def card(activity: str, value: Decimal) -> Card:
     return Card(title, amount, tone(activity, value), detail)
 
 
+@dataclass(frozen=True)
+class Section:
+    """How the page shows an activity: in its own direction, like its card."""
+
+    title: str  # for the total, and the chart
+    sign: int  # turns an effect on cash into the activity's direction
+    lines: str  # what a line's sign means
+
+
+# The statement's lines are effects on cash. The page turns investing and
+# financing around, so that money into investments and debt paid down are
+# positive, as on the cards: e.g. invested 9,640 rather than -9,640.
+SECTIONS = {
+    OPERATING: Section("Net income", 1, "income (+) and spending (−)"),
+    INVESTING: Section("Invested", -1, "money put in (+) or taken out (−)"),
+    FINANCING: Section("Debt paid down", -1, "payments (+) or new borrowing (−)"),
+}
+
+
+def _kind(activity: str, inflow: bool) -> str:
+    """A Sankey node's color group: income, spending, investments or debt."""
+    if activity == OPERATING:
+        return "income" if inflow else "spending"
+    return "investments" if activity == INVESTING else "debt"
+
+
+# What a node's flow is, for its tooltip, by activity and whether it's into cash.
+VERBS = {
+    (OPERATING, True): "in",
+    (OPERATING, False): "spent",
+    (INVESTING, True): "taken out",
+    (INVESTING, False): "invested",
+    (FINANCING, True): "borrowed",
+    (FINANCING, False): "paid down",
+}
+
+
 class CashFlow(FavaExtensionBase):
     """Fava report of cash flows by activity."""
 
@@ -115,6 +154,7 @@ class CashFlow(FavaExtensionBase):
     balance = staticmethod(balance)
     tone = staticmethod(tone)
     card = staticmethod(card)
+    sections = SECTIONS
 
     def period(self) -> tuple[datetime.date, datetime.date]:
         """Fava's time filter, or the last 12 months: the first day, and the day after the last.
@@ -159,8 +199,12 @@ class CashFlow(FavaExtensionBase):
         account_types = get_account_types(self.ledger.options)
         return statement(self._entries(), price_map, roles, account_types, currency, begin, end)
 
-    def chart(self, result: Statement) -> BarChart:
-        """Each activity's flows per interval of Fava's interval menu, stacked."""
+    def charts(self, result: Statement) -> list[BarChart]:
+        """Per interval of Fava's interval menu: each card's amount, as a chart to switch to.
+
+        Each is in its own direction, like the cards: net income, invested, debt
+        paid down, and the change in cash.
+        """
         roles, _ = self.roles()
         price_map = prices.build_price_map(self.ledger.all_entries)
         account_types = get_account_types(self.ledger.options)
@@ -172,28 +216,72 @@ class CashFlow(FavaExtensionBase):
         intervals = by_interval(
             self._entries(), price_map, roles, account_types, result.currency, ranges
         )
-        currency = result.currency
-        bars = [
-            DateAndBalanceWithBudget(
-                interval.date,
-                SimpleCounterInventory({currency: sum(interval.totals.values(), Decimal(0))}),
-                {
-                    activity.capitalize(): SimpleCounterInventory({currency: value})
-                    for activity, value in interval.totals.items()
-                },
-                {},
+        series = [
+            (
+                SECTIONS[activity].title,
+                # `or 0`: turned around, a zero is -0.
+                [SECTIONS[activity].sign * i.totals[activity] or Decimal(0) for i in intervals],
             )
-            for interval in intervals
+            for activity in ACTIVITIES
         ]
-        return BarChart(f"Cash flows by activity ({g.interval.label})", bars)
+        series.append(("Change in cash", [sum(i.totals.values(), Decimal(0)) for i in intervals]))
+        return [
+            BarChart(
+                title,
+                [
+                    DateAndBalanceWithBudget(
+                        interval.date, SimpleCounterInventory({result.currency: value}), {}, {}
+                    )
+                    for interval, value in zip(intervals, values, strict=True)
+                ],
+            )
+            for title, values in series
+        ]
 
-    def chart_links(self) -> dict[str, str]:
-        """The chart's activities, and the Fava report each should link to."""
-        return {
-            "Operating": url_for("report", report_name="income_statement", time=self._time()),
-            "Investing": url_for("report", report_name="balance_sheet", time=self._time()),
-            "Financing": url_for("report", report_name="balance_sheet", time=self._time()),
-        }
+    def sankey(self, result: Statement) -> list[dict[str, object]]:
+        """The Sankey diagram's nodes: each statement line, flowing into or out of cash.
+
+        Lines that brought money into cash (income, money taken out of
+        investments, borrowing) flow in; the rest (spending, investing, paying
+        down debt) flow out. The change in cash balances them: added to cash
+        flows out, and cash used flows in.
+        """
+        nodes = []
+        for activity in ACTIVITIES:
+            for line, value in result.lines(activity):
+                inflow = value > 0
+                amount = balance(abs(value))
+                nodes.append(
+                    {
+                        "name": line,
+                        "value": float(abs(value)),
+                        "amount": amount,
+                        "inflow": inflow,
+                        "kind": _kind(activity, inflow),
+                        "title": f"{line}: {amount} {VERBS[(activity, inflow)]}",
+                        "url": self.account_url(line),
+                    }
+                )
+        change = result.net_change
+        if change:
+            name = "Added to cash" if change > 0 else "Taken from cash"
+            nodes.append(
+                {
+                    "name": name,
+                    "value": float(abs(change)),
+                    "amount": balance(abs(change)),
+                    "inflow": change < 0,
+                    "kind": "cash",
+                    "title": f"{name}: {balance(abs(change))}",
+                    "url": None,
+                }
+            )
+        return nodes
+
+    @staticmethod
+    def interval_label() -> str:
+        """The charts' heading: Fava's interval, e.g. Monthly."""
+        return g.interval.label
 
     def _time(self) -> str:
         """The period, as a Fava time filter."""

@@ -31,9 +31,9 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from beancount.core import account as account_lib
-from beancount.core import prices
+from beancount.core import convert, prices
 from beancount.core.account_types import AccountTypes, get_account_type
-from beancount.core.data import Directive, Transaction
+from beancount.core.data import Directive, Posting, Transaction
 from beancount.core.inventory import Inventory
 
 from beancount_sg.cash_flow_roles import (
@@ -44,8 +44,6 @@ from beancount_sg.cash_flow_roles import (
     Role,
     default_role,
 )
-
-from .._valuation import market_values, posting_value
 
 ACTIVITIES = (OPERATING, INVESTING, FINANCING)
 ONE_DAY = datetime.timedelta(days=1)
@@ -143,6 +141,54 @@ def line_of(account: str, account_types: AccountTypes) -> str:
     if get_account_type(account) in (account_types.income, account_types.expenses):
         return account_lib.join(*account_lib.split(account)[:2])
     return account
+
+
+def posting_value(
+    posting: Posting,
+    currency: str,
+    price_map: prices.PriceMap,
+    date: datetime.date,
+    unconverted: set[str],
+) -> Decimal:
+    """A posting's weight in ``currency`` on the date, or 0 if it can't be converted.
+
+    Beancount's conversions return an amount they can't convert (for lack of a
+    price) unchanged, in its own currency; adding it up would mix currencies. So
+    it's left out, and its currency added to ``unconverted`` for the page to show.
+    """
+    amount = convert.convert_amount(convert.get_weight(posting), currency, price_map, date)
+    if amount.currency != currency:
+        unconverted.add(amount.currency)
+        return Decimal(0)
+    return amount.number
+
+
+def market_values(
+    balances: Mapping[str, Inventory],
+    currency: str,
+    price_map: prices.PriceMap,
+    date: datetime.date,
+    unconverted: set[str],
+) -> dict[str, Decimal]:
+    """Each account's market value in ``currency`` on the date, or its cost without a price.
+
+    Positions that can't be converted are left out, and their currencies added to
+    ``unconverted``.
+    """
+    values: dict[str, Decimal] = defaultdict(Decimal)
+    for account, inventory in balances.items():
+        for position in inventory:
+            amount = convert.convert_position(position, currency, price_map, date)
+            if amount.currency != currency and position.cost:
+                # No market price yet: value it at cost.
+                amount = convert.convert_amount(
+                    convert.get_cost(position), currency, price_map, date
+                )
+            if amount.currency != currency:
+                unconverted.add(amount.currency)
+                continue
+            values[account] += amount.number
+    return values
 
 
 def statement(

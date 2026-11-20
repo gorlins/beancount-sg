@@ -47,6 +47,10 @@
   .cf-bad { color: var(--red); }
   .cf-neutral { color: inherit; }
   .cf details { margin-top: 1rem; }
+  .cf-sankey-panel { margin-bottom: 1rem; }
+  #cash-flow-sankey svg { display: block; width: 100%; height: auto; color: inherit; }
+  #cash-flow-sankey .cash-flow-link { cursor: pointer; }
+  #cash-flow-sankey text { font-size: 12px; fill: currentColor; }
 </style>
 
 {# A flow, signed: colored only where good or bad is clear (operating cash). #}
@@ -94,6 +98,13 @@
   </div>
 </div>
 
+<section class="cf-panel cf-sankey-panel">
+  <h3>Where cash came from and went</h3>
+  <p class="cf-note">Into cash on the left, out of it on the right. Click an account for its page.</p>
+  <div id="cash-flow-sankey"></div>
+  <script type="application/json" id="cash-flow-sankey-data">{{ extension.sankey(result)|tojson }}</script>
+</section>
+
 <div class="cf-columns">
   <section class="cf-panel">
     <h3>Statement</h3>
@@ -101,22 +112,24 @@
       <thead><tr><th></th><th class="num">{{ currency }}</th></tr></thead>
       <tbody>
         {% for activity in extension.activities %}
-        <tr class="cf-section"><td>{{ activity|capitalize }} activities</td><td></td></tr>
+        {% set section = extension.sections[activity] %}
+        <tr class="cf-section"><td>{{ activity|capitalize }}: {{ section.lines }}</td><td></td></tr>
         {% for line, value in result.lines(activity) %}
-        <tr class="cf-line"><td><a href="{{ extension.account_url(line) }}">{{ line }}</a></td><td class="num">{{ flow(value) }}</td></tr>
+        <tr class="cf-line"><td><a href="{{ extension.account_url(line) }}">{{ line }}</a></td><td class="num">{{ extension.money(section.sign * value) }}</td></tr>
         {% else %}
         <tr class="cf-line"><td class="cf-note">None</td><td></td></tr>
         {% endfor %}
-        <tr class="cf-total"><td>Net cash from {{ activity }} activities</td><td class="num">{{ flow(result.total(activity), activity) }}</td></tr>
+        <tr class="cf-total"><td>{{ section.title }}</td><td class="num">{{ flow(section.sign * result.total(activity), activity) }}</td></tr>
         {% endfor %}
-        <tr class="cf-total"><td>Net change in cash</td><td class="num">{{ flow(result.net_change) }}</td></tr>
+        <tr class="cf-total"><td title="Net income, minus invested, minus debt paid down">Change in cash</td><td class="num">{{ flow(result.net_change) }}</td></tr>
       </tbody>
     </table>
+    <p class="cf-note">Change in cash = net income − invested − debt paid down.</p>
   </section>
   <div class="cf-stack">
     <section class="cf-panel">
-      <svelte-component type="charts"><script type="application/json">{{ [extension.chart(result)]|tojson }}</script></svelte-component>
-      <script type="application/json" id="cash-flow-chart-links">{{ extension.chart_links()|tojson }}</script>
+      <h3>{{ extension.interval_label() }}</h3>
+      <svelte-component type="charts"><script type="application/json">{{ extension.charts(result)|tojson }}</script></svelte-component>
     </section>
     <section class="cf-panel">
       <h3>Cash &amp; cash equivalents</h3>
@@ -140,7 +153,7 @@
       <table style="margin-top: 0.75rem">
         <tbody>
           <tr><td>Cash at the start</td><td class="num">{{ extension.balance(result.cash_start_total) }}</td></tr>
-          <tr><td>Net change from activities</td><td class="num">{{ flow(result.net_change) }}</td></tr>
+          <tr><td>Change from net income, investing and debt</td><td class="num">{{ flow(result.net_change) }}</td></tr>
           {% if result.valuation_change|abs >= 0.5 %}
           <tr><td title="Changes in cash's value the activities don't explain, e.g. exchange rates on cash in another currency">Change in value</td><td class="num">{{ flow(result.valuation_change) }}</td></tr>
           {% endif %}
@@ -186,9 +199,14 @@
       <em>invested</em> or <em>withdrawn from investments</em> (investing), and <em>debt paid
       down</em> or <em>borrowed</em> (financing). Only net income is green (a surplus) or red (a
       deficit): investing and financing aren't good or bad by which way they go.</li>
-    <li>In the statement, each line is an account's effect on cash: money in is positive, money
-      out negative, e.g. investing −9,640 is 9,640 invested. Income and expenses are rolled up to
-      their top-level category, e.g. <code>Expenses:Food</code>.</li>
+    <li>The statement and charts read the same way as the cards: income is positive and spending
+      negative, money put into investments positive, and debt payments positive (new borrowing
+      negative). The change in cash is net income, minus invested, minus debt paid down. Income
+      and expenses are rolled up to their top-level category, e.g. <code>Expenses:Food</code>.</li>
+    <li>The diagram shows the same flows: what brought money into cash on the left (income,
+      money taken out of investments, borrowing) and where it went on the right (spending,
+      investing, paying down debt), with what was added to or taken from cash balancing
+      them.</li>
     <li>The <em>emergency fund</em> is cash at the end, in months of average spending over the 12
       months up to it, whatever the period.</li>
     <li>Credit cards are <code>financing</code>, like any liability: spending on a card is in
@@ -197,8 +215,9 @@
     <li>Values are in the first operating currency, rounded to whole units: flows at each
       transaction's date, cash at market value at the start and end. A <em>change in value</em>
       line shows any difference, e.g. from exchange rates.</li>
-    <li>Click a line or cash account for its account page, or part of a bar in the chart for the
-      income statement (operating) or balance sheet.</li>
+    <li>Click a line, cash account or account in the diagram for its account page. Below the
+      chart, switch between net income, invested, debt paid down and the change in cash; click a
+      bar's date for that interval.</li>
   </ul>
 </details>
 </div>

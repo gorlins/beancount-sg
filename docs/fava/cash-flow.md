@@ -25,7 +25,26 @@ Only net income is colored, green for a surplus and red for a deficit, since tha
 or bad. Investing and financing aren't: investing or paying down debt is usually good, though it
 takes money out of cash.
 
+## Where cash came from and went
+
+A Sankey diagram of the same flows. On the left is what brought money into cash: income, money
+taken out of investments, and borrowing. On the right is where it went: spending by category,
+investing, and paying down debt. Cash is in the middle. If cash grew, *added to cash* is on the
+right; if it shrank, *taken from cash* is on the left, so the two sides balance. Each band fades
+from its source's color to its target's. Click an account for its page.
+
 ## The statement
+
+The statement reads the same way as the cards. Each section's lines and total are in its own
+direction:
+
+| Section | Positive | Negative | Total |
+| --- | --- | --- | --- |
+| **Operating** | income | spending | Net income |
+| **Investing** | money put into investments | money taken out | Invested |
+| **Financing** | payments on loans and cards | new borrowing | Debt paid down |
+
+So the change in cash is net income, minus invested, minus debt paid down.
 
 Accounts are classified by their **cash-flow role**, using the same metadata and defaults as
 [Beancount.io's cash-flow report](https://beancount.io/blog/2026/08/28/declare-cash-flow-roles-in-your-ledger),
@@ -39,9 +58,8 @@ on the account's `open` directive:
 - **Cash** (`cash`): the cash and equivalents whose change the statement explains. Moving money
   between cash accounts doesn't show up.
 - **Operating, investing and financing** (`operating`, `investing`, `financing`): every other
-  account's flows over the period are a line in its role's section, as its effect on cash: money
-  in is positive, money out negative, e.g. investing −9,640 is 9,640 invested. Income and
-  expenses are rolled up to their top-level category, e.g. `Expenses:Food`.
+  account's flows over the period are a line in its role's section. Income and expenses are
+  rolled up to their top-level category, e.g. `Expenses:Food`.
 
 Without a declared role (a parent's applies to its subaccounts), assets named with Cash, Checking,
 Savings or Bank are `cash`, other assets `investing`, liabilities and equity `financing`, and
@@ -57,8 +75,8 @@ shows as borrowing, or as repaying it.
 ## Reconciliation
 
 The **Cash & cash equivalents** panel lists each cash account at the start and end of the period,
-and reconciles them: cash at the start, plus the net change from the activities, is cash at the
-end. Flows are valued at each transaction's date and cash at its market value at the start and
+and reconciles them: cash at the start, plus the change from net income, investing and debt, is
+cash at the end. Flows are valued at each transaction's date and cash at its market value at the start and
 end, in the first `operating_currency`. If those differ, e.g. from exchange rates moving on cash
 held in another currency, a **change in value** line shows the difference.
 
@@ -74,7 +92,6 @@ The period is Fava's time filter, or the last 12 months (this month to date and 
 without one. A time filter ends today at the latest, so this year is year-to-date. Fava's account
 and advanced filters apply, as on Fava's own reports.
 
-The chart shows each activity's flows per interval, from the chart's interval menu (e.g. monthly).
-Click a bar's date for that interval, or part of a bar for the income statement (operating) or
-balance sheet (investing and financing). Click a statement line or cash account for its account
-page.
+The charts show each card's amount per interval, from the chart's interval menu (e.g. monthly):
+switch between net income, invested, debt paid down and the change in cash below the chart. Click
+a bar's date for that interval, and a statement line or cash account for its account page.
