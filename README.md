@@ -209,6 +209,16 @@ A "Cash Flow" statement: each account's flows in operating, investing and financ
 reconciled with the change in cash, by `cash-flow-role` metadata or account names.
 [Docs](docs/fava/cash-flow.md)
 
+### `beancount_sg.ext.summary`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.summary"
+```
+
+A "Financial Summary" for someone who doesn't use Beancount, e.g. a spouse taking over: open
+accounts with the last 4 digits of their numbers, equity in property with a loan, the bills marked
+with `bill` metadata, and closed accounts, with a PDF to download. [Docs](docs/fava/summary.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`

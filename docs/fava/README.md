@@ -9,7 +9,7 @@ extension with a `custom` directive in your ledger:
 ```
 
 Each report then appears in Fava's sidebar. Most cover the transactions in Fava's current time,
-account and filter selection; Update Status covers the whole ledger.
+account and filter selection; Update Status and Financial Summary cover the whole ledger.
 
 | Extension | Report | |
 | --- | --- | --- |
@@ -21,3 +21,4 @@ account and filter selection; Update Status covers the whole ledger.
 | [`beancount_sg.ext.payees`](payees.md) | Payee Review | Payees likely miscategorized or duplicated |
 | [`beancount_sg.ext.year_end`](year-in-review.md) | Year in Review | Year-end dashboard of key metrics |
 | [`beancount_sg.ext.cash_flow`](cash-flow.md) | Cash Flow | Cash-flow statement by activity |
+| [`beancount_sg.ext.summary`](summary.md) | Financial Summary | Accounts, equity and bills for a non-technical reader, as a PDF too |

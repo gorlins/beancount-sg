@@ -1,0 +1,181 @@
+<style>
+  .fs { --fs-radius: 8px; max-width: 1100px; }
+  .fs-intro { color: var(--text-color-lightest); margin-top: -0.5rem; }
+  /* More specific than Fava's link color, which would hide the text. */
+  .fs a.fs-download, .fs a.fs-download:visited {
+    display: inline-block;
+    margin: 0.25rem 0 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--fs-radius);
+    background: var(--link-color);
+    color: #fff;
+    font-weight: 600;
+  }
+  .fs-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  @media (max-width: 700px) {
+    .fs-cards { grid-template-columns: minmax(0, 1fr); }
+  }
+  .fs-card {
+    background: var(--background-darker);
+    border: 1px solid var(--border);
+    border-radius: var(--fs-radius);
+    padding: 0.75rem 1rem;
+  }
+  .fs-card-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-color-lightest);
+  }
+  .fs-card-value { font-size: 1.6rem; font-weight: 600; line-height: 1.3; }
+  .fs-note { font-size: 0.85rem; color: var(--text-color-lightest); }
+  .fs-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--fs-radius);
+    padding: 0.75rem 1rem 1rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+  }
+  .fs-panel h3 { margin: 0 0 0.25rem; }
+  .fs-panel table { width: 100%; margin-top: 0.5rem; }
+  .fs details { margin-top: 1rem; }
+</style>
+
+{% set summary = extension.summary() %}
+{% set money = extension.amounts %}
+<div class="fs">
+<h2>Financial Summary</h2>
+<p class="fs-intro">Our accounts, what they're worth and the bills to keep paying, as of
+  {{ summary.date }}, for whoever takes over the household's finances. Values are in
+  {{ summary.currency or "each currency" }}, at market value where there are prices. Account numbers
+  show only their last 4 digits.</p>
+{# data-remote: Fava's router leaves the link to the browser, as for its own downloads. #}
+<a class="fs-download" href="pdf" download data-remote>Download PDF</a>
+
+<div class="fs-cards">
+  <div class="fs-card">
+    <div class="fs-card-label">Everything we own</div>
+    <div class="fs-card-value">{{ money(summary.assets) }}</div>
+    <div class="fs-note">bank accounts, investments and property</div>
+  </div>
+  <div class="fs-card">
+    <div class="fs-card-label">Everything we owe</div>
+    <div class="fs-card-value">{{ money(summary.debts) }}</div>
+    <div class="fs-note">loans and credit cards</div>
+  </div>
+  <div class="fs-card">
+    <div class="fs-card-label">Net worth</div>
+    <div class="fs-card-value">{{ money(summary.net_worth) }}</div>
+    <div class="fs-note">owned minus owed</div>
+  </div>
+</div>
+
+{% for group, column in extension.groups.items() %}
+{% set items = summary.group(group) %}
+{% if items %}
+<section class="fs-panel">
+  <h3>{{ group }}</h3>
+  <table>
+    <thead><tr><th>Account</th><th>Number</th><th>Open since</th><th class="num">{{ column }}</th></tr></thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td><a href="{{ url_for('account', name=item.account) }}">{{ item.label }}</a></td>
+        <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
+        <td>{{ item.opened }}</td>
+        <td class="num">{{ money(item.amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endfor %}
+
+{% if summary.secured_loans %}
+<section class="fs-panel">
+  <h3>Loans secured by property</h3>
+  <p class="fs-note">Equity is what the property is worth, minus what's owed on it.</p>
+  <table>
+    <thead><tr><th>Property</th><th>Loans</th><th class="num">Value</th><th class="num">Owed</th><th class="num">Equity</th></tr></thead>
+    <tbody>
+      {% for item in summary.secured_loans %}
+      <tr>
+        <td>{{ item.label }}</td>
+        <td>{{ item.loan_labels }}</td>
+        <td class="num">{{ money(item.value) }}</td>
+        <td class="num">{{ money(item.owed) }}</td>
+        <td class="num">{{ money(item.equity) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if summary.bills %}
+<section class="fs-panel">
+  <h3>Bills</h3>
+  <p class="fs-note">Regular payments to keep up, and the account each was last paid from.</p>
+  <table>
+    <thead><tr><th>Bill</th><th>Paid from</th><th>Last paid</th><th class="num">Last amount</th><th class="num">Last 12 months</th></tr></thead>
+    <tbody>
+      {% for bill in summary.bills %}
+      <tr>
+        <td><a href="{{ url_for('account', name=bill.account) }}">{{ bill.name }}</a></td>
+        <td>{{ bill.paid_from_labels }}</td>
+        <td>{{ bill.last_paid or "never" }}</td>
+        <td class="num">{{ money(bill.last_amount) }}</td>
+        <td class="num">{{ money(bill.yearly) }} <span class="fs-note">({{ bill.payments }} payment{{ "" if bill.payments == 1 else "s" }})</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if summary.closed_accounts %}
+<section class="fs-panel">
+  <h3>Closed accounts</h3>
+  <p class="fs-note">No longer in use: listed so they're recognized if they turn up.</p>
+  <table>
+    <thead><tr><th>Account</th><th>Number</th><th>Opened</th><th>Closed</th></tr></thead>
+    <tbody>
+      {% for item in summary.closed_accounts %}
+      <tr>
+        <td>{{ item.label }}</td>
+        <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
+        <td>{{ item.opened }}</td>
+        <td>{{ item.closed }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<details>
+  <summary>How to set up (for you, not the reader)</summary>
+  <ul>
+    <li>Give each account its number on its <code>open</code> directive. Only its last 4 digits
+      are shown: <pre>2020-01-01 open Assets:Bank:Checking USD
+  account-number: "123456789"</pre></li>
+    <li>Mark each bill: an expense account, or a loan or card the bill pays, with
+      <code>bill: TRUE</code> to use its name, or a name for the reader. Its payments are the
+      transactions adding to the account: <pre>2020-01-01 open Expenses:Home:Electric USD
+  bill: "Electric (City Power)"</pre></li>
+    <li>A loan opened under the same path as an asset is secured by it, e.g.
+      <code>Liabilities:Home:Mortgage</code> for <code>Assets:Home</code>; the asset's equity is
+      its value minus what's owed.</li>
+    <li>Bank accounts are the accounts with the <code>cash</code> cash-flow role: those named with
+      Cash, Checking, Savings or Bank, or declared <code>cash-flow-role: "cash"</code>.</li>
+    <li>The summary covers the whole ledger as of today, whatever Fava's filters. Download the PDF
+      and keep it somewhere your family can find it, and update it now and then.</li>
+  </ul>
+</details>
+</div>
