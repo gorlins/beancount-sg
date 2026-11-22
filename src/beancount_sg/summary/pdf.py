@@ -14,12 +14,11 @@ from reportlab.platypus import (
     KeepTogether,
     Paragraph,
     SimpleDocTemplate,
-    Spacer,
     Table,
     TableStyle,
 )
 
-from . import GROUPS, Summary
+from . import Property, Summary
 
 STYLES = getSampleStyleSheet()
 BODY, SMALL = STYLES["BodyText"], STYLES["Italic"]
@@ -42,6 +41,10 @@ def _or_dash(text: str | None) -> str:
     return text or "\u2014"
 
 
+class _Markup(str):
+    """Text with ReportLab's paragraph markup, e.g. ``<b>`` or ``<br/>``, already escaped."""
+
+
 def _table(
     header: list[str],
     rows: list[list[object]],
@@ -49,13 +52,17 @@ def _table(
     amounts: int = 1,
     *,
     bold_first: bool = False,
+    bold_rows: tuple[int, ...] = (),
 ) -> Table:
-    """A table, its last ``amounts`` columns right-aligned, and its first in bold if asked."""
+    """A table: its last ``amounts`` columns right-aligned, and its first column, or the
+    ``bold_rows``, in bold if asked."""
     first = len(header) - amounts
     cells = []
-    for row in rows:
-        texts = [escape(str(value)) for value in row]
-        if bold_first:
+    for index, row in enumerate(rows):
+        texts = [value if isinstance(value, _Markup) else escape(str(value)) for value in row]
+        if index in bold_rows:
+            texts = [f"<b>{text}</b>" if text else text for text in texts]
+        elif bold_first:
             texts[0] = f"<b>{texts[0]}</b>"
         cells.append(
             [Paragraph(text, AMOUNT if i >= first else BODY) for i, text in enumerate(texts)]
@@ -64,6 +71,52 @@ def _table(
     style = [*TABLE_STYLE, ("ALIGN", (first, 0), (-1, 0), "RIGHT")] if amounts else TABLE_STYLE
     table.setStyle(TableStyle(style))
     return table
+
+
+def _grouped_table(
+    header: list[str], groups: list[tuple[str, list[list[object]]]], widths: list[float]
+) -> Table:
+    """A table of rows under headings, e.g. accounts by statement line: the institution in
+    bold, the last column right-aligned."""
+    cells: list[list[object]] = [header]
+    style = [*TABLE_STYLE, ("ALIGN", (-1, 0), (-1, 0), "RIGHT")]
+    for title, rows in groups:
+        style += [
+            ("SPAN", (0, len(cells)), (-1, len(cells))),
+            ("BACKGROUND", (0, len(cells)), (-1, len(cells)), colors.HexColor("#dde4ee")),
+        ]
+        cells.append([Paragraph(f"<b>{escape(title)}</b>", BODY)] + [""] * (len(header) - 1))
+        for row in rows:
+            texts = [escape(str(value)) for value in row]
+            texts[0] = f"<b>{texts[0]}</b>"
+            last = len(texts) - 1
+            cells.append(
+                [Paragraph(text, AMOUNT if i == last else BODY) for i, text in enumerate(texts)]
+            )
+    table = Table(cells, colWidths=[WIDTH * share for share in widths], repeatRows=1)
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _loans(item: Property) -> _Markup:
+    """A property's loans: each lender and the last 4 digits of its number, a line each."""
+    return _Markup(
+        "<br/>".join(
+            escape(
+                " ".join(
+                    filter(
+                        None,
+                        [
+                            loan.account.institution or loan.account.label,
+                            _number(loan.account.number),
+                        ],
+                    )
+                )
+            )
+            for loan in item.loans
+        )
+        or "none"
+    )
 
 
 def _section(title: str, note: str | None, table: Table) -> KeepTogether:
@@ -76,64 +129,87 @@ def _section(title: str, note: str | None, table: Table) -> KeepTogether:
 
 def render(summary: Summary) -> bytes:
     """The PDF's bytes."""
-    title, amounts = summary.title, summary.money
+    title, money = summary.title, summary.money
+    statement: list[list[object]] = [["Assets", ""]]
+    bold = [0]
+    for line, _, total in summary.lines(liability=False):
+        statement.append([line.title, money(total)])
+    statement.append(["Total assets", money(summary.assets)])
+    bold.append(len(statement) - 1)
+    statement.append(["Liabilities", ""])
+    bold.append(len(statement) - 1)
+    for line, _, total in summary.lines(liability=True):
+        statement.append([line.title, money(total)])
+    statement.append(["Total liabilities", money(summary.debts)])
+    statement.append(["Net worth (total assets minus total liabilities)", money(summary.net_worth)])
+    bold += [len(statement) - 2, len(statement) - 1]
     story: list = [
-        Paragraph(f"Financial summary: {escape(title)}", STYLES["Title"]),
+        Paragraph(f"Personal financial statement: {escape(title)}", STYLES["Title"]),
         Paragraph(
-            f"As of {summary.date}. Values are in {summary.currency or 'each currency'}, at "
-            "market value where there are prices. Account numbers show only their last 4 "
-            "digits.",
+            f"As of {summary.date}. Laid out like the personal financial statement a bank asks "
+            "for (SBA Form 413). Values are in "
+            f"{summary.currency or 'each currency'}, at market value where there are prices. "
+            "Account numbers show only their last 4 digits.",
             SMALL,
         ),
-        Spacer(1, 12),
-        _table(
-            ["", "Value"],
-            [
-                ["Everything we own (assets)", amounts(summary.assets)],
-                ["Everything we owe (loans and credit cards)", amounts(summary.debts)],
-                ["Net worth (owned minus owed)", amounts(summary.net_worth)],
-            ],
-            [0.6, 0.4],
+        _section(
+            "Statement",
+            None,
+            _table(["", "Amount"], statement, [0.65, 0.35], bold_rows=tuple(bold)),
         ),
     ]
-    for group, column in GROUPS.items():
-        items = summary.group(group)
-        if items:
-            rows = [
+    for liability, title, column in ((False, "Assets", "Value"), (True, "Liabilities", "Owed")):
+        groups = [
+            (
+                line.title,
                 [
-                    _or_dash(i.institution),
-                    i.label,
-                    _or_dash(i.owner),
-                    _number(i.number),
-                    amounts(i.amount),
-                ]
-                for i in items
-            ]
+                    [
+                        _or_dash(i.institution),
+                        i.label,
+                        _or_dash(i.owner),
+                        _number(i.number),
+                        money(i.amount),
+                    ]
+                    for i in items
+                ],
+            )
+            for line, items, _ in summary.lines(liability)
+        ]
+        if groups:
             story.append(
                 _section(
-                    group,
+                    title,
                     None,
-                    _table(
+                    _grouped_table(
                         ["Institution", "Account", "Owner", "Number", column],
-                        rows,
+                        groups,
                         [0.22, 0.24, 0.2, 0.13, 0.21],
-                        bold_first=True,
                     ),
                 )
             )
-    if summary.secured_loans:
+    if summary.properties:
         rows = [
-            [i.label, i.loan_labels, amounts(i.value), amounts(i.owed), amounts(i.equity)]
-            for i in summary.secured_loans
+            [
+                item.asset.label,
+                _or_dash(item.asset.owner),
+                money(item.value),
+                _loans(item),
+                money(item.owed),
+                _Markup(
+                    "<br/>".join(escape(money(loan.payments.last_amount)) for loan in item.loans)
+                ),
+                money(item.equity),
+            ]
+            for item in summary.properties
         ]
         story.append(
             _section(
-                "Loans secured by property",
-                "Equity is what the property is worth, minus what's owed on it.",
+                "Real estate and vehicles",
+                "Each property, the loans against it, and the equity: its value minus what's owed.",
                 _table(
-                    ["Property", "Loans", "Value", "Owed", "Equity"],
+                    ["Property", "Owner", "Value", "Loans", "Owed", "Last payment", "Equity"],
                     rows,
-                    [0.2, 0.2, 0.2, 0.2, 0.2],
+                    [0.12, 0.15, 0.14, 0.17, 0.14, 0.14, 0.14],
                     amounts=3,
                 ),
             )
@@ -142,11 +218,11 @@ def render(summary: Summary) -> bytes:
         rows = [
             [
                 bill.name,
-                bill.paid_from_labels,
-                bill.last_paid or "never",
-                amounts(bill.last_amount),
-                f"{amounts(bill.yearly)} ({bill.payments} payment"
-                f"{'' if bill.payments == 1 else 's'})",
+                bill.payments.paid_from_labels,
+                bill.payments.last_paid or "never",
+                money(bill.payments.last_amount),
+                f"{money(bill.payments.yearly)} ({bill.payments.count} payment"
+                f"{'' if bill.payments.count == 1 else 's'})",
             ]
             for bill in summary.bills
         ]
@@ -190,7 +266,7 @@ def render(summary: Summary) -> bytes:
     SimpleDocTemplate(
         buffer,
         pagesize=LETTER,
-        title=f"Financial summary: {title}",
+        title=f"Personal financial statement: {title}",
         leftMargin=0.75 * inch,
         rightMargin=0.75 * inch,
     ).build(story)

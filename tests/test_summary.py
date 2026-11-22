@@ -3,18 +3,18 @@
 import datetime
 from decimal import Decimal
 
+import pytest
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
 
-from beancount_sg.cash_flow_roles import account_roles
+from beancount_sg.cash_flow_roles import CASH, INVESTING, Role, account_roles
 from beancount_sg.summary import (
-    BANK,
-    DEBTS,
-    INVESTMENTS,
+    LINES,
     accounts,
+    asset_line,
     bills,
     label,
     last4,
-    secured_loans,
+    liability_line,
     summarize,
 )
 from beancount_sg.summary.cli import main
@@ -74,6 +74,12 @@ LEDGER = """
 2024-06-30 close Assets:Bank:Old
 """
 TODAY = datetime.date(2024, 12, 31)
+OPTIONS = 'option "title" "Test"\noption "operating_currency" "USD"\n'
+
+
+def summary_of(ledger=LEDGER, date=TODAY):
+    entries, options = load(OPTIONS + ledger)
+    return summarize(entries, options, date)
 
 
 def test_last4_and_labels():
@@ -83,27 +89,19 @@ def test_last4_and_labels():
     assert label("Assets:Bank:Checking") == "Bank › Checking"
 
 
-def found_accounts():
-    entries, _ = load(LEDGER)
-    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    values = {"Assets:Bank:Checking": {"USD": Decimal(3580)}}
-    return accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, values)
-
-
-def test_open_and_closed_accounts_by_group_and_institution():
-    open_accounts, closed = found_accounts()
+def test_accounts_by_line_with_institutions_and_owners():
+    summary = summary_of()
     # Assets:Bank, only giving its subaccounts an institution and owner, isn't listed.
     assert [
-        (item.account, item.group, item.institution, item.owner, item.number)
-        for item in open_accounts
+        (item.account, item.line.key, item.institution, item.owner, item.number)
+        for item in summary.open_accounts
     ] == [
-        ("Assets:Bank:Checking", BANK, "First Bank", "Joint (Alex and Sam)", "4321"),
-        ("Assets:Home", INVESTMENTS, None, "Joint (Alex and Sam)", None),
-        ("Liabilities:CreditCard", DEBTS, "Card Co", "Sam", "3456"),
-        ("Liabilities:Home:Mortgage", DEBTS, "Hometown Lending", "Alex", None),
+        ("Assets:Bank:Checking", "cash", "First Bank", "Joint (Alex and Sam)", "4321"),
+        ("Assets:Home", "real-estate", None, "Joint (Alex and Sam)", None),
+        ("Liabilities:CreditCard", "credit-cards", "Card Co", "Sam", "3456"),
+        ("Liabilities:Home:Mortgage", "mortgages", "Hometown Lending", "Alex", None),
     ]
-    assert open_accounts[0].amount == {"USD": 3580}
-    [old] = closed
+    [old] = summary.closed_accounts
     assert (old.account, old.institution, old.number, old.closed) == (
         "Assets:Bank:Old",
         "First Bank",
@@ -112,30 +110,116 @@ def test_open_and_closed_accounts_by_group_and_institution():
     )
 
 
-def test_a_loan_amount_is_whats_owed():
-    entries, _ = load(LEDGER)
-    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    [mortgage] = [
-        item
-        for item in accounts(
-            entries,
-            roles,
-            DEFAULT_ACCOUNT_TYPES,
-            {"Liabilities:Home:Mortgage": {"USD": Decimal(-199000)}},
-        )[0]
-        if item.account == "Liabilities:Home:Mortgage"
+def test_the_statement():
+    summary = summary_of()
+    assert [(line.key, total) for line, _, total in summary.lines(liability=False)] == [
+        ("cash", {"USD": 3580}),
+        ("real-estate", {"USD": 300000}),
     ]
-    assert mortgage.amount == {"USD": 199000}
+    # What's owed is positive.
+    assert [(line.key, total) for line, _, total in summary.lines(liability=True)] == [
+        ("credit-cards", {"USD": 100}),
+        ("mortgages", {"USD": 199000}),
+    ]
+    assert (summary.assets, summary.debts, summary.net_worth) == (
+        {"USD": 303580},
+        {"USD": 199100},
+        {"USD": 104480},
+    )
 
 
-def test_secured_loans_match_the_assets_path():
-    open_accounts, _ = found_accounts()
-    totals = {
-        "Assets:Home": {"USD": Decimal(300000)},
-        "Liabilities:Home": {"USD": Decimal(-199000)},
-    }
-    [home] = secured_loans(open_accounts, totals, DEFAULT_ACCOUNT_TYPES)
-    assert (home.asset, home.loans) == ("Assets:Home", ["Liabilities:Home:Mortgage"])
+INVESTMENT, CASH_ROLE = Role(INVESTING), Role(CASH)
+
+
+@pytest.mark.parametrize(
+    ("account", "role", "loans", "key"),
+    [
+        ("Assets:Bank:Checking", CASH_ROLE, [], "cash"),
+        ("Assets:Bank:Savings", CASH_ROLE, [], "savings"),
+        ("Assets:Bank:MoneyMarket", CASH_ROLE, [], "savings"),
+        ("Assets:Vanguard:RothIRA", INVESTMENT, [], "retirement"),
+        ("Assets:Fidelity:401k:Cash", CASH_ROLE, [], "retirement"),  # cash, but retirement
+        ("Assets:Schwab:IRA", INVESTMENT, [], "retirement"),
+        ("Assets:Receivable:Alex", INVESTMENT, [], "receivables"),
+        ("Assets:LifeInsurance:Policy", INVESTMENT, [], "life-insurance"),
+        ("Assets:Car", INVESTMENT, [], "automobiles"),
+        ("Assets:Home", INVESTMENT, [], "real-estate"),
+        ("Assets:Rental:MainSt", INVESTMENT, [], "real-estate"),
+        ("Assets:MainSt", INVESTMENT, ["Liabilities:MainSt:Mortgage"], "real-estate"),
+        ("Assets:Truck2", INVESTMENT, [], "automobiles"),
+        ("Assets:Brokerage", INVESTMENT, [], "stocks-bonds"),
+        ("Assets:Brokerage", INVESTMENT, ["Liabilities:Brokerage:Margin"], "stocks-bonds"),
+    ],
+)
+def test_asset_lines_inferred(account, role, loans, key):
+    assert asset_line(account, role, {}, loans)[0].key == key
+
+
+@pytest.mark.parametrize(
+    ("account", "secures", "key"),
+    [
+        ("Liabilities:Home:Mortgage", None, "mortgages"),
+        ("Liabilities:HELOC", None, "mortgages"),
+        ("Liabilities:CreditCard:Visa", None, "credit-cards"),
+        ("Liabilities:Amex", None, "credit-cards"),
+        ("Liabilities:PropertyTax", None, "unpaid-taxes"),
+        ("Liabilities:CarLoan", None, "auto-loans"),
+        ("Liabilities:StudentLoan", None, "installment-loans"),
+        ("Liabilities:MainSt:Lender", LINES["real-estate"], "mortgages"),
+        ("Liabilities:Boat2:Lender", LINES["automobiles"], "auto-loans"),
+        ("Liabilities:BankLoan", None, "notes-payable"),
+        ("Liabilities:Owed:Friend", None, "other-liabilities"),
+    ],
+)
+def test_liability_lines_inferred(account, secures, key):
+    assert liability_line(account, {}, secures)[0].key == key
+
+
+def test_declared_types_on_an_account_a_parent_or_a_commodity():
+    ledger = (
+        LEDGER
+        + """
+2020-01-01 open Assets:Valuables
+  asset-type: "personal-property"
+2020-01-01 open Assets:Valuables:Art USD
+2020-01-01 commodity MAINST
+  asset-type: "real-estate"
+2020-01-01 open Assets:Holdings MAINST
+2020-01-01 open Liabilities:Family USD
+  liability-type: "notes-payable"
+2020-01-01 open Assets:Bank:Wrong USD
+  asset-type: "mortgages"
+2024-01-02 * "Opening"
+  Assets:Valuables:Art  5000 USD
+  Assets:Holdings  1 MAINST {200000 USD}
+  Liabilities:Family  -1000 USD
+  Assets:Bank:Wrong  1 USD
+  Equity:Opening
+"""
+    )
+    found = {item.account: item for item in summary_of(ledger).open_accounts}
+    assert (found["Assets:Valuables:Art"].line.key, found["Assets:Valuables:Art"].reason) == (
+        "personal-property",
+        "asset-type: personal-property on Assets:Valuables",
+    )
+    assert (found["Assets:Holdings"].line.key, found["Assets:Holdings"].reason) == (
+        "real-estate",
+        "asset-type: real-estate on commodity MAINST",
+    )
+    assert found["Liabilities:Family"].line.key == "notes-payable"
+    # A liability type on an asset is ignored.
+    assert found["Assets:Bank:Wrong"].line.key == "cash"
+
+
+def test_real_estate_and_vehicles():
+    [home] = summary_of().properties
+    assert home.asset.account == "Assets:Home"
+    [mortgage] = home.loans
+    assert (mortgage.account.account, mortgage.account.institution) == (
+        "Liabilities:Home:Mortgage",
+        "Hometown Lending",
+    )
+    assert mortgage.payments.last_amount == {"USD": 1000}
     assert (home.value, home.owed, home.equity) == (
         {"USD": 300000},
         {"USD": 199000},
@@ -143,9 +227,19 @@ def test_secured_loans_match_the_assets_path():
     )
 
 
+def test_a_property_without_a_loan():
+    ledger = (
+        LEDGER
+        + "2020-01-01 open Assets:Car USD\n"
+        + '2024-01-02 * "Car"\n  Assets:Car  9000 USD\n  Equity:Opening\n'
+    )
+    [car] = [item for item in summary_of(ledger).properties if item.asset.account == "Assets:Car"]
+    assert (car.loans, car.equity) == ([], {"USD": 9000})
+
+
 def test_bills():
     entries, _ = load(LEDGER)
-    found = {bill.name: bill for bill in bills(entries, DEFAULT_ACCOUNT_TYPES, TODAY)}
+    found = {bill.name: bill.payments for bill in bills(entries, DEFAULT_ACCOUNT_TYPES, TODAY)}
     assert sorted(found) == ["CreditCard", "Electric", "Mortgage"]  # TRUE: the account's label
     electric = found["Electric"]
     assert (electric.last_paid, electric.last_amount, electric.paid_from) == (
@@ -153,33 +247,27 @@ def test_bills():
         {"USD": 100},
         ["Liabilities:CreditCard"],
     )
-    assert (electric.payments, electric.yearly) == (2, {"USD": 220})
+    assert (electric.count, electric.yearly) == (2, {"USD": 220})
     # Paying the card: the payment adds to it; charges don't.
     card = found["CreditCard"]
-    assert (card.payments, card.last_amount, card.paid_from) == (
+    assert (card.count, card.last_amount, card.paid_from) == (
         1,
         {"USD": 420},
         ["Assets:Bank:Checking"],
     )
-    assert found["Mortgage"].last_amount == {"USD": 1000}
 
 
 def test_bills_count_only_the_last_12_months():
     entries, _ = load(LEDGER)
     later = datetime.date(2025, 2, 15)
-    found = {bill.name: bill for bill in bills(entries, DEFAULT_ACCOUNT_TYPES, later)}
+    found = {bill.name: bill.payments for bill in bills(entries, DEFAULT_ACCOUNT_TYPES, later)}
     # The February 8th payment is more than a year before.
-    assert (found["Electric"].payments, found["Electric"].yearly) == (1, {"USD": 100})
-    assert found["Electric"].last_paid == datetime.date(2024, 3, 8)
+    assert (found["Electric"].count, found["Electric"].yearly) == (1, {"USD": 100})
 
 
-OPTIONS = 'option "title" "Test"\noption "operating_currency" "USD"\n'
-
-
-def test_summarize_values_holdings_at_market_value():
+def test_values_at_market_value():
     ledger = (
-        OPTIONS
-        + LEDGER
+        LEDGER
         + """
 2020-01-01 open Assets:Brokerage
 2024-04-01 * "Buy"
@@ -191,32 +279,44 @@ def test_summarize_values_holdings_at_market_value():
   Equity:Opening
 """
     )
-    entries, options = load(ledger)
-    summary = summarize(entries, options, TODAY)
+    summary = summary_of(ledger)
     found = {item.account: item for item in summary.open_accounts}
     assert found["Assets:Brokerage"].value == {"USD": 1500, "EUR": 20}
-    assert found["Assets:Bank:Checking"].value == {"USD": 2580}
-    # 2580 + 300000 + 1500 in USD; 199000 on the mortgage and 100 on the card.
-    assert summary.assets == {"USD": 304080, "EUR": 20}
-    assert summary.debts == {"USD": 199100}
     assert summary.net_worth == {"USD": 104980, "EUR": 20}
     assert summary.money(summary.net_worth) == "20.00 EUR, 104,980.00 USD"
-    assert [loan.asset for loan in summary.secured_loans] == ["Assets:Home"]
-    assert summary.title == "Test"
 
 
 def test_summarize_as_of_a_date():
-    entries, options = load(OPTIONS + LEDGER)
-    summary = summarize(entries, options, datetime.date(2024, 2, 10))
+    summary = summary_of(date=datetime.date(2024, 2, 10))
     found = {item.account: item for item in summary.open_accounts}
     # Not the card payment on the 25th, or the old account's closing in June.
     assert found["Liabilities:CreditCard"].amount == {"USD": 120}
     assert not summary.closed_accounts
 
 
+def test_accounts_are_by_institution_within_a_line():
+    ledger = LEDGER + (
+        '2020-01-01 open Assets:Bank:Zebra USD\n  institution: "A Credit Union"\n'
+        '2024-01-05 * "Deposit"\n  Assets:Bank:Zebra  10 USD\n  Equity:Opening\n'
+    )
+    cash = [item.account for item in summary_of(ledger).open_accounts if item.line.key == "cash"]
+    assert cash == ["Assets:Bank:Zebra", "Assets:Bank:Checking"]  # A Credit Union, First Bank
+
+
+def test_a_parent_with_its_own_balance_is_listed():
+    entries, _ = load(LEDGER)
+    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
+    values = {"Assets:Bank": {"USD": Decimal(5)}}
+    open_accounts, _ = accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, values)
+    assert "Assets:Bank" in [item.account for item in open_accounts]
+
+
+def test_missing_details():
+    assert [item.account for item in summary_of().missing_details] == ["Assets:Home"]
+
+
 def test_render_is_a_pdf():
-    entries, options = load(OPTIONS + LEDGER)
-    assert render(summarize(entries, options, TODAY)).startswith(b"%PDF")
+    assert render(summary_of()).startswith(b"%PDF")
 
 
 def test_the_command_writes_the_pdf(tmp_path, capsys):
@@ -234,31 +334,3 @@ def test_the_command_names_the_pdf_by_date(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main([str(ledger), "--date", "2024-12-31"])
     assert (tmp_path / "financial-summary-2024-12-31.pdf").exists()
-
-
-def test_accounts_are_by_institution_within_a_group():
-    ledger = LEDGER + (
-        '2020-01-01 open Assets:Bank:Zebra USD\n  institution: "A Credit Union"\n'
-        '2024-01-05 * "Deposit"\n  Assets:Bank:Zebra  10 USD\n  Equity:Opening\n'
-    )
-    entries, _ = load(ledger)
-    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    open_accounts, _ = accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, {})
-    assert [item.account for item in open_accounts if item.group == BANK] == [
-        "Assets:Bank:Zebra",  # A Credit Union
-        "Assets:Bank:Checking",  # First Bank
-    ]
-
-
-def test_a_parent_with_its_own_balance_is_listed():
-    entries, _ = load(LEDGER)
-    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    values = {"Assets:Bank": {"USD": Decimal(5)}}
-    open_accounts, _ = accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, values)
-    assert "Assets:Bank" in [item.account for item in open_accounts]
-
-
-def test_missing_details():
-    entries, options = load(OPTIONS + LEDGER)
-    summary = summarize(entries, options, TODAY)
-    assert [item.account for item in summary.missing_details] == ["Assets:Home"]  # no institution

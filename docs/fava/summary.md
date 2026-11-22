@@ -29,20 +29,73 @@ reported, but don't stop the summary.
 
 ## What it shows
 
-- **Totals:** everything owned (assets), everything owed (loans and credit cards), and net worth.
-- **Open accounts:** each open asset and liability account, with the **institution** that holds it
-  and its **owner** (or owners, if held jointly), the last 4 digits of its number, and what it's
-  worth (or, for a loan or card, what's owed), in three groups, each by institution: bank accounts
-  and cash, investments and property, and loans and credit cards. Bank accounts are those with the
-  `cash` [cash-flow role](cash-flow.md#the-statement): named with Cash, Checking, Savings or Bank,
-  or declared `cash`.
-- **Loans secured by property:** an asset with a loan opened under the matching account path,
-  e.g. `Assets:Home` and `Liabilities:Home:Mortgage`, with its value, what's owed, and the equity:
-  the value minus what's owed.
+It's laid out like the personal financial statement a bank asks for, e.g. with a loan application:
+the US Small Business Administration's Form 413 (Personal Financial Statement), whose asset and
+liability lines Fannie Mae's mortgage application (Form 1003) mostly shares.
+
+- **Statement:** each asset and liability line's total, and net worth. Only lines with accounts are
+  shown.
+- **Assets** and **Liabilities:** each line's open accounts, sorted by **institution**, with each
+  account's **owner** (or owners, if held jointly), the last 4 digits of its number, and its value
+  (for a loan or card, what's owed).
+- **Real estate and vehicles:** like the form's "real estate owned" schedule. Each property is
+  listed with its value, owner and equity (value minus what's owed). Its loans are the liabilities
+  opened under its matching account path, e.g. `Liabilities:Home:Mortgage` for `Assets:Home`, each
+  with its lender, number and last payment.
 - **Bills:** the accounts you mark, with when each was last paid and how much, the account that
   paid it, and what it came to over the last 12 months.
 - **Closed accounts:** with their institutions, owners, the last 4 digits of their numbers, and
   when they were opened and closed, so they're recognized if a statement or letter turns up.
+
+| Assets | Liabilities |
+| --- | --- |
+| Cash on hand and in banks (`cash`) | Credit cards and accounts payable (`credit-cards`) |
+| Savings accounts (`savings`) | Notes payable to banks and others (`notes-payable`) |
+| IRA or other retirement accounts (`retirement`) | Installment loans, auto (`auto-loans`) |
+| Accounts and notes receivable (`receivables`) | Installment loans, other (`installment-loans`) |
+| Life insurance, cash surrender value (`life-insurance`) | Loans against life insurance (`life-insurance-loans`) |
+| Stocks and bonds (`stocks-bonds`) | Mortgages on real estate (`mortgages`) |
+| Real estate (`real-estate`) | Unpaid taxes (`unpaid-taxes`) |
+| Automobiles (`automobiles`) | Other liabilities (`other-liabilities`) |
+| Other personal property (`personal-property`) | |
+| Other assets (`other-assets`) | |
+
+### Which line an account is on
+
+Without a declaration, each account's line is inferred from what the ledger already says:
+
+- **Assets**, in order:
+  1. A retirement account by name (401k, 403b, 457, IRA, Roth, Pension, TSP or Retirement), even
+     its cash.
+  2. The `cash` [cash-flow role](cash-flow.md#the-statement): named with Cash, Checking, Savings or
+     Bank, or declared `cash`. Savings if named Savings, Money Market or CD; otherwise cash.
+  3. By name: receivables, life insurance, a vehicle (Car, Auto, Vehicle, Truck, Motorcycle, Boat,
+     RV), or real estate (Home, House, Condo, Property, Land, Rental, Cabin).
+  4. Real estate or a vehicle if a mortgage or vehicle loan is opened under its path. A margin loan
+     under `Assets:Brokerage` doesn't make it property.
+  5. Otherwise, stocks and bonds.
+- **Liabilities**, in order:
+  1. By name: a mortgage or HELOC, a card (or Amex, Visa, Mastercard, Discover), taxes, a life
+     insurance loan, a vehicle loan, or a student, personal or installment loan.
+  2. The property it's opened under: real estate's loans are mortgages, a vehicle's auto loans.
+  3. A loan or note, by name: notes payable. Otherwise, other liabilities.
+
+To place an account yourself, declare its line with `asset-type` or `liability-type`, on its `open`
+directive or a parent's. An asset's type can also go on the `commodity` directive of what it holds,
+e.g. a property tracked as its own commodity:
+
+```beancount
+2020-01-01 open Assets:Valuables USD
+  asset-type: "personal-property"
+
+2020-01-01 commodity HOUSE-MAIN-ST
+  asset-type: "real-estate"
+
+2020-01-01 open Liabilities:Family:Loan USD
+  liability-type: "notes-payable"
+```
+
+The Fava page's "How accounts are placed on the statement" lists each account's line and why.
 
 ## Setting it up
 

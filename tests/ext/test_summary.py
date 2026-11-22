@@ -47,27 +47,35 @@ def page(tmp_path, ledger=LEDGER):
     return response.get_data(as_text=True)
 
 
-def test_totals(tmp_path):
-    found = text(page(tmp_path))
-    # 3,580 in checking and the 300,000 home; 199,000 on the mortgage and 100 on the card.
-    assert "Everything we own 303,580.00 USD" in found
-    assert "Everything we owe 199,100.00 USD" in found
-    assert "Net worth 104,480.00 USD" in found
-
-
-def test_accounts_by_group(tmp_path):
+def test_the_statement(tmp_path):
     found = text(page(tmp_path))
     assert (
-        "Bank accounts and cash Institution Account Owner Number Balance "
-        "First Bank Bank › Checking Joint (Alex and Sam) •••• 4321 3,580.00 USD"
+        "Statement Assets Cash on hand and in banks 3,580.00 USD Real estate 300,000.00 USD "
+        "Total assets 303,580.00 USD Liabilities Credit cards and accounts payable 100.00 USD "
+        "Mortgages on real estate 199,000.00 USD Total liabilities 199,100.00 USD "
+        "Net worth (total assets minus total liabilities) 104,480.00 USD"
+    ) in found
+
+
+def test_accounts_by_line(tmp_path):
+    found = text(page(tmp_path))
+    assert (
+        "Assets Institution Account Owner Number Value Cash on hand and in banks "
+        "First Bank Bank › Checking Joint (Alex and Sam) •••• 4321 3,580.00 USD "
+        "Real estate — Home Joint (Alex and Sam) 300,000.00 USD"  # no institution
     ) in found
     assert (
-        "Loans and credit cards Institution Account Owner Number Owed "
-        "Card Co CreditCard Sam •••• 3456 100.00 USD "
+        "Liabilities Institution Account Owner Number Owed Credit cards and accounts payable "
+        "Card Co CreditCard Sam •••• 3456 100.00 USD Mortgages on real estate "
         "Hometown Lending Home › Mortgage Alex 199,000.00 USD"
     ) in found
-    assert "Value — Home Joint (Alex and Sam) 300,000.00 USD" in found  # no institution
     assert "First Bank Bank › Old Joint (Alex and Sam) •••• 8802 2020-01-01 2024-06-30" in found
+
+
+def test_how_accounts_are_placed(tmp_path):
+    found = text(page(tmp_path))
+    assert "Assets:Home Real estate ( real-estate ) by its name" in found
+    assert "Assets:Bank:Checking Cash on hand and in banks ( cash ) cash" in found
 
 
 def test_accounts_missing_details_are_flagged(tmp_path):
@@ -76,9 +84,12 @@ def test_accounts_missing_details_are_flagged(tmp_path):
     assert "Home ." in found
 
 
-def test_secured_loans_and_bills(tmp_path):
+def test_real_estate_and_bills(tmp_path):
     found = text(page(tmp_path))
-    assert "Home Home › Mortgage 300,000.00 USD 199,000.00 USD 101,000.00 USD" in found
+    assert (
+        "Home Joint (Alex and Sam) 300,000.00 USD Hometown Lending 199,000.00 USD "
+        "1,000.00 USD 101,000.00 USD"
+    ) in found
     assert "Electric CreditCard 2024-03-08 100.00 USD 220.00 USD (2 payments)" in found
     assert "CreditCard Bank › Checking 2024-02-25 420.00 USD 420.00 USD (1 payment)" in found
 
@@ -105,7 +116,7 @@ option "operating_currency" "USD"
 2020-01-01 open Assets:Bank:Checking USD
 """
     found = text(page(tmp_path, ledger))
-    assert "Bank accounts and cash" in found
-    for absent in ("Loans secured by property", "Bills ", "Closed accounts"):
+    assert "Cash on hand and in banks" in found
+    for absent in ("Real estate and vehicles", "Bills Regular", "Closed accounts"):
         assert absent not in found
     assert get(tmp_path, "pdf", ledger).status_code == 200

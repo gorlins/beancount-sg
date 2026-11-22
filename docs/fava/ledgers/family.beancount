@@ -29,7 +29,6 @@ option "operating_currency" "USD"
   owner: "Sam (beneficiary: Alex)"
   account-number: "401-88-2210"
 2020-06-30 open Assets:Home USD
-  investable: FALSE
   institution: "Deed at Example County Registry"
   owner: "Joint (Alex and Sam)"
 2020-06-30 open Liabilities:Home:Mortgage USD
@@ -37,8 +36,11 @@ option "operating_currency" "USD"
   owner: "Joint (Alex and Sam)"
   account-number: "7700012345"
   bill: "Mortgage (Hometown Bank)"
+2015-01-01 open Assets:Collectibles USD
+  asset-type: "personal-property"
+  institution: "Appraised by Example Auction House"
+  owner: "Sam"
 2023-04-10 open Assets:Car USD
-  investable: FALSE
   institution: "Title with the state DMV"
   owner: "Alex"
 2023-04-10 open Liabilities:Car:Loan USD
@@ -79,6 +81,7 @@ option "operating_currency" "USD"
   Assets:Home  450000.00 USD
   Liabilities:Home:Mortgage  -268000.00 USD
   Assets:Car  24000.00 USD
+  Assets:Collectibles  18500.00 USD
   Liabilities:Car:Loan  -15400.00 USD
   Equity:Opening-Balances
 

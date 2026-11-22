@@ -44,6 +44,17 @@
   .fs-panel h3 { margin: 0 0 0.25rem; }
   .fs-panel table { width: 100%; margin-top: 0.5rem; }
   .fs details { margin-top: 1rem; }
+  .fs-statement { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  @media (max-width: 800px) {
+    .fs-statement { grid-template-columns: minmax(0, 1fr); }
+  }
+  .fs-statement table { width: 100%; }
+  .fs-total td { font-weight: 600; border-top: 2px solid var(--border-darker); }
+  .fs-line td {
+    font-weight: 600;
+    background: var(--background-darker);
+    padding-top: 0.5rem;
+  }
   .fs-missing {
     border-left: 4px solid var(--warning, #e0a800);
     padding: 0.25rem 0.75rem;
@@ -53,12 +64,14 @@
 
 {% set summary = extension.summary() %}
 {% set money = summary.money %}
+{% macro number(item) %}{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}{% endmacro %}
 <div class="fs">
 <h2>Financial Summary</h2>
 <p class="fs-intro">Our accounts, what they're worth and the bills to keep paying, as of
-  {{ summary.date }}, for whoever takes over the household's finances. Values are in
-  {{ summary.currency or "each currency" }}, at market value where there are prices. Account numbers
-  show only their last 4 digits.</p>
+  {{ summary.date }}, for whoever takes over the household's finances. It's laid out like the
+  personal financial statement a bank asks for, e.g. with a loan application (SBA Form 413). Values
+  are in {{ summary.currency or "each currency" }}, at market value where there are prices. Account
+  numbers show only their last 4 digits.</p>
 {# data-remote: Fava's router leaves the link to the browser, as for its own downloads. #}
 <a class="fs-download" href="pdf" download data-remote>Download PDF</a>
 {% set missing = summary.missing_details %}
@@ -69,40 +82,45 @@
   See "How to set up" below.</p>
 {% endif %}
 
-<div class="fs-cards">
-  <div class="fs-card">
-    <div class="fs-card-label">Everything we own</div>
-    <div class="fs-card-value">{{ money(summary.assets) }}</div>
-    <div class="fs-note">bank accounts, investments and property</div>
-  </div>
-  <div class="fs-card">
-    <div class="fs-card-label">Everything we owe</div>
-    <div class="fs-card-value">{{ money(summary.debts) }}</div>
-    <div class="fs-note">loans and credit cards</div>
-  </div>
-  <div class="fs-card">
-    <div class="fs-card-label">Net worth</div>
-    <div class="fs-card-value">{{ money(summary.net_worth) }}</div>
-    <div class="fs-note">owned minus owed</div>
-  </div>
-</div>
-
-{% for group, column in extension.groups.items() %}
-{% set items = summary.group(group) %}
-{% if items %}
 <section class="fs-panel">
-  <h3>{{ group }}</h3>
+  <h3>Statement</h3>
+  <div class="fs-statement">
+    {% for liability, title, total in ((false, "Assets", summary.assets), (true, "Liabilities", summary.debts)) %}
+    <table>
+      <thead><tr><th>{{ title }}</th><th class="num"></th></tr></thead>
+      <tbody>
+        {% for line, _, line_total in summary.lines(liability) %}
+        <tr><td>{{ line.title }}</td><td class="num">{{ money(line_total) }}</td></tr>
+        {% endfor %}
+        <tr class="fs-total"><td>Total {{ title|lower }}</td><td class="num">{{ money(total) }}</td></tr>
+        {% if liability %}
+        <tr class="fs-total"><td>Net worth (total assets minus total liabilities)</td><td class="num">{{ money(summary.net_worth) }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    {% endfor %}
+  </div>
+</section>
+
+{% for liability, title, column in ((false, "Assets", "Value"), (true, "Liabilities", "Owed")) %}
+{% set lines = summary.lines(liability) %}
+{% if lines %}
+<section class="fs-panel">
+  <h3>{{ title }}</h3>
   <table>
     <thead><tr><th>Institution</th><th>Account</th><th>Owner</th><th>Number</th><th class="num">{{ column }}</th></tr></thead>
     <tbody>
+      {% for line, items, _ in lines %}
+      <tr class="fs-line"><td colspan="5">{{ line.title }}</td></tr>
       {% for item in items %}
       <tr>
         <td><strong>{{ item.institution or "—" }}</strong></td>
         <td><a href="{{ url_for('account', name=item.account) }}">{{ item.label }}</a></td>
         <td>{{ item.owner or "—" }}</td>
-        <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
+        <td>{{ number(item) }}</td>
         <td class="num">{{ money(item.amount) }}</td>
       </tr>
+      {% endfor %}
       {% endfor %}
     </tbody>
   </table>
@@ -110,19 +128,21 @@
 {% endif %}
 {% endfor %}
 
-{% if summary.secured_loans %}
+{% if summary.properties %}
 <section class="fs-panel">
-  <h3>Loans secured by property</h3>
-  <p class="fs-note">Equity is what the property is worth, minus what's owed on it.</p>
+  <h3>Real estate and vehicles</h3>
+  <p class="fs-note">Each property, the loans against it, and the equity: its value minus what's owed.</p>
   <table>
-    <thead><tr><th>Property</th><th>Loans</th><th class="num">Value</th><th class="num">Owed</th><th class="num">Equity</th></tr></thead>
+    <thead><tr><th>Property</th><th>Owner</th><th class="num">Value</th><th>Loans</th><th class="num">Owed</th><th class="num">Last payment</th><th class="num">Equity</th></tr></thead>
     <tbody>
-      {% for item in summary.secured_loans %}
+      {% for item in summary.properties %}
       <tr>
-        <td>{{ item.label }}</td>
-        <td>{{ item.loan_labels }}</td>
+        <td>{{ item.asset.label }}</td>
+        <td>{{ item.asset.owner or "—" }}</td>
         <td class="num">{{ money(item.value) }}</td>
+        <td>{% for loan in item.loans %}{{ loan.account.institution or loan.account.label }} {{ number(loan.account) }}{% if not loop.last %}<br>{% endif %}{% else %}none{% endfor %}</td>
         <td class="num">{{ money(item.owed) }}</td>
+        <td class="num">{% for loan in item.loans %}{{ money(loan.payments.last_amount) }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
         <td class="num">{{ money(item.equity) }}</td>
       </tr>
       {% endfor %}
@@ -139,12 +159,13 @@
     <thead><tr><th>Bill</th><th>Paid from</th><th>Last paid</th><th class="num">Last amount</th><th class="num">Last 12 months</th></tr></thead>
     <tbody>
       {% for bill in summary.bills %}
+      {% set paid = bill.payments %}
       <tr>
-        <td><a href="{{ url_for('account', name=bill.account) }}">{{ bill.name }}</a></td>
-        <td>{{ bill.paid_from_labels }}</td>
-        <td>{{ bill.last_paid or "never" }}</td>
-        <td class="num">{{ money(bill.last_amount) }}</td>
-        <td class="num">{{ money(bill.yearly) }} <span class="fs-note">({{ bill.payments }} payment{{ "" if bill.payments == 1 else "s" }})</span></td>
+        <td><a href="{{ url_for('account', name=paid.account) }}">{{ bill.name }}</a></td>
+        <td>{{ paid.paid_from_labels }}</td>
+        <td>{{ paid.last_paid or "never" }}</td>
+        <td class="num">{{ money(paid.last_amount) }}</td>
+        <td class="num">{{ money(paid.yearly) }} <span class="fs-note">({{ paid.count }} payment{{ "" if paid.count == 1 else "s" }})</span></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -164,7 +185,7 @@
         <td>{{ item.institution or "—" }}</td>
         <td>{{ item.label }}</td>
         <td>{{ item.owner or "—" }}</td>
-        <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
+        <td>{{ number(item) }}</td>
         <td>{{ item.opened }}</td>
         <td>{{ item.closed }}</td>
       </tr>
@@ -173,6 +194,22 @@
   </table>
 </section>
 {% endif %}
+
+<details>
+  <summary>How accounts are placed on the statement (for you, not the reader)</summary>
+  <p>Each open account's line, and why: declared with <code>asset-type</code> or
+    <code>liability-type</code> (on the account, a parent, or for an asset the commodity it
+    holds), or inferred from its cash-flow role, name, or the loans opened under its path. Declare
+    one to change it, e.g. <code>asset-type: "real-estate"</code>.</p>
+  <table>
+    <thead><tr><th>Account</th><th>Line</th><th>Because</th></tr></thead>
+    <tbody>
+      {% for item in summary.open_accounts %}
+      <tr><td>{{ item.account }}</td><td>{{ item.line.title }} (<code>{{ item.line.key }}</code>)</td><td>{{ item.reason }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
 
 <details>
   <summary>How to set up (for you, not the reader)</summary>
@@ -185,15 +222,23 @@
 
 2020-01-01 open Assets:Chase:Checking USD
   account-number: "123456789"</pre></li>
+    <li>Each account is on a line of the statement, inferred from its cash-flow role, its name,
+      and loans opened under the same path (e.g. <code>Liabilities:Home:Mortgage</code> under
+      <code>Assets:Home</code> makes the home real estate). Declare <code>asset-type</code> on an
+      asset account, a parent, or the commodity it holds, or <code>liability-type</code> on a
+      liability, to place one: <pre>2020-01-01 open Assets:Jewelry USD
+  asset-type: "personal-property"
+
+2020-01-01 commodity HOUSE-MAIN-ST
+  asset-type: "real-estate"</pre>
+      The asset types are
+      {% for line in extension.lines if not line.liability %}<code>{{ line.key }}</code>{% if not loop.last %}, {% endif %}{% endfor %};
+      the liability types
+      {% for line in extension.lines if line.liability %}<code>{{ line.key }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.</li>
     <li>Mark each bill: an expense account, or a loan or card the bill pays, with
       <code>bill: TRUE</code> to use its name, or a name for the reader. Its payments are the
       transactions adding to the account: <pre>2020-01-01 open Expenses:Home:Electric USD
   bill: "Electric (City Power)"</pre></li>
-    <li>A loan opened under the same path as an asset is secured by it, e.g.
-      <code>Liabilities:Home:Mortgage</code> for <code>Assets:Home</code>; the asset's equity is
-      its value minus what's owed.</li>
-    <li>Bank accounts are the accounts with the <code>cash</code> cash-flow role: those named with
-      Cash, Checking, Savings or Bank, or declared <code>cash-flow-role: "cash"</code>.</li>
     <li>The summary covers the whole ledger as of today, whatever Fava's filters. Download the PDF
       and keep it somewhere your family can find it, and update it now and then.</li>
   </ul>
