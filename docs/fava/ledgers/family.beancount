@@ -8,7 +8,12 @@ option "operating_currency" "USD"
 
 2015-01-01 open Equity:Opening-Balances
 2015-01-01 open Income:Salary USD
+2015-01-01 open Assets:Bank
+  institution: "First Example Bank"
+  owner: "Joint (Alex and Sam)"
 2015-01-01 open Assets:Bank:OldSavings USD
+  institution: "Old Town Savings"
+  owner: "Alex"
   account-number: "4400-1188-02"
 2018-05-01 open Assets:Bank:Checking USD
   account-number: "000123454321"
@@ -16,23 +21,39 @@ option "operating_currency" "USD"
   account-number: "000123459876"
 2019-03-15 open Assets:Brokerage
   cash-flow-role: "investing"
+  institution: "Example Brokerage"
+  owner: "Joint (Alex and Sam)"
   account-number: "Z12-345678"
 2016-09-01 open Assets:Retirement:401k
+  institution: "Acme Corp 401(k), via Example Retirement"
+  owner: "Sam (beneficiary: Alex)"
   account-number: "401-88-2210"
 2020-06-30 open Assets:Home USD
   investable: FALSE
+  institution: "Deed at Example County Registry"
+  owner: "Joint (Alex and Sam)"
 2020-06-30 open Liabilities:Home:Mortgage USD
+  institution: "Hometown Bank"
+  owner: "Joint (Alex and Sam)"
   account-number: "7700012345"
   bill: "Mortgage (Hometown Bank)"
 2023-04-10 open Assets:Car USD
   investable: FALSE
+  institution: "Title with the state DMV"
+  owner: "Alex"
 2023-04-10 open Liabilities:Car:Loan USD
+  institution: "Auto Finance"
+  owner: "Alex"
   account-number: "AL-5566781"
   bill: "Car loan"
 2017-02-01 open Liabilities:CreditCard:Visa USD
+  institution: "Example Card Services"
+  owner: "Sam (Alex is an authorized user)"
   account-number: "4111 1111 1111 3456"
   bill: "Visa card"
 2016-11-01 open Liabilities:CreditCard:Store USD
+  institution: "Department Store Card"
+  owner: "Alex"
   account-number: "6011 0000 0000 7788"
 2015-01-01 open Expenses:Home:Electric USD
   bill: "Electric (City Power)"

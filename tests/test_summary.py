@@ -22,12 +22,20 @@ from beancount_sg.summary.pdf import render
 from beancount_sg.testing import load
 
 LEDGER = """
+2020-01-01 open Assets:Bank
+  institution: "First Bank"
+  owner: "Joint (Alex and Sam)"
 2020-01-01 open Assets:Bank:Checking USD
   account-number: "000123454321"
 2020-01-01 open Assets:Home USD
+  owner: "Joint (Alex and Sam)"
 2020-01-01 open Liabilities:Home:Mortgage USD
+  institution: "Hometown Lending"
+  owner: "Alex"
   bill: "Mortgage"
 2020-01-01 open Liabilities:CreditCard USD
+  institution: "Card Co"
+  owner: "Sam"
   account-number: 4111111111113456
   bill: TRUE
 2020-01-01 open Assets:Bank:Old USD
@@ -82,18 +90,23 @@ def found_accounts():
     return accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, values)
 
 
-def test_open_and_closed_accounts_by_group():
+def test_open_and_closed_accounts_by_group_and_institution():
     open_accounts, closed = found_accounts()
-    assert [(item.account, item.group, item.number) for item in open_accounts] == [
-        ("Assets:Bank:Checking", BANK, "4321"),
-        ("Assets:Home", INVESTMENTS, None),
-        ("Liabilities:CreditCard", DEBTS, "3456"),
-        ("Liabilities:Home:Mortgage", DEBTS, None),
+    # Assets:Bank, only giving its subaccounts an institution and owner, isn't listed.
+    assert [
+        (item.account, item.group, item.institution, item.owner, item.number)
+        for item in open_accounts
+    ] == [
+        ("Assets:Bank:Checking", BANK, "First Bank", "Joint (Alex and Sam)", "4321"),
+        ("Assets:Home", INVESTMENTS, None, "Joint (Alex and Sam)", None),
+        ("Liabilities:CreditCard", DEBTS, "Card Co", "Sam", "3456"),
+        ("Liabilities:Home:Mortgage", DEBTS, "Hometown Lending", "Alex", None),
     ]
     assert open_accounts[0].amount == {"USD": 3580}
     [old] = closed
-    assert (old.account, old.number, old.closed) == (
+    assert (old.account, old.institution, old.number, old.closed) == (
         "Assets:Bank:Old",
+        "First Bank",
         "8802",
         datetime.date(2024, 6, 30),
     )
@@ -221,3 +234,31 @@ def test_the_command_names_the_pdf_by_date(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main([str(ledger), "--date", "2024-12-31"])
     assert (tmp_path / "financial-summary-2024-12-31.pdf").exists()
+
+
+def test_accounts_are_by_institution_within_a_group():
+    ledger = LEDGER + (
+        '2020-01-01 open Assets:Bank:Zebra USD\n  institution: "A Credit Union"\n'
+        '2024-01-05 * "Deposit"\n  Assets:Bank:Zebra  10 USD\n  Equity:Opening\n'
+    )
+    entries, _ = load(ledger)
+    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
+    open_accounts, _ = accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, {})
+    assert [item.account for item in open_accounts if item.group == BANK] == [
+        "Assets:Bank:Zebra",  # A Credit Union
+        "Assets:Bank:Checking",  # First Bank
+    ]
+
+
+def test_a_parent_with_its_own_balance_is_listed():
+    entries, _ = load(LEDGER)
+    roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
+    values = {"Assets:Bank": {"USD": Decimal(5)}}
+    open_accounts, _ = accounts(entries, roles, DEFAULT_ACCOUNT_TYPES, values)
+    assert "Assets:Bank" in [item.account for item in open_accounts]
+
+
+def test_missing_details():
+    entries, options = load(OPTIONS + LEDGER)
+    summary = summarize(entries, options, TODAY)
+    assert [item.account for item in summary.missing_details] == ["Assets:Home"]  # no institution

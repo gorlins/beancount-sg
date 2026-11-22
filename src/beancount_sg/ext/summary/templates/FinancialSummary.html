@@ -44,6 +44,11 @@
   .fs-panel h3 { margin: 0 0 0.25rem; }
   .fs-panel table { width: 100%; margin-top: 0.5rem; }
   .fs details { margin-top: 1rem; }
+  .fs-missing {
+    border-left: 4px solid var(--warning, #e0a800);
+    padding: 0.25rem 0.75rem;
+    margin: 0 0 1rem;
+  }
 </style>
 
 {% set summary = extension.summary() %}
@@ -56,6 +61,13 @@
   show only their last 4 digits.</p>
 {# data-remote: Fava's router leaves the link to the browser, as for its own downloads. #}
 <a class="fs-download" href="pdf" download data-remote>Download PDF</a>
+{% set missing = summary.missing_details %}
+{% if missing %}
+<p class="fs-missing">Not in the PDF, for you: {{ missing|length }} open account{{ "" if missing|length == 1 else "s" }}
+  without an institution or owner, which matter most to whoever takes over:
+  {% for item in missing %}<a href="{{ url_for('account', name=item.account) }}">{{ item.label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+  See "How to set up" below.</p>
+{% endif %}
 
 <div class="fs-cards">
   <div class="fs-card">
@@ -81,13 +93,14 @@
 <section class="fs-panel">
   <h3>{{ group }}</h3>
   <table>
-    <thead><tr><th>Account</th><th>Number</th><th>Open since</th><th class="num">{{ column }}</th></tr></thead>
+    <thead><tr><th>Institution</th><th>Account</th><th>Owner</th><th>Number</th><th class="num">{{ column }}</th></tr></thead>
     <tbody>
       {% for item in items %}
       <tr>
+        <td><strong>{{ item.institution or "—" }}</strong></td>
         <td><a href="{{ url_for('account', name=item.account) }}">{{ item.label }}</a></td>
+        <td>{{ item.owner or "—" }}</td>
         <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
-        <td>{{ item.opened }}</td>
         <td class="num">{{ money(item.amount) }}</td>
       </tr>
       {% endfor %}
@@ -144,11 +157,13 @@
   <h3>Closed accounts</h3>
   <p class="fs-note">No longer in use: listed so they're recognized if they turn up.</p>
   <table>
-    <thead><tr><th>Account</th><th>Number</th><th>Opened</th><th>Closed</th></tr></thead>
+    <thead><tr><th>Institution</th><th>Account</th><th>Owner</th><th>Number</th><th>Opened</th><th>Closed</th></tr></thead>
     <tbody>
       {% for item in summary.closed_accounts %}
       <tr>
+        <td>{{ item.institution or "—" }}</td>
         <td>{{ item.label }}</td>
+        <td>{{ item.owner or "—" }}</td>
         <td>{% if item.number %}&bull;&bull;&bull;&bull; {{ item.number }}{% endif %}</td>
         <td>{{ item.opened }}</td>
         <td>{{ item.closed }}</td>
@@ -162,8 +177,13 @@
 <details>
   <summary>How to set up (for you, not the reader)</summary>
   <ul>
-    <li>Give each account its number on its <code>open</code> directive. Only its last 4 digits
-      are shown: <pre>2020-01-01 open Assets:Bank:Checking USD
+    <li>Give each account its institution, its owner (or owners, if held jointly) and its number
+      on its <code>open</code> directive. An institution or owner on a parent account applies to
+      its subaccounts. Only the number's last 4 digits are shown: <pre>2020-01-01 open Assets:Chase
+  institution: "Chase"
+  owner: "Joint (Scott and Jane)"
+
+2020-01-01 open Assets:Chase:Checking USD
   account-number: "123456789"</pre></li>
     <li>Mark each bill: an expense account, or a loan or card the bill pays, with
       <code>bill: TRUE</code> to use its name, or a name for the reader. Its payments are the

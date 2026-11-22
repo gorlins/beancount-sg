@@ -5,11 +5,13 @@ real-world accounts, not the ledger's categories. Make it as a PDF with the
 ``bean-summary`` command (see `beancount_sg.summary.cli`), or view it in Fava with
 the `beancount_sg.ext.summary` report. `summarize` makes it, as of a date:
 
-- **Open accounts**: each asset and liability account that's open, with its
-  value and the last 4 digits of its number (``account-number`` metadata on its
-  ``open`` directive), in groups: bank accounts and cash (the ``cash`` cash-flow
-  role, see `beancount_sg.cash_flow_roles`), investments and property (other
-  assets), and loans and credit cards (liabilities).
+- **Open accounts**: each asset and liability account that's open, with the
+  institution that holds it and who owns it (``institution`` and ``owner``
+  metadata on its ``open`` directive, or a parent's), the last 4 digits of its
+  number (``account-number``), and its value, in groups: bank accounts and cash
+  (the ``cash`` cash-flow role, see `beancount_sg.cash_flow_roles`), investments
+  and property (other assets), and loans and credit cards (liabilities). Within
+  a group, accounts are by institution.
 - **Secured loans**: an asset with a loan opened under the matching path (e.g.
   ``Assets:Home`` and ``Liabilities:Home:Mortgage``), with its value, what's owed
   and the equity: value minus what's owed.
@@ -17,8 +19,9 @@ the `beancount_sg.ext.summary` report. `summarize` makes it, as of a date:
   utility's expense account or the mortgage, with their last payment, which
   account paid it, and what they came to over the last 12 months. ``bill: TRUE``
   uses the account's name; a string names the bill, e.g. ``bill: "Electric"``.
-- **Closed accounts**: asset and liability accounts that were closed, with the
-  last 4 digits of their numbers and when, so they're recognized if they turn up.
+- **Closed accounts**: asset and liability accounts that were closed, with their
+  institutions, owners, the last 4 digits of their numbers and when, so they're
+  recognized if they turn up.
 
 Values are at market value in the first operating currency where there are
 prices, and as they are otherwise.
@@ -43,6 +46,9 @@ from beancount.parser.options import get_account_types
 from beancount_sg.cash_flow_roles import CASH, Role, account_roles
 
 ACCOUNT_NUMBER_KEY = "account-number"
+# Who holds an account, and who owns it, e.g. "Joint (Scott and Jane)": on its
+# open directive, or a parent's.
+INSTITUTION_KEY, OWNER_KEY = "institution", "owner"
 BILL_KEY = "bill"
 BANK, INVESTMENTS, DEBTS = (
     "Bank accounts and cash",
@@ -76,6 +82,8 @@ class Account:
     group: str
     opened: datetime.date
     number: str | None  # the last 4 digits
+    institution: str | None = None
+    owner: str | None = None
     value: Amounts = field(default_factory=dict)  # liabilities are negative
     closed: datetime.date | None = None
 
@@ -148,9 +156,15 @@ def accounts(
     """
     entries = list(entries)
     closed = {entry.account: entry.date for entry in entries if isinstance(entry, Close)}
+    meta = {entry.account: entry.meta for entry in entries if isinstance(entry, Open)}
+    # Parents of other accounts, e.g. one opened only to give its subaccounts an
+    # institution: left out unless they hold something themselves.
+    parents = {parent for name in meta for parent in account_lib.parents(name) if parent != name}
     found = []
     for entry in entries:
         if not isinstance(entry, Open):
+            continue
+        if entry.account in parents and not any(values.get(entry.account, {}).values()):
             continue
         root = get_account_type(entry.account)
         if root == account_types.assets:
@@ -166,12 +180,28 @@ def accounts(
                 group,
                 entry.date,
                 last4(number) if number is not None else None,
+                _inherited(meta, entry.account, INSTITUTION_KEY),
+                _inherited(meta, entry.account, OWNER_KEY),
                 values.get(entry.account, {}),
                 closed.get(entry.account),
             )
         )
-    found.sort(key=lambda item: (list(GROUPS).index(item.group), item.account))
+    found.sort(
+        key=lambda item: (
+            list(GROUPS).index(item.group),
+            (item.institution or "").lower(),
+            item.account,
+        )
+    )
     return [item for item in found if not item.closed], [item for item in found if item.closed]
+
+
+def _inherited(meta: Mapping[str, Mapping[str, object]], account: str, key: str) -> str | None:
+    """A metadata value on the account's ``open`` directive, or its nearest parent's."""
+    for name in account_lib.parents(account):
+        if key in meta.get(name, {}):
+            return str(meta[name][key])
+    return None
 
 
 def secured_loans(
@@ -261,6 +291,11 @@ class Summary:
     @property
     def net_worth(self) -> Amounts:
         return subtract(self.assets, self.debts)
+
+    @property
+    def missing_details(self) -> list[Account]:
+        """The open accounts without an institution or an owner, to fill in."""
+        return [item for item in self.open_accounts if not item.institution or not item.owner]
 
     @staticmethod
     def money(values: Amounts) -> str:

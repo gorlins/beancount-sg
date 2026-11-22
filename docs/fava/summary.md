@@ -30,9 +30,10 @@ reported, but don't stop the summary.
 ## What it shows
 
 - **Totals:** everything owned (assets), everything owed (loans and credit cards), and net worth.
-- **Open accounts:** each open asset and liability account, with the last 4 digits of its number
-  and what it's worth (or, for a loan or card, what's owed), in three groups: bank accounts and
-  cash, investments and property, and loans and credit cards. Bank accounts are those with the
+- **Open accounts:** each open asset and liability account, with the **institution** that holds it
+  and its **owner** (or owners, if held jointly), the last 4 digits of its number, and what it's
+  worth (or, for a loan or card, what's owed), in three groups, each by institution: bank accounts
+  and cash, investments and property, and loans and credit cards. Bank accounts are those with the
   `cash` [cash-flow role](cash-flow.md#the-statement): named with Cash, Checking, Savings or Bank,
   or declared `cash`.
 - **Loans secured by property:** an asset with a loan opened under the matching account path,
@@ -40,18 +41,28 @@ reported, but don't stop the summary.
   the value minus what's owed.
 - **Bills:** the accounts you mark, with when each was last paid and how much, the account that
   paid it, and what it came to over the last 12 months.
-- **Closed accounts:** with the last 4 digits of their numbers and when they were opened and
-  closed, so they're recognized if a statement or letter turns up.
+- **Closed accounts:** with their institutions, owners, the last 4 digits of their numbers, and
+  when they were opened and closed, so they're recognized if a statement or letter turns up.
 
 ## Setting it up
 
-Give each account its number on its `open` directive. Only the last 4 digits are shown, on the page
-and in the PDF:
+Give each account its institution, owner and number on its `open` directive. These matter most:
+they say who to call, and whose name the account is in. Write the owner as the reader should read
+it, e.g. `"Alex"`, `"Joint (Alex and Sam)"`, or `"Sam (beneficiary: Alex)"`. An institution or owner
+on a parent account applies to its subaccounts; a parent that holds nothing itself isn't listed.
+Only the number's last 4 digits are shown, on the page and in the PDF:
 
 ```beancount
+2020-01-01 open Assets:Bank
+  institution: "First Example Bank"
+  owner: "Joint (Alex and Sam)"
+
 2020-01-01 open Assets:Bank:Checking USD
   account-number: "000123454321"
 ```
+
+The Fava page (not the PDF) lists the open accounts still without an institution or owner, to fill
+in.
 
 Mark each bill with `bill`, on the account its payments go to: an expense account, e.g. a utility,
 or a loan or card. `bill: TRUE` uses the account's name; a string names the bill for the reader:

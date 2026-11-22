@@ -216,7 +216,8 @@ reconciled with the change in cash, by `cash-flow-role` metadata or account name
 ```
 
 A "Financial Summary" for someone who doesn't use Beancount, e.g. a spouse taking over: open
-accounts with the last 4 digits of their numbers, equity in property with a loan, the bills marked
+accounts with their institutions, owners and the last 4 digits of their numbers, equity in property
+with a loan, the bills marked
 with `bill` metadata, and closed accounts, with a PDF to download. The `bean-summary` command makes
 the same PDF without Fava. [Docs](docs/fava/summary.md)
 

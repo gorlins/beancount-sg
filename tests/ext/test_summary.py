@@ -57,13 +57,23 @@ def test_totals(tmp_path):
 
 def test_accounts_by_group(tmp_path):
     found = text(page(tmp_path))
-    assert "Bank accounts and cash Account Number Open since Balance Bank › Checking •••• 4321" in (
-        found
-    )
-    assert "Loans and credit cards Account Number Open since Owed CreditCard •••• 3456" in found
-    assert "Home › Mortgage 2020-01-01 199,000.00 USD" in found
-    assert "Closed accounts" in found
-    assert "Bank › Old •••• 8802 2020-01-01 2024-06-30" in found
+    assert (
+        "Bank accounts and cash Institution Account Owner Number Balance "
+        "First Bank Bank › Checking Joint (Alex and Sam) •••• 4321 3,580.00 USD"
+    ) in found
+    assert (
+        "Loans and credit cards Institution Account Owner Number Owed "
+        "Card Co CreditCard Sam •••• 3456 100.00 USD "
+        "Hometown Lending Home › Mortgage Alex 199,000.00 USD"
+    ) in found
+    assert "Value — Home Joint (Alex and Sam) 300,000.00 USD" in found  # no institution
+    assert "First Bank Bank › Old Joint (Alex and Sam) •••• 8802 2020-01-01 2024-06-30" in found
+
+
+def test_accounts_missing_details_are_flagged(tmp_path):
+    found = text(page(tmp_path))
+    assert "1 open account without an institution or owner" in found
+    assert "Home ." in found
 
 
 def test_secured_loans_and_bills(tmp_path):

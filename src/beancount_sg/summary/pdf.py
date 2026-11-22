@@ -38,24 +38,31 @@ def _number(last4: str | None) -> str:
     return f"\u2022\u2022\u2022\u2022 {last4}" if last4 else ""
 
 
+def _or_dash(text: str | None) -> str:
+    return text or "\u2014"
+
+
 def _table(
-    header: list[str], rows: list[list[object]], widths: list[float], amounts: int = 1
+    header: list[str],
+    rows: list[list[object]],
+    widths: list[float],
+    amounts: int = 1,
+    *,
+    bold_first: bool = False,
 ) -> Table:
-    """A table, its last ``amounts`` columns right-aligned."""
+    """A table, its last ``amounts`` columns right-aligned, and its first in bold if asked."""
     first = len(header) - amounts
-    table = Table(
-        [header]
-        + [
-            [
-                Paragraph(escape(str(value)), AMOUNT if i >= first else BODY)
-                for i, value in enumerate(row)
-            ]
-            for row in rows
-        ],
-        colWidths=[WIDTH * share for share in widths],
-        repeatRows=1,
-    )
-    table.setStyle(TableStyle([*TABLE_STYLE, ("ALIGN", (first, 0), (-1, 0), "RIGHT")]))
+    cells = []
+    for row in rows:
+        texts = [escape(str(value)) for value in row]
+        if bold_first:
+            texts[0] = f"<b>{texts[0]}</b>"
+        cells.append(
+            [Paragraph(text, AMOUNT if i >= first else BODY) for i, text in enumerate(texts)]
+        )
+    table = Table([header, *cells], colWidths=[WIDTH * share for share in widths], repeatRows=1)
+    style = [*TABLE_STYLE, ("ALIGN", (first, 0), (-1, 0), "RIGHT")] if amounts else TABLE_STYLE
+    table.setStyle(TableStyle(style))
     return table
 
 
@@ -92,13 +99,25 @@ def render(summary: Summary) -> bytes:
     for group, column in GROUPS.items():
         items = summary.group(group)
         if items:
-            rows = [[i.label, _number(i.number), i.opened, amounts(i.amount)] for i in items]
+            rows = [
+                [
+                    _or_dash(i.institution),
+                    i.label,
+                    _or_dash(i.owner),
+                    _number(i.number),
+                    amounts(i.amount),
+                ]
+                for i in items
+            ]
             story.append(
                 _section(
                     group,
                     None,
                     _table(
-                        ["Account", "Number", "Open since", column], rows, [0.45, 0.13, 0.17, 0.25]
+                        ["Institution", "Account", "Owner", "Number", column],
+                        rows,
+                        [0.22, 0.24, 0.2, 0.13, 0.21],
+                        bold_first=True,
                     ),
                 )
             )
@@ -144,15 +163,25 @@ def render(summary: Summary) -> bytes:
             )
         )
     if summary.closed_accounts:
-        rows = [[i.label, _number(i.number), i.opened, i.closed] for i in summary.closed_accounts]
+        rows = [
+            [
+                _or_dash(i.institution),
+                i.label,
+                _or_dash(i.owner),
+                _number(i.number),
+                i.opened,
+                i.closed,
+            ]
+            for i in summary.closed_accounts
+        ]
         story.append(
             _section(
                 "Closed accounts",
                 "No longer in use: listed so they're recognized if they turn up.",
                 _table(
-                    ["Account", "Number", "Opened", "Closed"],
+                    ["Institution", "Account", "Owner", "Number", "Opened", "Closed"],
                     rows,
-                    [0.5, 0.16, 0.17, 0.17],
+                    [0.19, 0.2, 0.17, 0.14, 0.15, 0.15],
                     amounts=0,
                 ),
             )
