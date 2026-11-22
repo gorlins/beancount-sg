@@ -350,6 +350,40 @@ def _matching_path(account: str, root: str) -> str:
     return account_lib.join(root, *account_lib.split(account)[1:])
 
 
+def lines(
+    entries: Iterable[Directive], roles: Mapping[str, Role], account_types: AccountTypes
+) -> dict[str, tuple[Line, str]]:
+    """Each opened asset and liability account's line, and why (see `asset_line` and
+    `liability_line`)."""
+    entries = list(entries)
+    opens = [entry for entry in entries if isinstance(entry, Open)]
+    meta = {entry.account: entry.meta for entry in opens}
+    liabilities = [name for name in meta if get_account_type(name) == account_types.liabilities]
+    declared_commodities = commodity_lines(entries)
+    held: dict[str, set[str]] = defaultdict(set)
+    for txn in entries:
+        if isinstance(txn, Transaction):
+            for posting in txn.postings:
+                held[posting.account].add(posting.units.currency)
+    found: dict[str, tuple[Line, str]] = {}
+    # Assets first: a liability's line can depend on the asset it's opened under.
+    for name in sorted(meta, key=lambda name: get_account_type(name) != account_types.assets):
+        root = get_account_type(name)
+        if root == account_types.assets:
+            path = _matching_path(name, account_types.liabilities)
+            loans = [loan for loan in liabilities if loan == path or loan.startswith(path + ":")]
+            held_line = _held_line(held[name], declared_commodities)
+            found[name] = asset_line(name, roles[name], meta, loans, held_line)
+        elif root == account_types.liabilities:
+            secured = [
+                found[parent][0]
+                for parent in account_lib.parents(_matching_path(name, account_types.assets))
+                if parent in found
+            ]
+            found[name] = liability_line(name, meta, secured[0] if secured else None)
+    return found
+
+
 def accounts(
     entries: Iterable[Directive],
     roles: Mapping[str, Role],
@@ -367,37 +401,13 @@ def accounts(
     opens = [entry for entry in entries if isinstance(entry, Open)]
     meta = {entry.account: entry.meta for entry in opens}
     parents = {parent for name in meta for parent in account_lib.parents(name) if parent != name}
-    liabilities = [name for name in meta if get_account_type(name) == account_types.liabilities]
-    declared_commodities = commodity_lines(entries)
-    held: dict[str, set[str]] = defaultdict(set)
-    for txn in entries:
-        if isinstance(txn, Transaction):
-            for posting in txn.postings:
-                held[posting.account].add(posting.units.currency)
-    asset_lines: dict[str, Line] = {}
+    placed = lines(entries, roles, account_types)
     found = []
-    # Assets first: a liability's line can depend on the asset it's opened under.
-    for entry in sorted(opens, key=lambda e: get_account_type(e.account) != account_types.assets):
+    for entry in opens:
         name = entry.account
-        root = get_account_type(name)
-        if root == account_types.assets:
-            path = _matching_path(name, account_types.liabilities)
-            loans = [loan for loan in liabilities if loan == path or loan.startswith(path + ":")]
-            line, reason = asset_line(
-                name, roles[name], meta, loans, _held_line(held[name], declared_commodities)
-            )
-            asset_lines[name] = line
-        elif root == account_types.liabilities:
-            secured = [
-                asset_lines[parent]
-                for parent in account_lib.parents(_matching_path(name, account_types.assets))
-                if parent in asset_lines
-            ]
-            line, reason = liability_line(name, meta, secured[0] if secured else None)
-        else:
+        if name not in placed or (name in parents and not any(values.get(name, {}).values())):
             continue
-        if name in parents and not any(values.get(name, {}).values()):
-            continue
+        line, reason = placed[name]
         number = entry.meta.get(ACCOUNT_NUMBER_KEY)
         institution, owner = (_inherited(meta, name, key) for key in (INSTITUTION_KEY, OWNER_KEY))
         found.append(

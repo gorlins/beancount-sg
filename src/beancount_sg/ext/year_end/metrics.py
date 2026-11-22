@@ -2,11 +2,16 @@
 
 Net worth is assets minus liabilities (what's owed), in groups:
 
-- **Cash**: assets with the ``cash`` cash-flow role (see
-  `beancount_sg.cash_flow_roles`).
+- **Cash**: cash and savings accounts.
 - **Investments**: other assets, unless they're property.
-- **Property**: assets you live in or use rather than invest, e.g. a home: those
-  whose ``open`` directive (or a parent's) says ``investable: FALSE``.
+- **Property**: assets you live in or use rather than invest: real estate,
+  vehicles and other personal property.
+
+An asset's group follows its line on the Financial Summary's personal financial
+statement (see `beancount_sg.summary.lines`): declared with ``asset-type`` on its
+``open`` directive, a parent's, or the commodity it holds, or else inferred from
+its cash-flow role (see `beancount_sg.cash_flow_roles`), its name, and the loans
+opened under its path.
 - **Debt**: liabilities with the ``financing`` role (the default), credit cards
   included.
 - **Other**: liabilities declared with another role.
@@ -57,13 +62,16 @@ from beancount.core.data import Directive, Open, Posting, Transaction
 from beancount.core.inventory import Inventory
 
 from beancount_sg.cash_flow_roles import CASH, FINANCING, INVESTING, OPERATING, Role
+from beancount_sg.summary import lines
 
-INVESTABLE_KEY = "investable"
 INVESTMENTS, PROPERTY, DEBT, OTHER = "investments", "property", "debt", "other"
 GROUPS = (CASH, INVESTMENTS, PROPERTY, DEBT, OTHER)
 # Income and expense accounts that aren't income or expenses: investment returns, or
 # transfers (e.g. to a loan) counted elsewhere.
 RETURNS, TRANSFERS = "investment returns", "transfers"
+# The statement lines in the cash and property groups: the rest are investments.
+CASH_LINES = ("cash", "savings")
+PROPERTY_LINES = ("real-estate", "automobiles", "personal-property")
 MAX_YEARS = 5
 ONE_DAY = datetime.timedelta(days=1)
 
@@ -78,39 +86,35 @@ class Classification:
 
 
 def classify(
-    opens: Iterable[Open], roles: Mapping[str, Role], account_types: AccountTypes
+    entries: Iterable[Directive], roles: Mapping[str, Role], account_types: AccountTypes
 ) -> dict[str, Classification]:
     """Each asset and liability's net worth group, and the income and expense accounts
     declared with a role other than ``operating``: investment returns (``investing``)
     or transfers."""
-    opens = list(opens)
-    investable = {
-        entry.account: entry.meta[INVESTABLE_KEY] for entry in opens if INVESTABLE_KEY in entry.meta
-    }
+    entries = list(entries)
+    placed = lines(entries, roles, account_types)
     found = {}
-    for entry in opens:
+    for entry in entries:
+        if not isinstance(entry, Open):
+            continue
         account = entry.account
         root = get_account_type(account)
         role = roles[account]
         if root == account_types.assets:
-            found[account] = _asset(account, role, investable)
+            line, reason = placed[account]
+            if line.key in CASH_LINES:
+                group = CASH
+            elif line.key in PROPERTY_LINES:
+                group = PROPERTY
+            else:
+                group = INVESTMENTS
+            found[account] = Classification(group, f"{line.title.lower()}: {reason}")
         elif root == account_types.liabilities:
             found[account] = _liability(role)
         elif root in (account_types.income, account_types.expenses) and role.role != OPERATING:
             group = RETURNS if role.role == INVESTING else TRANSFERS
             found[account] = Classification(group, _role_reason(role))
     return found
-
-
-def _asset(account: str, role: Role, investable: Mapping[str, object]) -> Classification:
-    if role.role == CASH:
-        return Classification(CASH, _role_reason(role))
-    # Its own investable metadata, or its nearest parent's.
-    for name in account_lib.parents(account):
-        if name in investable:
-            group = INVESTMENTS if investable[name] else PROPERTY
-            return Classification(group, f"{INVESTABLE_KEY}: {investable[name]} on {name}")
-    return Classification(INVESTMENTS, _role_reason(role))
 
 
 def _liability(role: Role) -> Classification:

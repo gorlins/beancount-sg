@@ -169,7 +169,7 @@
       <tbody>
         {{ yearly_row("Cash", years|map(attribute="holdings.cash")|list, title="Assets with the cash role") }}
         {{ yearly_row("Investments", years|map(attribute="holdings.investments")|list, title="Other assets, at market value") }}
-        {{ yearly_row("Property", years|map(attribute="holdings.property")|list, title="Assets that aren't investable, e.g. a home") }}
+        {{ yearly_row("Property", years|map(attribute="holdings.property")|list, title="Real estate, vehicles and other personal property") }}
         {{ yearly_row("Debt", years|map(attribute="holdings.debt")|list, higher=true, title="Loans and credit cards (as negative amounts owed)") }}
         {{ yearly_row("Other", years|map(attribute="holdings.other")|list, title="Liabilities declared with a role other than financing") }}
         {{ yearly_row("Net worth", years|map(attribute="net_worth")|list, total=true, title="Assets minus liabilities") }}
@@ -276,10 +276,12 @@
   <pre>2020-01-01 open Assets:Bank:CD
   cash-flow-role: "investing"
 
-2020-01-01 open Assets:Car
-  investable: FALSE</pre>
-  <p>Assets with the <code>cash</code> role are cash, and other assets are investments, unless
-    marked <code>investable: FALSE</code> (e.g. a home or a car): property. Liabilities with the
+2020-01-01 open Assets:Collectibles
+  asset-type: "personal-property"</pre>
+  <p>Assets are grouped by their line on the Financial Summary's statement: cash and savings
+    accounts are cash; real estate, vehicles and other personal property (by name, a mortgage or
+    vehicle loan under the same path, or declared with <code>asset-type</code>) are property; the
+    rest are investments. Liabilities with the
     <code>financing</code> role, the default, are debt. Income and expense accounts declared with
     a role other than <code>operating</code> are left out of income, expenses and savings:
     <code>investing</code> ones, e.g. capital gains, are investment returns, and others, e.g. a

@@ -6,7 +6,6 @@ from decimal import Decimal
 import pytest
 from beancount.core import prices
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
-from beancount.core.data import Open
 
 from beancount_sg.cash_flow_roles import CASH, account_roles
 from beancount_sg.ext.year_end.metrics import (
@@ -30,7 +29,6 @@ option "operating_currency" "USD"
 2020-01-01 open Assets:Bank:Checking USD
 2020-01-01 open Assets:Brokerage
 2020-01-01 open Assets:Home USD
-  investable: FALSE
 2020-01-01 open Liabilities:CreditCard USD
 2020-01-01 open Liabilities:Home:Mortgage USD
 2020-01-01 open Equity:Opening
@@ -72,8 +70,7 @@ option "operating_currency" "USD"
 def classes(ledger=LEDGER):
     entries, _ = load(ledger)
     roles, _ = account_roles(entries, DEFAULT_ACCOUNT_TYPES)
-    opens = [entry for entry in entries if isinstance(entry, Open)]
-    return entries, classify(opens, roles, DEFAULT_ACCOUNT_TYPES)
+    return entries, classify(entries, roles, DEFAULT_ACCOUNT_TYPES)
 
 
 def summaries(ledger=LEDGER, years=(2024,), today=datetime.date(2030, 1, 1)):
@@ -92,18 +89,34 @@ def test_classification():
         "Liabilities:CreditCard": DEBT,  # financing, by default, like a loan
         "Liabilities:Home:Mortgage": DEBT,
     }
-    assert found["Assets:Home"].reason == "investable: False on Assets:Home"
+    # Real estate, by its name, on the Financial Summary's statement.
+    assert found["Assets:Home"].reason == "real estate: by its name"
+    assert found["Assets:Bank:Checking"].reason == "cash on hand and in banks: cash"
     assert found["Liabilities:CreditCard"].reason == "financing, by default"
 
 
-def test_investable_metadata():
-    ledger = LEDGER.replace("investable: FALSE", "investable: TRUE").replace(
-        "2020-01-01 open Assets:Brokerage", "2020-01-01 open Assets:Brokerage\n  investable: FALSE"
+def test_asset_type_metadata():
+    ledger = LEDGER.replace(
+        "2020-01-01 open Assets:Home USD",
+        '2020-01-01 open Assets:Home USD\n  asset-type: "stocks-bonds"',
+    ).replace(
+        "2020-01-01 open Assets:Brokerage",
+        '2020-01-01 open Assets:Brokerage\n  asset-type: "personal-property"',
     )
     _, found = classes(ledger)
     assert found["Assets:Home"].group == INVESTMENTS
     assert found["Assets:Brokerage"].group == PROPERTY
-    assert found["Assets:Brokerage"].reason == "investable: False on Assets:Brokerage"
+    assert found["Assets:Brokerage"].reason == (
+        "other personal property: asset-type: personal-property"
+    )
+
+
+def test_asset_type_on_a_commodity():
+    ledger = LEDGER + '2020-01-01 commodity MAINST\n  asset-type: "real-estate"\n'
+    ledger += "2020-01-01 open Assets:MainSt MAINST\n"
+    ledger += '2024-01-02 * "Buy"\n  Assets:MainSt  1 MAINST {100000 USD}\n  Equity:Opening\n'
+    _, found = classes(ledger)
+    assert found["Assets:MainSt"].group == PROPERTY
 
 
 def test_a_secured_loan_does_not_make_property():
@@ -113,18 +126,20 @@ def test_a_secured_loan_does_not_make_property():
     assert found["Liabilities:Brokerage:Margin"].group == DEBT
 
 
-def test_investable_inheritance_does_not_depend_on_open_order():
+def test_asset_type_inheritance_does_not_depend_on_open_order():
     ledger = (
         LEDGER
         + """
-2019-01-01 open Assets:Vehicles:Car USD
-2021-01-01 open Assets:Vehicles
-  investable: FALSE
+2019-01-01 open Assets:Things:Painting USD
+2021-01-01 open Assets:Things
+  asset-type: "personal-property"
 """
     )
     _, found = classes(ledger)
-    assert found["Assets:Vehicles:Car"].group == PROPERTY
-    assert found["Assets:Vehicles:Car"].reason == "investable: False on Assets:Vehicles"
+    assert found["Assets:Things:Painting"].group == PROPERTY
+    assert found["Assets:Things:Painting"].reason == (
+        "other personal property: asset-type: personal-property on Assets:Things"
+    )
 
 
 def test_a_liability_with_another_role_is_other():

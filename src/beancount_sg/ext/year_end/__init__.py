@@ -34,7 +34,7 @@ end; see `beancount_sg.ext.year_end.metrics`. The dashboard has:
 
 Changes from the previous year are green when they're good and red when they're
 bad. Accounts are classified by their ``cash-flow-role`` (see
-`beancount_sg.cash_flow_roles`) and ``investable`` metadata, or their names; see
+`beancount_sg.cash_flow_roles`), ``asset-type`` metadata and their names; see
 `beancount_sg.ext.year_end.metrics`.
 """
 
@@ -187,9 +187,7 @@ class YearInReview(FavaExtensionBase):
 
     def _classes(self) -> dict[str, Classification]:
         roles, _ = self.roles()
-        return classify(
-            self.ledger.all_entries_by_type.Open, roles, get_account_types(self.ledger.options)
-        )
+        return classify(self.ledger.all_entries, roles, get_account_types(self.ledger.options))
 
     def review(self) -> YearEnd | None:
         """The summaries of the years shown, or None without an operating currency."""
