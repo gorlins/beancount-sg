@@ -7,7 +7,7 @@ from fava.application import create_app
 
 import beancount_sg.ext.summary as summary_ext
 
-from .test_summary_contents import LEDGER as CONTENTS_LEDGER
+from ..test_summary import LEDGER as CONTENTS_LEDGER
 
 ENABLE = 'custom "fava-extension" "beancount_sg.ext.summary"'
 LEDGER = (

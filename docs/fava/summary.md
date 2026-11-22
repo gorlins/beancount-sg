@@ -14,6 +14,19 @@ gives the same as a PDF, to print or keep somewhere your family can find it.
 The summary covers the whole ledger as of today, whatever Fava's filters. Values are at market
 value in the first `operating_currency` where there are prices.
 
+## Without Fava
+
+The `bean-summary` command, installed with `beancount-sg` (Fava isn't needed), writes the same PDF
+from a ledger file:
+
+```bash
+bean-summary ledger.beancount                       # writes financial-summary-<today>.pdf
+bean-summary ledger.beancount -o summary.pdf -d 2026-12-31
+```
+
+`-o` names the PDF, and `-d` makes the summary as of another date. Errors in the ledger are
+reported, but don't stop the summary.
+
 ## What it shows
 
 - **Totals:** everything owned (assets), everything owed (loans and credit cards), and net worth.

@@ -1,8 +1,9 @@
-"""The Financial Summary's contents: accounts, secured loans and bills, as of a date.
+"""A summary of a ledger's finances for someone who doesn't use Beancount.
 
-Written for someone who doesn't use Beancount, e.g. a spouse taking over the
-household's finances, so it covers the real-world accounts, not the ledger's
-categories:
+Written for e.g. a spouse taking over the household's finances, so it covers the
+real-world accounts, not the ledger's categories. Make it as a PDF with the
+``bean-summary`` command (see `beancount_sg.summary.cli`), or view it in Fava with
+the `beancount_sg.ext.summary` report. `summarize` makes it, as of a date:
 
 - **Open accounts**: each asset and liability account that's open, with its
   value and the last 4 digits of its number (``account-number`` metadata on its
@@ -19,8 +20,8 @@ categories:
 - **Closed accounts**: asset and liability accounts that were closed, with the
   last 4 digits of their numbers and when, so they're recognized if they turn up.
 
-Values are at market value in one currency where there are prices (Fava's
-conversion), and as they are otherwise.
+Values are at market value in the first operating currency where there are
+prices, and as they are otherwise.
 """
 
 from __future__ import annotations
@@ -33,11 +34,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from beancount.core import account as account_lib
-from beancount.core import convert
+from beancount.core import convert, prices
 from beancount.core.account_types import AccountTypes, get_account_type
 from beancount.core.data import Close, Directive, Open, Transaction
+from beancount.core.inventory import Inventory
+from beancount.parser.options import get_account_types
 
-from beancount_sg.cash_flow_roles import CASH, Role
+from beancount_sg.cash_flow_roles import CASH, Role, account_roles
 
 ACCOUNT_NUMBER_KEY = "account-number"
 BILL_KEY = "bill"
@@ -236,3 +239,92 @@ def bills(
                 for currency, number in paid.items():
                     payment.yearly[currency] = payment.yearly.get(currency, Decimal(0)) + number
     return sorted(found.values(), key=lambda item: item.name.lower())
+
+
+@dataclass(frozen=True)
+class Summary:
+    """Everything the summary shows, as of a date."""
+
+    title: str
+    date: datetime.date
+    currency: str | None
+    open_accounts: list[Account]
+    closed_accounts: list[Account]
+    secured_loans: list[SecuredLoan]
+    bills: list[Bill]
+    assets: Amounts
+    debts: Amounts  # positive
+
+    def group(self, group: str) -> list[Account]:
+        return [item for item in self.open_accounts if item.group == group]
+
+    @property
+    def net_worth(self) -> Amounts:
+        return subtract(self.assets, self.debts)
+
+    @staticmethod
+    def money(values: Amounts) -> str:
+        """Amounts for a reader: to the cent, with thousands separators and currencies."""
+        shown = [
+            f"{number:,.2f} {currency}" for currency, number in sorted(values.items()) if number
+        ]
+        return ", ".join(shown) if shown else "0.00"
+
+
+def values_by_account(
+    entries: Iterable[Directive],
+    currency: str | None,
+    price_map: prices.PriceMap,
+    date: datetime.date,
+) -> tuple[dict[str, Amounts], dict[str, Amounts]]:
+    """Each account's value, and its value with its subaccounts' (and for each parent).
+
+    At market value in ``currency`` where there are prices on the date, and as
+    they are otherwise.
+    """
+    balances: dict[str, Inventory] = defaultdict(Inventory)
+    for entry in entries:
+        if isinstance(entry, Transaction):
+            for posting in entry.postings:
+                balances[posting.account].add_position(posting)
+    values: dict[str, Amounts] = {}
+    totals: dict[str, Amounts] = defaultdict(dict)
+    for account, inventory in balances.items():
+        value: dict[str, Decimal] = defaultdict(Decimal)
+        for position in inventory:
+            amount = (
+                convert.convert_position(position, currency, price_map, date)
+                if currency
+                else position.units
+            )
+            value[amount.currency] += amount.number
+        values[account] = dict(value)
+        for name in account_lib.parents(account):
+            for unit, number in value.items():
+                totals[name][unit] = totals[name].get(unit, Decimal(0)) + number
+    return values, dict(totals)
+
+
+def summarize(
+    entries: list[Directive], options: Mapping[str, object], date: datetime.date
+) -> Summary:
+    """The summary of a ledger's entries (e.g. from `beancount.loader.load_file`) on a date."""
+    account_types = get_account_types(options)
+    entries = [entry for entry in entries if entry.date <= date]
+    currencies = options["operating_currency"]
+    currency = currencies[0] if currencies else None
+    values, totals = values_by_account(entries, currency, prices.build_price_map(entries), date)
+    roles, _ = account_roles(entries, account_types)
+    open_accounts, closed_accounts = accounts(entries, roles, account_types, values)
+    debts = {unit: -number for unit, number in totals.get(account_types.liabilities, {}).items()}
+    return Summary(
+        str(options["title"]),
+        date,
+        currency,
+        open_accounts,
+        closed_accounts,
+        secured_loans(open_accounts, totals, account_types),
+        bills(entries, account_types, date),
+        totals.get(account_types.assets, {}),
+        debts,
+    )

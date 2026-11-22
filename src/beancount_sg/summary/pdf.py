@@ -1,10 +1,8 @@
-"""The Financial Summary as a PDF, laid out with ReportLab, to print or keep safe."""
+"""The financial summary as a PDF, laid out with ReportLab, to print or keep safe."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from io import BytesIO
-from typing import TYPE_CHECKING
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -21,10 +19,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from .contents import GROUPS, Amounts
-
-if TYPE_CHECKING:
-    from . import Summary
+from . import GROUPS, Summary
 
 STYLES = getSampleStyleSheet()
 BODY, SMALL = STYLES["BodyText"], STYLES["Italic"]
@@ -72,8 +67,9 @@ def _section(title: str, note: str | None, table: Table) -> KeepTogether:
     return KeepTogether([*parts, table])
 
 
-def render(summary: Summary, title: str, amounts: Callable[[Amounts], str]) -> bytes:
+def render(summary: Summary) -> bytes:
     """The PDF's bytes."""
+    title, amounts = summary.title, summary.money
     story: list = [
         Paragraph(f"Financial summary: {escape(title)}", STYLES["Title"]),
         Paragraph(

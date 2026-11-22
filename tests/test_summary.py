@@ -1,4 +1,4 @@
-"""Tests for the Financial Summary's contents (see test_summary.py for the page and PDF)."""
+"""Tests for the financial summary (see ext/test_summary.py for the Fava report)."""
 
 import datetime
 from decimal import Decimal
@@ -6,7 +6,7 @@ from decimal import Decimal
 from beancount.core.account_types import DEFAULT_ACCOUNT_TYPES
 
 from beancount_sg.cash_flow_roles import account_roles
-from beancount_sg.ext.summary.contents import (
+from beancount_sg.summary import (
     BANK,
     DEBTS,
     INVESTMENTS,
@@ -15,7 +15,10 @@ from beancount_sg.ext.summary.contents import (
     label,
     last4,
     secured_loans,
+    summarize,
 )
+from beancount_sg.summary.cli import main
+from beancount_sg.summary.pdf import render
 from beancount_sg.testing import load
 
 LEDGER = """
@@ -155,3 +158,66 @@ def test_bills_count_only_the_last_12_months():
     # The February 8th payment is more than a year before.
     assert (found["Electric"].payments, found["Electric"].yearly) == (1, {"USD": 100})
     assert found["Electric"].last_paid == datetime.date(2024, 3, 8)
+
+
+OPTIONS = 'option "title" "Test"\noption "operating_currency" "USD"\n'
+
+
+def test_summarize_values_holdings_at_market_value():
+    ledger = (
+        OPTIONS
+        + LEDGER
+        + """
+2020-01-01 open Assets:Brokerage
+2024-04-01 * "Buy"
+  Assets:Brokerage  10 VTI {100 USD}
+  Assets:Bank:Checking
+2024-12-30 price VTI  150 USD
+2024-06-01 * "Euros, without a price"
+  Assets:Brokerage  20 EUR
+  Equity:Opening
+"""
+    )
+    entries, options = load(ledger)
+    summary = summarize(entries, options, TODAY)
+    found = {item.account: item for item in summary.open_accounts}
+    assert found["Assets:Brokerage"].value == {"USD": 1500, "EUR": 20}
+    assert found["Assets:Bank:Checking"].value == {"USD": 2580}
+    # 2580 + 300000 + 1500 in USD; 199000 on the mortgage and 100 on the card.
+    assert summary.assets == {"USD": 304080, "EUR": 20}
+    assert summary.debts == {"USD": 199100}
+    assert summary.net_worth == {"USD": 104980, "EUR": 20}
+    assert summary.money(summary.net_worth) == "20.00 EUR, 104,980.00 USD"
+    assert [loan.asset for loan in summary.secured_loans] == ["Assets:Home"]
+    assert summary.title == "Test"
+
+
+def test_summarize_as_of_a_date():
+    entries, options = load(OPTIONS + LEDGER)
+    summary = summarize(entries, options, datetime.date(2024, 2, 10))
+    found = {item.account: item for item in summary.open_accounts}
+    # Not the card payment on the 25th, or the old account's closing in June.
+    assert found["Liabilities:CreditCard"].amount == {"USD": 120}
+    assert not summary.closed_accounts
+
+
+def test_render_is_a_pdf():
+    entries, options = load(OPTIONS + LEDGER)
+    assert render(summarize(entries, options, TODAY)).startswith(b"%PDF")
+
+
+def test_the_command_writes_the_pdf(tmp_path, capsys):
+    ledger = tmp_path / "main.beancount"
+    ledger.write_text(OPTIONS + LEDGER)
+    output = tmp_path / "out.pdf"
+    assert main([str(ledger), "--output", str(output), "--date", "2024-12-31"]) == 0
+    assert output.read_bytes().startswith(b"%PDF")
+    assert capsys.readouterr().out == f"Wrote {output}\n"
+
+
+def test_the_command_names_the_pdf_by_date(tmp_path, monkeypatch):
+    ledger = tmp_path / "main.beancount"
+    ledger.write_text(OPTIONS + LEDGER)
+    monkeypatch.chdir(tmp_path)
+    main([str(ledger), "--date", "2024-12-31"])
+    assert (tmp_path / "financial-summary-2024-12-31.pdf").exists()

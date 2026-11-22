@@ -19,13 +19,16 @@ dependencies = [
     "autobean-refactor>=0.3",
     "beancount>=3",
     "python-slugify>=8",
+    "reportlab>=4",
 ]
+
+[project.scripts]
+bean-summary = "beancount_sg.summary.cli:main"
 
 [project.optional-dependencies]
 fava = [
     "fava>=1.30",
     "rapidfuzz>=3.14.6",
-    "reportlab>=4",
 ]
 
 [project.urls]
@@ -36,7 +39,6 @@ dev = [
     "fava>=1.30",
     "pytest>=8",
     "rapidfuzz>=3.14.6",
-    "reportlab>=4",
     "ruff>=0.6",
 ]
 
