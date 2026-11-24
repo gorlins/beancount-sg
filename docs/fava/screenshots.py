@@ -29,6 +29,7 @@ HERE = Path(__file__).parent
 LEDGERS = {
     "example": HERE / "ledgers" / "example.beancount",
     "household": HERE / "ledgers" / "household.beancount",
+    "family": HERE / "ledgers" / "family.beancount",
 }
 IMAGES = HERE / "images"
 
@@ -133,6 +134,11 @@ def cash_flow(page: Page, root: str) -> None:
     save(page, "cash-flow")
 
 
+def summary(page: Page, root: str) -> None:
+    page.goto(report_url(root, "family", "FinancialSummary/"), wait_until="networkidle")
+    save(page, "summary")
+
+
 # Each screenshot's name, and the function that saves it (``travel`` saves two).
 SCREENSHOTS = {
     "checkbook": checkbook,
@@ -143,6 +149,7 @@ SCREENSHOTS = {
     "payees": payees,
     "year-in-review": year_in_review,
     "cash-flow": cash_flow,
+    "summary": summary,
 }
 
 

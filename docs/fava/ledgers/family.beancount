@@ -1,0 +1,1220 @@
+; Example ledger for the Financial Summary screenshot (see screenshots.py): a
+; household's bank accounts, investments, home and car with loans, a credit card,
+; the bills marked to keep paying, and two closed accounts.
+option "title" "Family"
+option "operating_currency" "USD"
+
+2015-01-01 custom "fava-extension" "beancount_sg.ext.summary"
+
+2015-01-01 open Equity:Opening-Balances
+2015-01-01 open Income:Salary USD
+2015-01-01 open Assets:Bank
+  institution: "First Example Bank"
+  owner: "Joint (Alex and Sam)"
+2015-01-01 open Assets:Bank:OldSavings USD
+  institution: "Old Town Savings"
+  owner: "Alex"
+  account-number: "4400-1188-02"
+2018-05-01 open Assets:Bank:Checking USD
+  account-number: "000123454321"
+2018-05-01 open Assets:Bank:Savings USD
+  account-number: "000123459876"
+2019-03-15 open Assets:Brokerage
+  cash-flow-role: "investing"
+  institution: "Example Brokerage"
+  owner: "Joint (Alex and Sam)"
+  account-number: "Z12-345678"
+2016-09-01 open Assets:Retirement:401k
+  institution: "Acme Corp 401(k), via Example Retirement"
+  owner: "Sam (beneficiary: Alex)"
+  account-number: "401-88-2210"
+2020-06-30 open Assets:Home USD
+  institution: "Deed at Example County Registry"
+  owner: "Joint (Alex and Sam)"
+2020-06-30 open Liabilities:Home:Mortgage USD
+  institution: "Hometown Bank"
+  owner: "Joint (Alex and Sam)"
+  account-number: "7700012345"
+  bill: "Mortgage (Hometown Bank)"
+2015-01-01 open Assets:Collectibles USD
+  asset-type: "personal-property"
+  institution: "Appraised by Example Auction House"
+  owner: "Sam"
+2023-04-10 open Assets:Car USD
+  institution: "Title with the state DMV"
+  owner: "Alex"
+2023-04-10 open Liabilities:Car:Loan USD
+  institution: "Auto Finance"
+  owner: "Alex"
+  account-number: "AL-5566781"
+  bill: "Car loan"
+2017-02-01 open Liabilities:CreditCard:Visa USD
+  institution: "Example Card Services"
+  owner: "Sam (Alex is an authorized user)"
+  account-number: "4111 1111 1111 3456"
+  bill: "Visa card"
+2016-11-01 open Liabilities:CreditCard:Store USD
+  institution: "Department Store Card"
+  owner: "Alex"
+  account-number: "6011 0000 0000 7788"
+2015-01-01 open Expenses:Home:Electric USD
+  bill: "Electric (City Power)"
+2015-01-01 open Expenses:Home:Internet USD
+  bill: "Internet (FastNet)"
+2015-01-01 open Expenses:Home:MortgageInterest USD
+2015-01-01 open Expenses:Insurance:Home USD
+  bill: "Home insurance (yearly)"
+2015-01-01 open Expenses:Insurance:Car USD
+  bill: "Car insurance (twice a year)"
+2015-01-01 open Expenses:Phone USD
+  bill: "Phones (Mobile Co.)"
+2015-01-01 open Expenses:Car:Interest USD
+2015-01-01 open Expenses:Food:Groceries USD
+2015-01-01 open Expenses:Shopping USD
+
+2024-12-31 * "Opening balances"
+  Assets:Bank:Checking  6200.00 USD
+  Assets:Bank:Savings  31000.00 USD
+  Assets:Bank:OldSavings  4300.00 USD
+  Assets:Brokerage  210 VTI {180.00 USD}
+  Assets:Retirement:401k  560 VTI {150.00 USD}
+  Assets:Home  450000.00 USD
+  Liabilities:Home:Mortgage  -268000.00 USD
+  Assets:Car  24000.00 USD
+  Assets:Collectibles  18500.00 USD
+  Liabilities:Car:Loan  -15400.00 USD
+  Equity:Opening-Balances
+
+2025-03-20 * "Moved the old savings account to the new bank"
+  Assets:Bank:OldSavings  -4300.00 USD
+  Assets:Bank:Savings
+2025-03-31 close Assets:Bank:OldSavings
+2024-11-15 close Liabilities:CreditCard:Store
+
+2025-01-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-01-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  880.00 USD
+  Expenses:Home:MortgageInterest  1470.00 USD
+  Assets:Bank:Checking
+
+2025-01-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  345.00 USD
+  Expenses:Car:Interest  45.00 USD
+  Assets:Bank:Checking
+
+2025-01-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  135.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-01-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-01-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-01-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  640.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-01-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-01-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  905.00 USD
+  Assets:Bank:Checking
+
+2025-01-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-01-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {240.00 USD}
+  Assets:Bank:Checking
+
+2025-01-28 price VTI  242.00 USD
+
+2025-02-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-02-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  883.00 USD
+  Expenses:Home:MortgageInterest  1467.00 USD
+  Assets:Bank:Checking
+
+2025-02-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  345.60 USD
+  Expenses:Car:Interest  44.40 USD
+  Assets:Bank:Checking
+
+2025-02-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  139.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-02-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-02-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-02-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  655.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-02-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-02-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  924.00 USD
+  Assets:Bank:Checking
+
+2025-02-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-02-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {243.00 USD}
+  Assets:Bank:Checking
+
+2025-02-28 price VTI  245.00 USD
+
+2025-03-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-03-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  886.00 USD
+  Expenses:Home:MortgageInterest  1464.00 USD
+  Assets:Bank:Checking
+
+2025-03-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  346.20 USD
+  Expenses:Car:Interest  43.80 USD
+  Assets:Bank:Checking
+
+2025-03-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-03-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-03-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-03-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  670.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-03-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-03-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1503.00 USD
+  Assets:Bank:Checking
+
+2025-03-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-03-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {246.00 USD}
+  Assets:Bank:Checking
+
+2025-03-10 * "Safe Auto" "Car insurance"
+  Expenses:Insurance:Car  600.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-03-28 price VTI  248.00 USD
+
+2025-04-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-04-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  889.00 USD
+  Expenses:Home:MortgageInterest  1461.00 USD
+  Assets:Bank:Checking
+
+2025-04-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  346.80 USD
+  Expenses:Car:Interest  43.20 USD
+  Assets:Bank:Checking
+
+2025-04-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  95.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-04-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-04-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-04-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  685.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-04-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-04-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  910.00 USD
+  Assets:Bank:Checking
+
+2025-04-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-04-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {249.00 USD}
+  Assets:Bank:Checking
+
+2025-04-15 * "Home Mutual" "Home insurance"
+  Expenses:Insurance:Home  1450.00 USD
+  Assets:Bank:Checking
+
+2025-04-28 price VTI  251.00 USD
+
+2025-05-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-05-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  892.00 USD
+  Expenses:Home:MortgageInterest  1458.00 USD
+  Assets:Bank:Checking
+
+2025-05-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  347.40 USD
+  Expenses:Car:Interest  42.60 USD
+  Assets:Bank:Checking
+
+2025-05-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  99.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-05-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-05-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-05-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  700.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-05-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-05-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  929.00 USD
+  Assets:Bank:Checking
+
+2025-05-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-05-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {252.00 USD}
+  Assets:Bank:Checking
+
+2025-05-28 price VTI  254.00 USD
+
+2025-06-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-06-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  895.00 USD
+  Expenses:Home:MortgageInterest  1455.00 USD
+  Assets:Bank:Checking
+
+2025-06-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  348.00 USD
+  Expenses:Car:Interest  42.00 USD
+  Assets:Bank:Checking
+
+2025-06-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-06-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-06-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-06-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  640.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-06-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-06-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  873.00 USD
+  Assets:Bank:Checking
+
+2025-06-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-06-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {255.00 USD}
+  Assets:Bank:Checking
+
+2025-06-28 price VTI  257.00 USD
+
+2025-07-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-07-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  898.00 USD
+  Expenses:Home:MortgageInterest  1452.00 USD
+  Assets:Bank:Checking
+
+2025-07-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  348.60 USD
+  Expenses:Car:Interest  41.40 USD
+  Assets:Bank:Checking
+
+2025-07-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  135.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-07-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-07-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-07-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  655.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-07-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-07-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  920.00 USD
+  Assets:Bank:Checking
+
+2025-07-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-07-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {258.00 USD}
+  Assets:Bank:Checking
+
+2025-07-28 price VTI  260.00 USD
+
+2025-08-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-08-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  901.00 USD
+  Expenses:Home:MortgageInterest  1449.00 USD
+  Assets:Bank:Checking
+
+2025-08-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  349.20 USD
+  Expenses:Car:Interest  40.80 USD
+  Assets:Bank:Checking
+
+2025-08-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  139.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-08-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-08-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-08-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  670.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-08-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-08-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  939.00 USD
+  Assets:Bank:Checking
+
+2025-08-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-08-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {261.00 USD}
+  Assets:Bank:Checking
+
+2025-08-28 price VTI  263.00 USD
+
+2025-09-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-09-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  904.00 USD
+  Expenses:Home:MortgageInterest  1446.00 USD
+  Assets:Bank:Checking
+
+2025-09-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  349.80 USD
+  Expenses:Car:Interest  40.20 USD
+  Assets:Bank:Checking
+
+2025-09-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-09-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-09-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-09-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  685.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-09-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-09-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1518.00 USD
+  Assets:Bank:Checking
+
+2025-09-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-09-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {264.00 USD}
+  Assets:Bank:Checking
+
+2025-09-10 * "Safe Auto" "Car insurance"
+  Expenses:Insurance:Car  600.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-09-28 price VTI  266.00 USD
+
+2025-10-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-10-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  907.00 USD
+  Expenses:Home:MortgageInterest  1443.00 USD
+  Assets:Bank:Checking
+
+2025-10-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  350.40 USD
+  Expenses:Car:Interest  39.60 USD
+  Assets:Bank:Checking
+
+2025-10-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  95.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-10-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-10-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-10-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  700.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-10-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-10-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  925.00 USD
+  Assets:Bank:Checking
+
+2025-10-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-10-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {267.00 USD}
+  Assets:Bank:Checking
+
+2025-10-28 price VTI  269.00 USD
+
+2025-11-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-11-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  910.00 USD
+  Expenses:Home:MortgageInterest  1440.00 USD
+  Assets:Bank:Checking
+
+2025-11-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  351.00 USD
+  Expenses:Car:Interest  39.00 USD
+  Assets:Bank:Checking
+
+2025-11-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  99.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-11-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-11-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-11-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  640.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-11-18 * "Shops" "Shopping"
+  Expenses:Shopping  180.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-11-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  989.00 USD
+  Assets:Bank:Checking
+
+2025-11-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-11-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {270.00 USD}
+  Assets:Bank:Checking
+
+2025-11-28 price VTI  272.00 USD
+
+2025-12-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2025-12-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  913.00 USD
+  Expenses:Home:MortgageInterest  1437.00 USD
+  Assets:Bank:Checking
+
+2025-12-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  351.60 USD
+  Expenses:Car:Interest  38.40 USD
+  Assets:Bank:Checking
+
+2025-12-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-12-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-12-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2025-12-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  655.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-12-18 * "Shops" "Shopping"
+  Expenses:Shopping  180.00 USD
+  Liabilities:CreditCard:Visa
+
+2025-12-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1008.00 USD
+  Assets:Bank:Checking
+
+2025-12-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2025-12-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {273.00 USD}
+  Assets:Bank:Checking
+
+2025-12-28 price VTI  275.00 USD
+
+2026-01-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-01-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  916.00 USD
+  Expenses:Home:MortgageInterest  1434.00 USD
+  Assets:Bank:Checking
+
+2026-01-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  352.20 USD
+  Expenses:Car:Interest  37.80 USD
+  Assets:Bank:Checking
+
+2026-01-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  135.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-01-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-01-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-01-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  670.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-01-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-01-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  935.00 USD
+  Assets:Bank:Checking
+
+2026-01-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-01-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {276.00 USD}
+  Assets:Bank:Checking
+
+2026-01-28 price VTI  278.00 USD
+
+2026-02-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-02-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  919.00 USD
+  Expenses:Home:MortgageInterest  1431.00 USD
+  Assets:Bank:Checking
+
+2026-02-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  352.80 USD
+  Expenses:Car:Interest  37.20 USD
+  Assets:Bank:Checking
+
+2026-02-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  139.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-02-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-02-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-02-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  685.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-02-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-02-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  954.00 USD
+  Assets:Bank:Checking
+
+2026-02-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-02-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {279.00 USD}
+  Assets:Bank:Checking
+
+2026-02-28 price VTI  281.00 USD
+
+2026-03-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-03-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  922.00 USD
+  Expenses:Home:MortgageInterest  1428.00 USD
+  Assets:Bank:Checking
+
+2026-03-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  353.40 USD
+  Expenses:Car:Interest  36.60 USD
+  Assets:Bank:Checking
+
+2026-03-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-03-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-03-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-03-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  700.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-03-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-03-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1533.00 USD
+  Assets:Bank:Checking
+
+2026-03-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-03-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {282.00 USD}
+  Assets:Bank:Checking
+
+2026-03-10 * "Safe Auto" "Car insurance"
+  Expenses:Insurance:Car  600.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-03-28 price VTI  284.00 USD
+
+2026-04-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-04-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  925.00 USD
+  Expenses:Home:MortgageInterest  1425.00 USD
+  Assets:Bank:Checking
+
+2026-04-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  354.00 USD
+  Expenses:Car:Interest  36.00 USD
+  Assets:Bank:Checking
+
+2026-04-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  95.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-04-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-04-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-04-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  640.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-04-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-04-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  865.00 USD
+  Assets:Bank:Checking
+
+2026-04-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-04-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {285.00 USD}
+  Assets:Bank:Checking
+
+2026-04-15 * "Home Mutual" "Home insurance"
+  Expenses:Insurance:Home  1450.00 USD
+  Assets:Bank:Checking
+
+2026-04-28 price VTI  287.00 USD
+
+2026-05-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-05-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  928.00 USD
+  Expenses:Home:MortgageInterest  1422.00 USD
+  Assets:Bank:Checking
+
+2026-05-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  354.60 USD
+  Expenses:Car:Interest  35.40 USD
+  Assets:Bank:Checking
+
+2026-05-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  99.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-05-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-05-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-05-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  655.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-05-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-05-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  884.00 USD
+  Assets:Bank:Checking
+
+2026-05-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-05-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {288.00 USD}
+  Assets:Bank:Checking
+
+2026-05-28 price VTI  290.00 USD
+
+2026-06-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-06-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  931.00 USD
+  Expenses:Home:MortgageInterest  1419.00 USD
+  Assets:Bank:Checking
+
+2026-06-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  355.20 USD
+  Expenses:Car:Interest  34.80 USD
+  Assets:Bank:Checking
+
+2026-06-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-06-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-06-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-06-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  670.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-06-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-06-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  903.00 USD
+  Assets:Bank:Checking
+
+2026-06-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-06-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {291.00 USD}
+  Assets:Bank:Checking
+
+2026-06-28 price VTI  293.00 USD
+
+2026-07-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-07-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  934.00 USD
+  Expenses:Home:MortgageInterest  1416.00 USD
+  Assets:Bank:Checking
+
+2026-07-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  355.80 USD
+  Expenses:Car:Interest  34.20 USD
+  Assets:Bank:Checking
+
+2026-07-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  135.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-07-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-07-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-07-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  685.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-07-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-07-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  950.00 USD
+  Assets:Bank:Checking
+
+2026-07-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-07-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {294.00 USD}
+  Assets:Bank:Checking
+
+2026-07-28 price VTI  296.00 USD
+
+2026-08-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-08-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  937.00 USD
+  Expenses:Home:MortgageInterest  1413.00 USD
+  Assets:Bank:Checking
+
+2026-08-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  356.40 USD
+  Expenses:Car:Interest  33.60 USD
+  Assets:Bank:Checking
+
+2026-08-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  139.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-08-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-08-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-08-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  700.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-08-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-08-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  969.00 USD
+  Assets:Bank:Checking
+
+2026-08-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-08-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {297.00 USD}
+  Assets:Bank:Checking
+
+2026-08-28 price VTI  299.00 USD
+
+2026-09-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-09-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  940.00 USD
+  Expenses:Home:MortgageInterest  1410.00 USD
+  Assets:Bank:Checking
+
+2026-09-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  357.00 USD
+  Expenses:Car:Interest  33.00 USD
+  Assets:Bank:Checking
+
+2026-09-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  103.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-09-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-09-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-09-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  640.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-09-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-09-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1473.00 USD
+  Assets:Bank:Checking
+
+2026-09-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-09-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {300.00 USD}
+  Assets:Bank:Checking
+
+2026-09-10 * "Safe Auto" "Car insurance"
+  Expenses:Insurance:Car  600.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-09-28 price VTI  302.00 USD
+
+2026-10-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-10-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  943.00 USD
+  Expenses:Home:MortgageInterest  1407.00 USD
+  Assets:Bank:Checking
+
+2026-10-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  357.60 USD
+  Expenses:Car:Interest  32.40 USD
+  Assets:Bank:Checking
+
+2026-10-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  95.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-10-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-10-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-10-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  655.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-10-18 * "Shops" "Shopping"
+  Expenses:Shopping  60.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-10-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  880.00 USD
+  Assets:Bank:Checking
+
+2026-10-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-10-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {303.00 USD}
+  Assets:Bank:Checking
+
+2026-10-28 price VTI  305.00 USD
+
+2026-11-01 * "Employer" "Payroll"
+  Assets:Bank:Checking  7400.00 USD
+  Income:Salary
+
+2026-11-02 * "Hometown Bank" "Mortgage payment"
+  Liabilities:Home:Mortgage  946.00 USD
+  Expenses:Home:MortgageInterest  1404.00 USD
+  Assets:Bank:Checking
+
+2026-11-05 * "Auto Finance" "Car loan payment"
+  Liabilities:Car:Loan  358.20 USD
+  Expenses:Car:Interest  31.80 USD
+  Assets:Bank:Checking
+
+2026-11-08 * "City Power" "Electric bill"
+  Expenses:Home:Electric  99.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-11-09 * "FastNet" "Internet"
+  Expenses:Home:Internet  70.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-11-12 * "Mobile Co." "Phones"
+  Expenses:Phone  85.00 USD
+  Assets:Bank:Checking
+
+2026-11-14 * "Grocer" "Groceries"
+  Expenses:Food:Groceries  670.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-11-18 * "Shops" "Shopping"
+  Expenses:Shopping  180.00 USD
+  Liabilities:CreditCard:Visa
+
+2026-11-25 * "Visa" "Card payment"
+  Liabilities:CreditCard:Visa  1019.00 USD
+  Assets:Bank:Checking
+
+2026-11-26 * "Transfer to savings"
+  Assets:Bank:Savings  1200.00 USD
+  Assets:Bank:Checking
+
+2026-11-27 * "Brokerage" "Monthly investment"
+  Assets:Brokerage  2 VTI {306.00 USD}
+  Assets:Bank:Checking
+
+2026-11-28 price VTI  308.00 USD

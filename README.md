@@ -209,6 +209,19 @@ A "Cash Flow" statement: each account's flows in operating, investing and financ
 reconciled with the change in cash, by `cash-flow-role` metadata or account names.
 [Docs](docs/fava/cash-flow.md)
 
+### `beancount_sg.ext.summary`
+
+```beancount
+2020-01-01 custom "fava-extension" "beancount_sg.ext.summary"
+```
+
+A "Financial Summary" for someone who doesn't use Beancount, e.g. a spouse taking over, laid out
+like a bank's personal financial statement (SBA Form 413): assets and liabilities by line, each
+account with its institution, owner and the last 4 digits of its number, real estate and vehicles
+with their loans and equity, the bills marked with `bill` metadata, and closed accounts, with a PDF
+to download. The `bean-summary` command makes the same PDF without Fava.
+[Docs](docs/fava/summary.md)
+
 ## Utilities
 
 ### `beancount_sg.builders`
@@ -234,6 +247,16 @@ uses, plus inheritance by subaccounts and `financing` for debt-payment accounts 
 have (e.g. Sankey diagrams): a mixin that serves a browser helper, which loads ECharts from a CDN
 (configurable), draws each chart from its option in the template, and loads its data from one of
 the extension's endpoints.
+
+### `beancount_sg.summary`
+
+The financial summary behind the Financial Summary report, independent of Fava, and its PDF. The
+`bean-summary` command, installed with the package, writes a ledger's summary as a PDF:
+
+```bash
+bean-summary ledger.beancount                       # financial-summary-<today>.pdf
+bean-summary ledger.beancount -o summary.pdf -d 2026-12-31
+```
 
 ### `beancount_sg.batch_edit`
 
