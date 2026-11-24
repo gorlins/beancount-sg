@@ -85,25 +85,27 @@ balance shows it growing or being paid off.
 
 | Group | Accounts |
 | --- | --- |
-| **Cash** | Assets with the `cash` [cash-flow role](#cash-flow-roles). |
+| **Cash** | Cash and savings accounts: those with the `cash` [cash-flow role](#cash-flow-roles), except in a retirement account. |
 | **Investments** | Other assets, unless they're property. |
-| **Property** | Assets marked `investable: FALSE`: ones you live in or use rather than invest, e.g. a home or a car. |
+| **Property** | Assets you live in or use rather than invest: real estate, vehicles and other personal property. |
 | **Debt** | Liabilities with the `financing` role, the default: loans and credit cards. |
 | **Other** | Liabilities declared with another role. |
 
-Most ledgers need only one declaration: `investable: FALSE` on a home, car or other property, on
-its `open` directive (it also applies to subaccounts). Investable assets leave it out, though net
-worth still counts it.
+An asset's group follows its line on the [Financial Summary](summary.md#which-line-an-account-is-on)'s
+personal financial statement, so the two reports agree: the `real-estate`, `automobiles` and
+`personal-property` lines are property, `cash` and `savings` are cash, and the rest are
+investments. Most property needs no declaration: it's inferred from its name (e.g. Home, House,
+Car) or a mortgage or vehicle loan opened under its path, e.g. `Liabilities:Home:Mortgage` for
+`Assets:Home`. A margin loan under `Assets:Brokerage` doesn't make the brokerage property.
+Investable assets leave property out, though net worth still counts it.
+
+Declare anything else with `asset-type`, on the account's `open` directive (it also applies to
+subaccounts), or on the `commodity` directive of what it holds:
 
 ```beancount
-2020-01-01 open Assets:Home
-  investable: FALSE
+2020-01-01 open Assets:Collectibles
+  asset-type: "personal-property"
 ```
-
-`investable` says whether an asset counts toward investable assets, and nothing else: a loan
-secured by it doesn't change that. A mortgage under `Liabilities:Home` and a margin loan under
-`Liabilities:Brokerage` are both debt, and net worth subtracts both, but only the home is
-property.
 
 ## Investment returns and transfers
 

@@ -267,8 +267,8 @@ def test_debt_in_the_last_year(tmp_path):
 
 def test_classification_is_shown(tmp_path):
     body = text(page(tmp_path))
-    assert "Assets:Bank:Checking cash cash, by default" in body
-    assert "Assets:Brokerage investments investing, declared on Assets:Brokerage" in body
+    assert "Assets:Bank:Checking cash cash on hand and in banks: cash" in body
+    assert "Assets:Brokerage investments stocks and bonds: an investment, by default" in body
     assert "Liabilities:CreditCard debt financing, by default" in body
     assert "Liabilities:Mortgage debt financing, by default" in body
 
